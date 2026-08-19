@@ -1,0 +1,10 @@
+{
+  "apply_ok": true,
+  "buggy_commit_sha": "72158ba4a589cf838b9c474798e4dce9315fa47c",
+  "case_id": "YosysHQ.picorv32#1",
+  "checked_at": "2026-08-19T23:24:53.854008+00:00",
+  "design_tree_matches": false,
+  "fix_oid": "82b44105a025cb611b4f641aebb1e585848a12a8",
+  "reason": "reverse apply --check failed: error: patch failed: picorv32.v:31\nerror: picorv32.v: patch does not apply",
+  "reverse_ok": false
+}

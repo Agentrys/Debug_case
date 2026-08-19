@@ -384,6 +384,17 @@ class CaseResult:
     sim_bonus_applied: bool = False
     sim_decision: str | None = None
     judge_basis: str = "llm_judge"
+    # Objective (deterministic, no-LLM) supplementary signals.
+    # None means "not evaluated"; True/False are actual verdicts.
+    # These NEVER lower the LLM-derived scores; a `True` on
+    # patch_equiv_gt or exact_equiv_gt boosts patch_func toward a
+    # ceiling appropriate to that evidence class.
+    gt_valid: bool | None = None         # ground_truth self-check passed
+    exact_equiv_gt: bool | None = None    # byte-identical after both patches
+    normalized_equiv_gt: bool | None = None  # equal after ws/comment norm
+    syntax_ok: bool | None = None         # patched file(s) parse
+    syntax_tool: str | None = None        # verilator|iverilog|none
+    objective_bonus_applied: bool = False  # any objective bonus fired?
 
 
 def grade_case(row: dict, agent: dict, fix_diff: str, judge: JudgeFn,
@@ -393,7 +404,14 @@ def grade_case(row: dict, agent: dict, fix_diff: str, judge: JudgeFn,
                sim_passed: bool | None = None,
                sim_status: str | None = None,
                sim_decision: str | None = None,
-               judge_basis: str | None = None) -> CaseResult:
+               judge_basis: str | None = None,
+               # New (all optional): deterministic supplementary signals.
+               # See harness/gt_selfcheck.py, patch_equiv.py, syntax_gate.py.
+               gt_valid: bool | None = None,
+               exact_equiv_gt: bool | None = None,
+               normalized_equiv_gt: bool | None = None,
+               syntax_ok: bool | None = None,
+               syntax_tool: str | None = None) -> CaseResult:
     case_id = f"{row.get('repo','').split('/')[-1]}#{row.get('number','')}"
     r = CaseResult(
         case_id=case_id,
@@ -403,6 +421,11 @@ def grade_case(row: dict, agent: dict, fix_diff: str, judge: JudgeFn,
         sim_status=sim_status,
         sim_decision=sim_decision,
         judge_basis=judge_basis or "llm_judge",
+        gt_valid=gt_valid,
+        exact_equiv_gt=exact_equiv_gt,
+        normalized_equiv_gt=normalized_equiv_gt,
+        syntax_ok=syntax_ok,
+        syntax_tool=syntax_tool,
     )
     if policy_violation:
         r.policy_violation = policy_violation
@@ -451,6 +474,26 @@ def grade_case(row: dict, agent: dict, fix_diff: str, judge: JudgeFn,
             r.patch_func = 0.75
             r.sim_bonus_applied = True
 
+    # Objective (no-simulation) bonuses. Ceiling depends on evidence class:
+    #   - byte-exact equivalence to GT (after normalizing whitespace / comments
+    #     the source files are identical): patch_func -> 1.00. This is the
+    #     strongest possible objective signal short of running the design.
+    #   - non-normalized exact equality is treated the same (implies normalized).
+    #   - syntax_ok alone is a *floor* against unparseable patches:
+    #     if patch_func would be 0.00 but the patch parses AND the agent
+    #     located the right file, lift to 0.25 (still wrong, but at least
+    #     the code compiles).
+    # Objective bonuses NEVER lower any score.
+    if not r.abstained:
+        if exact_equiv_gt is True or normalized_equiv_gt is True:
+            if r.patch_func < 1.00:
+                r.patch_func = 1.00
+                r.objective_bonus_applied = True
+        elif syntax_ok is True and r.patch_func < 0.25 and r.file_loc >= 0.5:
+            # right file + parses = at least "wrong_location_or_symptom" tier
+            r.patch_func = 0.25
+            r.objective_bonus_applied = True
+
     r.score = 0.20 * r.file_loc + 0.30 * r.hunk_loc + 0.40 * r.patch_func + 0.10 * r.rationale
     return r
 
@@ -472,6 +515,9 @@ def aggregate(results: list[CaseResult]) -> dict:
     # judge_basis / decision accounting: how each case was ultimately graded.
     basis_llm = basis_sim = 0
     dec_fallback = dec_declined = 0
+    # Objective (deterministic) signal counters.
+    obj_gt_valid = obj_exact = obj_norm = obj_syntax = obj_bonus = 0
+    obj_gt_evaluated = obj_syntax_evaluated = 0
     # Statuses that mean "sim did not actually execute the design" — these
     # must not inflate the sim `run` denominator (e.g. repo has no runnable
     # recipe on this image, the agent produced no patch to test, or the
@@ -514,6 +560,21 @@ def aggregate(results: list[CaseResult]) -> dict:
                 abst_correct += 1
         if r.policy_violation:
             violations += 1
+        # Objective signal accounting (None = not evaluated, don't count).
+        if r.gt_valid is not None:
+            obj_gt_evaluated += 1
+            if r.gt_valid:
+                obj_gt_valid += 1
+        if r.exact_equiv_gt is True:
+            obj_exact += 1
+        if r.normalized_equiv_gt is True:
+            obj_norm += 1
+        if r.syntax_ok is not None:
+            obj_syntax_evaluated += 1
+            if r.syntax_ok:
+                obj_syntax += 1
+        if r.objective_bonus_applied:
+            obj_bonus += 1
 
     def _mean(xs): return sum(xs) / len(xs) if xs else 0.0
 
@@ -541,6 +602,17 @@ def aggregate(results: list[CaseResult]) -> dict:
             "simulation": basis_sim,
             "fallback_to_llm": dec_fallback,
             "sim_declined": dec_declined,
+        },
+        "objective_signals": {
+            # Deterministic, no-LLM, no-sim signals. See harness/gt_selfcheck.py,
+            # patch_equiv.py, syntax_gate.py.
+            "gt_valid":              obj_gt_valid,
+            "gt_evaluated":          obj_gt_evaluated,
+            "exact_equiv_gt":        obj_exact,
+            "normalized_equiv_gt":   obj_norm,
+            "syntax_ok":             obj_syntax,
+            "syntax_evaluated":      obj_syntax_evaluated,
+            "objective_bonus":       obj_bonus,
         },
         "policy_violations": violations,
     }
@@ -603,6 +675,11 @@ def main() -> int:
             sim_status=entry.get("sim_status"),
             sim_decision=entry.get("sim_decision"),
             judge_basis=entry.get("judge_basis"),
+            gt_valid=entry.get("gt_valid"),
+            exact_equiv_gt=entry.get("exact_equiv_gt"),
+            normalized_equiv_gt=entry.get("normalized_equiv_gt"),
+            syntax_ok=entry.get("syntax_ok"),
+            syntax_tool=entry.get("syntax_tool"),
         )
         results.append(r)
         print(json.dumps({"case_id": r.case_id, "score": round(r.score, 4),

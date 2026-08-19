@@ -1,0 +1,10 @@
+{
+  "apply_ok": true,
+  "buggy_commit_sha": "77cbd18a7aa8d561297246a3802044a052f0fc6b",
+  "case_id": "OSCPU.NutShell#5",
+  "checked_at": "2026-08-19T23:24:53.586449+00:00",
+  "design_tree_matches": true,
+  "fix_oid": "6f2b8d1195a9528361f92117e9da5987ec3be73e",
+  "reason": "",
+  "reverse_ok": true
+}

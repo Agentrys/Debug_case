@@ -1,0 +1,48 @@
+diff --git a/build.sbt b/build.sbt
+index e8f999c0..1b8e90b3 100644
+--- a/build.sbt
++++ b/build.sbt
+@@ -12,7 +12,10 @@ lazy val commonSettings = Seq(
+   assembly / assemblyMergeStrategy := { _ match {
+     case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+     case _ => MergeStrategy.first}},
+-  scalacOptions ++= Seq("-deprecation","-unchecked"),
++  scalacOptions ++= Seq(
++    "-deprecation",
++    "-unchecked",
++    "-Ymacro-annotations"), // fix hierarchy API
+   unmanagedBase := (chipyardRoot / unmanagedBase).value,
+   allDependencies := {
+     // drop specific maven dependencies in subprojects in favor of Chipyard's version
+diff --git a/build.sbt b/build.sbt
+index e8f999c0..1b8e90b3 100644
+--- a/build.sbt
++++ b/build.sbt
+@@ -12,7 +12,10 @@ lazy val commonSettings = Seq(
+   assembly / assemblyMergeStrategy := { _ match {
+     case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+     case _ => MergeStrategy.first}},
+-  scalacOptions ++= Seq("-deprecation","-unchecked"),
++  scalacOptions ++= Seq(
++    "-deprecation",
++    "-unchecked",
++    "-Ymacro-annotations"), // fix hierarchy API
+   unmanagedBase := (chipyardRoot / unmanagedBase).value,
+   allDependencies := {
+     // drop specific maven dependencies in subprojects in favor of Chipyard's version
+diff --git a/build.sbt b/build.sbt
+index b25efa1b..90959ff1 100644
+--- a/build.sbt
++++ b/build.sbt
+@@ -12,7 +12,10 @@ lazy val commonSettings = Seq(
+   assembly / assemblyMergeStrategy := { _ match {
+     case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+     case _ => MergeStrategy.first}},
+-  scalacOptions ++= Seq("-deprecation","-unchecked"),
++  scalacOptions ++= Seq(
++    "-deprecation",
++    "-unchecked",
++    "-Ymacro-annotations"), // fix hierarchy API
+   unmanagedBase := (chipyardRoot / unmanagedBase).value,
+   allDependencies := {
+     // drop specific maven dependencies in subprojects in favor of Chipyard's version

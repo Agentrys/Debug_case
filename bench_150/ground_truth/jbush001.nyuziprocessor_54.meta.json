@@ -1,0 +1,53 @@
+{
+  "case_id": "jbush001.nyuziprocessor#54",
+  "issue_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_oid": "7780328fac3fb2b5573b7ce32bb956ff8d47b52d",
+  "buggy_commit_sha": "2e295ced87882cfd4d77c327fca7a44298087814",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/jbush001.nyuziprocessor_54.diff",
+  "diff_sha256": "c92521a4d43c87d44c6f38d9e6c77abbfcefd9bdcfdf5c19ba5134422d2f5e47",
+  "fix_oids_sorted": [
+    "7780328fac3fb2b5573b7ce32bb956ff8d47b52d",
+    "77a50a88d3ff460dc81724fd692845d06c10ad2c"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "range",
+  "design_only": true,
+  "ground_truth_files": [
+    "hardware/core/sram_1r1w.sv",
+    "hardware/core/sram_2r1w.sv"
+  ],
+  "ground_truth_hunks": {
+    "hardware/core/sram_1r1w.sv": [
+      [
+        100,
+        106
+      ],
+      [
+        120,
+        125
+      ]
+    ],
+    "hardware/core/sram_2r1w.sv": [
+      [
+        128,
+        134
+      ],
+      [
+        160,
+        165
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/jbush001.nyuziprocessor_54.raw.diff"
+}

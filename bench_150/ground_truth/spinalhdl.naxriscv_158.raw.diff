@@ -1,0 +1,39 @@
+diff --git a/src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala b/src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala
+index fef4800..071e08c 100644
+--- a/src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala
++++ b/src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala
+@@ -178,7 +178,7 @@ class FpuWriteback() extends Plugin  with WakeRobService with WakeRegFileService
+       val writeRd = rob.readAsyncSingle(decoder.WRITE_RD, integerWriteback.robId)
+ 
+       val wakeRob = Flow(WakeRob())
+-      wakeRob.valid := integerWriteback.fire
++      wakeRob.valid := integerWriteback.fire && writeRd
+       wakeRob.robId := integerWriteback.robId
+ 
+       val wakeRf = Flow(WakeRegFile(decoder.REGFILE_RD, decoder.PHYS_RD, needBypass = false, withRfBypass = false, rfLatency = 1))
+diff --git a/src/main/scala/naxriscv/lsu/LsuPlugin.scala b/src/main/scala/naxriscv/lsu/LsuPlugin.scala
+index f1c3c34..1d6521d 100644
+--- a/src/main/scala/naxriscv/lsu/LsuPlugin.scala
++++ b/src/main/scala/naxriscv/lsu/LsuPlugin.scala
+@@ -1038,7 +1038,7 @@ class LsuPlugin(var lqSize: Int,
+           import stage._
+ 
+           val wakeRob = Flow(WakeRob())
+-          wakeRob.valid := isFireing && HIT_SPECULATION
++          wakeRob.valid := isFireing && HIT_SPECULATION && HIT_SPECULATION_WRITE_RD
+           wakeRob.robId := ROB.ID
+ 
+           val wakeRf = Flow(WakeRegFile(decoder.REGFILE_RD, decoder.PHYS_RD, needBypass = false, withRfBypass = true, rfLatency = 2))
+diff --git a/src/main/scala/naxriscv/lsu2/Lsu2Plugin.scala b/src/main/scala/naxriscv/lsu2/Lsu2Plugin.scala
+index d480d07..198d0d1 100644
+--- a/src/main/scala/naxriscv/lsu2/Lsu2Plugin.scala
++++ b/src/main/scala/naxriscv/lsu2/Lsu2Plugin.scala
+@@ -967,7 +967,7 @@ class Lsu2Plugin(var lqSize: Int,
+         def fromAgu[T <: Data](that : Stageable[T]) = stage(that, "agu")
+ 
+         val wakeRob = Flow(WakeRob())
+-        wakeRob.valid := isFireing && HIT_SPECULATION
++        wakeRob.valid := isFireing && HIT_SPECULATION && fromAgu(WRITE_RD)
+         wakeRob.robId := fromAgu(ROB.ID)
+ 
+         val wakeRf = Flow(WakeRegFile(decoder.REGFILE_RD, decoder.PHYS_RD, needBypass = false, withRfBypass = true, rfLatency = 2))

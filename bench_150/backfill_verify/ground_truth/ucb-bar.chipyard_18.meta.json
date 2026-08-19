@@ -1,0 +1,36 @@
+{
+  "case_id": "ucb-bar.chipyard#18",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "riscv-boom",
+    "name": "boom-template"
+  },
+  "fix_oid": "27cfaf47c7e251b18690dc430143eb57f829cf12",
+  "buggy_commit_sha": "e8e93a1a1825567539de24b6aeead60ddf231a32",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_18.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "27cfaf47c7e251b18690dc430143eb57f829cf12",
+    "0c622a56932753094ef69069fa872cc31b391f27"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "Makefrag-variables",
+    "boom",
+    "build.sbt",
+    "generate-pkg-mk.sh",
+    "rocket-chip",
+    "icenet"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_18.raw.diff"
+}

@@ -1,0 +1,42 @@
+{
+  "case_id": "openhwgroup.ariane#1301",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "planvtech",
+    "name": "cva6"
+  },
+  "fix_oid": "6d371da41c3c44dff7aa19fc5b97403ef0809633",
+  "buggy_commit_sha": "513bb91f823a18a6653a1685acd60408049c9c8f",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openhwgroup.ariane_1301.diff",
+  "diff_sha256": "70537797314990cc1ad1cc4cb3d01e3a242b60e4ee6869af6fe8118d10be0cea",
+  "fix_oids_sorted": [
+    "6d371da41c3c44dff7aa19fc5b97403ef0809633",
+    "622409a7e47b1376efad32619d81fc4ef81d157c"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/include/std_cache_pkg.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/include/std_cache_pkg.sv": [
+      [
+        78,
+        84
+      ],
+      [
+        78,
+        84
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/openhwgroup.ariane_1301.raw.diff"
+}

@@ -1,0 +1,31 @@
+{
+  "case_id": "enjoy-digital.litex#1583",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "smunaut",
+    "name": "litex"
+  },
+  "fix_oid": "a6d9955c9d3065d5c04cd4cba392b2fcb831380f",
+  "buggy_commit_sha": "8ad728cd22952d02c909f2c1edad22fd3f39ddaf",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1583.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "a6d9955c9d3065d5c04cd4cba392b2fcb831380f"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/soc/software/liblitedram/accessors.c",
+    "litex/soc/software/liblitedram/accessors.h"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1583.raw.diff"
+}

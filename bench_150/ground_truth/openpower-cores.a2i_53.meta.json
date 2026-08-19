@@ -1,0 +1,32 @@
+{
+  "case_id": "openpower-cores.a2i#53",
+  "issue_repo": {
+    "owner": "openpower-cores",
+    "name": "a2i"
+  },
+  "fix_repo": {
+    "owner": "LarsAsplund",
+    "name": "a2i"
+  },
+  "fix_oid": "127b9bf858e4f51950a23c3d6c0dfbf16026661b",
+  "buggy_commit_sha": "96299300abca65a074c635204a163e10569ee9b7",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/openpower-cores.a2i_53.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "127b9bf858e4f51950a23c3d6c0dfbf16026661b",
+    "2483331025cc2b0ee37dd32106c1269f2c7f9c06",
+    "d1884338174ae25e518149ef59ceed2b70e8fa97"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "run.py"
+  ],
+  "raw_diff_path": "ground_truth/openpower-cores.a2i_53.raw.diff"
+}

@@ -1,0 +1,75 @@
+diff --git a/rtl/src/sld/caches/esp-caches b/rtl/src/sld/caches/esp-caches
+index 849f2907..2e06106b 160000
+--- a/rtl/src/sld/caches/esp-caches
++++ b/rtl/src/sld/caches/esp-caches
+@@ -1 +1 @@
+-Subproject commit 849f29076a962e2d2d966575677b44bd86b9f1ee
++Subproject commit 2e06106b1275dc6f2d6021f1cad4158712d80c43
+diff --git a/systemc/l2/src/l2.cpp b/systemc/l2/src/l2.cpp
+index 03426f19..4b383837 100644
+--- a/systemc/l2/src/l2.cpp
++++ b/systemc/l2/src/l2.cpp
+@@ -353,6 +353,8 @@ void l2::ctrl()
+ 		    if (fwd_in.coh_msg == FWD_INV)
+ 			send_rsp_out(RSP_INVACK, fwd_in.req_id, 1, fwd_in.addr, 0);
+ 
++		    send_inval(fwd_in.addr);
++
+ 		    reqs[reqs_hit_i].state -= 4; // TODO remove hardcoding, also in other places
+ 
+ 		    break;
+diff --git a/Makefile b/Makefile
+index 4dbd039e..5d5ebc15 100644
+--- a/Makefile
++++ b/Makefile
+@@ -174,10 +174,16 @@ src :=  core/include/$(target)_config_pkg.sv
+         corev_apu/register_interface/src/reg_demux.sv                                \
+         corev_apu/register_interface/src/axi_lite_to_reg.sv                          \
+         vendor/pulp-platform/axi/src/axi_multicut.sv                                 \
++        vendor/pulp-platform/common_cells/src/cb_filter_pkg.sv                       \
++        vendor/pulp-platform/common_cells/src/cb_filter.sv                           \
+         vendor/pulp-platform/common_cells/src/rstgen_bypass.sv                       \
+         vendor/pulp-platform/common_cells/src/rstgen.sv                              \
+         vendor/pulp-platform/common_cells/src/addr_decode.sv                         \
+         vendor/pulp-platform/common_cells/src/stream_register.sv                     \
++        vendor/pulp-platform/common_cells/src/stream_fifo.sv                         \
++        vendor/pulp-platform/common_cells/src/stream_xbar.sv                         \
++        vendor/pulp-platform/common_cells/src/onehot_to_bin.sv                       \
++        vendor/pulp-platform/common_cells/src/sub_per_hash.sv                        \
+         vendor/pulp-platform/axi/src/axi_intf.sv                                     \
+         vendor/pulp-platform/axi/src/axi_cut.sv                                      \
+         vendor/pulp-platform/axi/src/axi_join.sv                                     \
+@@ -189,6 +195,7 @@ src :=  core/include/$(target)_config_pkg.sv
+         vendor/pulp-platform/axi/src/axi_mux.sv                                      \
+         vendor/pulp-platform/axi/src/axi_demux.sv                                    \
+         vendor/pulp-platform/axi/src/axi_xbar.sv                                     \
++        vendor/pulp-platform/axi/src/axi_isolate.sv                                  \
+         vendor/pulp-platform/axi/src/axi_burst_splitter.sv                           \
+         vendor/pulp-platform/axi/src/axi_dw_upsizer.sv                               \
+         vendor/pulp-platform/axi/src/axi_dw_downsizer.sv                             \
+diff --git a/corev_apu/fpga/xilinx/xlnx_axi_clock_converter/tcl/run.tcl b/corev_apu/fpga/xilinx/xlnx_axi_clock_converter/tcl/run.tcl
+index deb767fe..8e1beeca 100644
+--- a/corev_apu/fpga/xilinx/xlnx_axi_clock_converter/tcl/run.tcl
++++ b/corev_apu/fpga/xilinx/xlnx_axi_clock_converter/tcl/run.tcl
+@@ -8,7 +8,7 @@ set_property board_part $boardName [current_project]
+ 
+ create_ip -name axi_clock_converter -vendor xilinx.com -library ip -module_name $ipName
+ 
+-set_property -dict [list CONFIG.ADDR_WIDTH {64} CONFIG.DATA_WIDTH {64} CONFIG.ID_WIDTH {8}] [get_ips $ipName]
++set_property -dict [list CONFIG.ADDR_WIDTH {64} CONFIG.DATA_WIDTH {64} CONFIG.ID_WIDTH {9}] [get_ips $ipName]
+ 
+ generate_target {instantiation_template} [get_files ./$ipName.srcs/sources_1/ip/$ipName/$ipName.xci]
+ generate_target all [get_files  ./$ipName.srcs/sources_1/ip/$ipName/$ipName.xci]
+diff --git a/corev_apu/fpga/xilinx/xlnx_mig_7_ddr3/mig_genesys2.prj b/corev_apu/fpga/xilinx/xlnx_mig_7_ddr3/mig_genesys2.prj
+index 0d1bba0f..3514754b 100755
+--- a/corev_apu/fpga/xilinx/xlnx_mig_7_ddr3/mig_genesys2.prj
++++ b/corev_apu/fpga/xilinx/xlnx_mig_7_ddr3/mig_genesys2.prj
+@@ -152,7 +152,7 @@
+             <C0_C_RD_WR_ARB_ALGORITHM>RD_PRI_REG</C0_C_RD_WR_ARB_ALGORITHM>
+             <C0_S_AXI_ADDR_WIDTH>30</C0_S_AXI_ADDR_WIDTH>
+             <C0_S_AXI_DATA_WIDTH>64</C0_S_AXI_DATA_WIDTH>
+-            <C0_S_AXI_ID_WIDTH>8</C0_S_AXI_ID_WIDTH>
++            <C0_S_AXI_ID_WIDTH>9</C0_S_AXI_ID_WIDTH>
+             <C0_S_AXI_SUPPORTS_NARROW_BURST>0</C0_S_AXI_SUPPORTS_NARROW_BURST>
+         </AXIParameters>
+     </Controller>

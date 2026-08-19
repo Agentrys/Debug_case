@@ -1,0 +1,26 @@
+diff --git a/litex/soc/cores/cpu/vexiiriscv/core.py b/litex/soc/cores/cpu/vexiiriscv/core.py
+index d3cbbe090..d0851ece5 100755
+--- a/litex/soc/cores/cpu/vexiiriscv/core.py
++++ b/litex/soc/cores/cpu/vexiiriscv/core.py
+@@ -156,7 +156,7 @@ class VexiiRiscv(CPU):
+         vdir = get_data_mod("cpu", "vexiiriscv").data_location
+         ndir = os.path.join(vdir, "ext", "VexiiRiscv")
+ 
+-        NaxRiscv.git_setup("VexiiRiscv", ndir, "https://github.com/SpinalHDL/VexiiRiscv.git", "dev", "b4269ddc", args.update_repo)
++        NaxRiscv.git_setup("VexiiRiscv", ndir, "https://github.com/SpinalHDL/VexiiRiscv.git", "dev", "3282ca22", args.update_repo)
+ 
+         if not args.cpu_variant:
+             args.cpu_variant = "standard"
+diff --git a/litex/soc/cores/cpu/vexiiriscv/core.py b/litex/soc/cores/cpu/vexiiriscv/core.py
+index d3cbbe090..d0851ece5 100755
+--- a/litex/soc/cores/cpu/vexiiriscv/core.py
++++ b/litex/soc/cores/cpu/vexiiriscv/core.py
+@@ -156,7 +156,7 @@ class VexiiRiscv(CPU):
+         vdir = get_data_mod("cpu", "vexiiriscv").data_location
+         ndir = os.path.join(vdir, "ext", "VexiiRiscv")
+ 
+-        NaxRiscv.git_setup("VexiiRiscv", ndir, "https://github.com/SpinalHDL/VexiiRiscv.git", "dev", "b4269ddc", args.update_repo)
++        NaxRiscv.git_setup("VexiiRiscv", ndir, "https://github.com/SpinalHDL/VexiiRiscv.git", "dev", "3282ca22", args.update_repo)
+ 
+         if not args.cpu_variant:
+             args.cpu_variant = "standard"

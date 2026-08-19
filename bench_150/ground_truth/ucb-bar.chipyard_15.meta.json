@@ -1,0 +1,64 @@
+{
+  "case_id": "ucb-bar.chipyard#15",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_oid": "f7056f3529e34489b223993e975da0b2d66068a8",
+  "buggy_commit_sha": "164bf2152c37430bcbc1b4c39c66920d6896ed66",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/ucb-bar.chipyard_15.diff",
+  "diff_sha256": "ef66a12afcf3f21a8fe8827197281f5e0de0e0c54b297366bae21112cfb4c0e0",
+  "fix_oids_sorted": [
+    "f7056f3529e34489b223993e975da0b2d66068a8"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala",
+    "tapeout/src/main/scala/transforms/clkgen/CreateClkConstraints.scala",
+    "tapeout/src/main/scala/transforms/pads/AddIOPadsTransform.scala",
+    "tapeout/src/main/scala/transforms/utils/ProgrammaticBundle.scala"
+  ],
+  "ground_truth_hunks": {
+    "tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala": [
+      [
+        21,
+        27
+      ]
+    ],
+    "tapeout/src/main/scala/transforms/clkgen/CreateClkConstraints.scala": [
+      [
+        89,
+        95
+      ]
+    ],
+    "tapeout/src/main/scala/transforms/pads/AddIOPadsTransform.scala": [
+      [
+        16,
+        22
+      ],
+      [
+        45,
+        55
+      ]
+    ],
+    "tapeout/src/main/scala/transforms/utils/ProgrammaticBundle.scala": [
+      [
+        3,
+        24
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "tapeout/src/test/scala/transforms/ResetInverterSpec.scala"
+  ],
+  "raw_diff_path": "ground_truth/ucb-bar.chipyard_15.raw.diff"
+}

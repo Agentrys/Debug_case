@@ -1,0 +1,45 @@
+{
+  "case_id": "spinalhdl.naxriscv#75",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "NaxRiscv"
+  },
+  "fix_repo": {
+    "owner": "SpinalHDL",
+    "name": "NaxRiscv"
+  },
+  "fix_oid": "c2cbc58aeb9014924a50ecfcb72cca9c631abb4b",
+  "buggy_commit_sha": "b312da881b8d1109b2b77e2190c9ff70b717a95d",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.naxriscv_75.diff",
+  "diff_sha256": "69f7a612aa9ee2e41a11a4a0a32e8045894fc6c2931077947c7c64454a9ffe7c",
+  "fix_oids_sorted": [
+    "c2cbc58aeb9014924a50ecfcb72cca9c631abb4b",
+    "2a4fd5e766c4c9f13a2a164f11138f66eb9bdc79"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "range",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/naxriscv/platform/litex/NaxSoc.scala",
+    "src/main/scala/naxriscv/platform/tilelinkdemo/SocSim.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/naxriscv/platform/litex/NaxSoc.scala": [
+      [
+        189,
+        195
+      ]
+    ],
+    "src/main/scala/naxriscv/platform/tilelinkdemo/SocSim.scala": [
+      [
+        112,
+        118
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.naxriscv_75.raw.diff"
+}

@@ -1,0 +1,66 @@
+{
+  "case_id": "microsoft.cheriot-ibex#42",
+  "issue_repo": {
+    "owner": "microsoft",
+    "name": "cheriot-ibex"
+  },
+  "fix_repo": {
+    "owner": "microsoft",
+    "name": "cheriot-ibex"
+  },
+  "fix_oid": "3f0ec8600cb7621c4c952951d211b3515116ea27",
+  "buggy_commit_sha": "d3672fe5b6b656545fd6f0d5100d0e1b97743ee0",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/microsoft.cheriot-ibex_42.diff",
+  "diff_sha256": "1e94ea59ca81b04a2de9905cdc85241edd2f30bd840cb8bb4c23aafc7f9c5743",
+  "fix_oids_sorted": [
+    "3f0ec8600cb7621c4c952951d211b3515116ea27"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "rtl/cheri_regfile.sv",
+    "rtl/ibex_decoder.sv",
+    "rtl/ibex_top.sv",
+    "rtl/ibexc_top.sv"
+  ],
+  "ground_truth_hunks": {
+    "rtl/cheri_regfile.sv": [
+      [
+        53,
+        65
+      ],
+      [
+        115,
+        123
+      ],
+      [
+        138,
+        149
+      ]
+    ],
+    "rtl/ibex_decoder.sv": [
+      [
+        230,
+        254
+      ]
+    ],
+    "rtl/ibex_top.sv": [
+      [
+        437,
+        443
+      ]
+    ],
+    "rtl/ibexc_top.sv": [
+      [
+        429,
+        435
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/microsoft.cheriot-ibex_42.raw.diff"
+}

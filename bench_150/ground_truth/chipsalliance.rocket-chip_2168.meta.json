@@ -1,0 +1,165 @@
+{
+  "case_id": "chipsalliance.rocket-chip#2168",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "gsomlo",
+    "name": "rocket-litex-verilog"
+  },
+  "fix_oid": "af346c0c20d38ee3dc45a39e0397e9c77f612549",
+  "buggy_commit_sha": "dadf8476750111f79d49f441fde25f6536dd8cbc",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/chipsalliance.rocket-chip_2168.diff",
+  "diff_sha256": "0fd14b262358d8c1e2cf2941f4b97e99ffb5ffd5eaf3600a56e89de106bc6ed6",
+  "fix_oids_sorted": [
+    "af346c0c20d38ee3dc45a39e0397e9c77f612549"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "generated-src/freechips.rocketchip.system.LitexConfig.v",
+    "generated-src/freechips.rocketchip.system.LitexFullConfig.v",
+    "generated-src/freechips.rocketchip.system.LitexLinuxConfig.v",
+    "generated-src/freechips.rocketchip.system.LitexLinuxDWConfig.v",
+    "generated-src/freechips.rocketchip.system.LitexLinuxWConfig.v"
+  ],
+  "ground_truth_hunks": {
+    "generated-src/freechips.rocketchip.system.LitexConfig.v": [
+      [
+        94769,
+        94774
+      ],
+      [
+        94790,
+        94795
+      ],
+      [
+        94827,
+        94832
+      ],
+      [
+        94848,
+        94853
+      ],
+      [
+        141875,
+        141880
+      ],
+      [
+        141896,
+        141901
+      ]
+    ],
+    "generated-src/freechips.rocketchip.system.LitexFullConfig.v": [
+      [
+        94910,
+        94915
+      ],
+      [
+        94931,
+        94936
+      ],
+      [
+        94968,
+        94973
+      ],
+      [
+        94989,
+        94994
+      ],
+      [
+        182942,
+        182947
+      ],
+      [
+        182963,
+        182968
+      ]
+    ],
+    "generated-src/freechips.rocketchip.system.LitexLinuxConfig.v": [
+      [
+        94910,
+        94915
+      ],
+      [
+        94931,
+        94936
+      ],
+      [
+        94968,
+        94973
+      ],
+      [
+        94989,
+        94994
+      ],
+      [
+        152766,
+        152771
+      ],
+      [
+        152787,
+        152792
+      ]
+    ],
+    "generated-src/freechips.rocketchip.system.LitexLinuxDWConfig.v": [
+      [
+        96541,
+        96546
+      ],
+      [
+        96562,
+        96567
+      ],
+      [
+        96599,
+        96604
+      ],
+      [
+        96620,
+        96625
+      ],
+      [
+        154397,
+        154402
+      ],
+      [
+        154418,
+        154423
+      ]
+    ],
+    "generated-src/freechips.rocketchip.system.LitexLinuxWConfig.v": [
+      [
+        95587,
+        95592
+      ],
+      [
+        95608,
+        95613
+      ],
+      [
+        95645,
+        95650
+      ],
+      [
+        95666,
+        95671
+      ],
+      [
+        153443,
+        153448
+      ],
+      [
+        153464,
+        153469
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/chipsalliance.rocket-chip_2168.raw.diff"
+}

@@ -1,0 +1,12 @@
+diff --git a/tools/visualizer/CMakeLists.txt b/tools/visualizer/CMakeLists.txt
+index b3cfdba9..f9ae97d9 100644
+--- a/tools/visualizer/CMakeLists.txt
++++ b/tools/visualizer/CMakeLists.txt
+@@ -16,6 +16,7 @@
+ 
+ project(visualizer)
+ 
++find_package(Java REQUIRED)
+ include(UseJava)
+ 
+ add_jar(visualizer

@@ -1,0 +1,47 @@
+diff --git a/src/main/scala/core.scala b/src/main/scala/core.scala
+index 7548058f..307aaff1 100755
+--- a/src/main/scala/core.scala
++++ b/src/main/scala/core.scala
+@@ -362,7 +362,7 @@ class BoomCore(implicit p: Parameters, edge: freechips.rocketchip.tilelink.TLEdg
+       dec_valids(w)                      := fetched_inst_valid && dec_fbundle.uops(w).valid && !dec_finished_mask(w)
+       decode_units(w).io.enq.uop         := dec_fbundle.uops(w)
+       decode_units(w).io.status          := csr.io.status
+-      decode_units(w).io.csr_decode      := csr.io.decode
++      decode_units(w).io.csr_decode      := csr.io.decode(w)
+       decode_units(w).io.interrupt       := csr.io.interrupt
+       decode_units(w).io.interrupt_cause := csr.io.interrupt_cause
+ 
+diff --git a/src/main/scala/decode.scala b/src/main/scala/decode.scala
+index d9cf09ba..9fcc39c3 100644
+--- a/src/main/scala/decode.scala
++++ b/src/main/scala/decode.scala
+@@ -336,20 +336,6 @@ object FDivSqrtDecode extends DecodeConstants with freechips.rocketchip.rocket.c
+ }
+ 
+ 
+-// This is a copy from Rocket's CSRFile, but they keep the bundle anonymous. :(
+-// TODO just pass in the full CSRFileIO?
+-class CSRDecodeInfo extends Bundle
+-{
+-   val csr = UInt(INPUT, CSR.ADDRSZ)
+-   val fp_illegal = Bool(OUTPUT)
+-   val rocc_illegal = Bool(OUTPUT)
+-   val read_illegal = Bool(OUTPUT)
+-   val write_illegal = Bool(OUTPUT)
+-   val write_flush = Bool(OUTPUT)
+-   val system_illegal = Bool(OUTPUT)
+-}
+-
+-
+ class DecodeUnitIo(implicit p: Parameters) extends BoomBundle()(p)
+ {
+    val enq = new Bundle { val uop = new MicroOp().asInput }
+@@ -357,7 +343,7 @@ class DecodeUnitIo(implicit p: Parameters) extends BoomBundle()(p)
+ 
+    // from CSRFile
+    val status = new freechips.rocketchip.rocket.MStatus().asInput
+-   val csr_decode = Flipped(new CSRDecodeInfo)
++   val csr_decode = Flipped(new freechips.rocketchip.rocket.CSRDecodeInfo)
+    val interrupt = Bool(INPUT)
+    val interrupt_cause = UInt(INPUT, xLen)
+ 

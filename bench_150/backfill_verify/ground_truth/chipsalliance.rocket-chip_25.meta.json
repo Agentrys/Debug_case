@@ -1,0 +1,45 @@
+{
+  "case_id": "chipsalliance.rocket-chip#25",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "147b912502fa3cfcfe0a6006a9d9bbb91670edb0",
+  "buggy_commit_sha": "93b0f9fa5398fdd8b6f4e58e5f5e55a8d1ccdef1",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_25.diff",
+  "diff_sha256": "78e8228f4735fd1586d5f495f53fceb1cf9dec6f28debfd4ac01c7a1309d35cf",
+  "fix_oids_sorted": [
+    "147b912502fa3cfcfe0a6006a9d9bbb91670edb0",
+    "5f3d3a0b2d0c59ad83c530a44ef30b490f4f60cc"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/broadcast.scala",
+    "uncore/src/main/scala/broadcast.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/broadcast.scala": [
+      [
+        202,
+        208
+      ]
+    ],
+    "uncore/src/main/scala/broadcast.scala": [
+      [
+        202,
+        208
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_25.raw.diff"
+}

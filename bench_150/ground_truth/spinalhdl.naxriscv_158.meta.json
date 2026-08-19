@@ -1,0 +1,51 @@
+{
+  "case_id": "spinalhdl.naxriscv#158",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "NaxRiscv"
+  },
+  "fix_repo": {
+    "owner": "rgruden",
+    "name": "NaxRiscv"
+  },
+  "fix_oid": "048b6c3e97415f82171beb905891ae13e22fa5a7",
+  "buggy_commit_sha": "89069d6bf6851bfa0c1fd62e2fd8a9949a7941cc",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.naxriscv_158.diff",
+  "diff_sha256": "326274fd3b413eaeb5343e1b9758b9934c041e3fd7550852e21fa2876f30b051",
+  "fix_oids_sorted": [
+    "048b6c3e97415f82171beb905891ae13e22fa5a7"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala",
+    "src/main/scala/naxriscv/lsu/LsuPlugin.scala",
+    "src/main/scala/naxriscv/lsu2/Lsu2Plugin.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala": [
+      [
+        178,
+        184
+      ]
+    ],
+    "src/main/scala/naxriscv/lsu/LsuPlugin.scala": [
+      [
+        1038,
+        1044
+      ]
+    ],
+    "src/main/scala/naxriscv/lsu2/Lsu2Plugin.scala": [
+      [
+        967,
+        973
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.naxriscv_158.raw.diff"
+}

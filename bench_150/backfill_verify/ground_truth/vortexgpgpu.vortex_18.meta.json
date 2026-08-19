@@ -1,0 +1,65 @@
+{
+  "case_id": "vortexgpgpu.vortex#18",
+  "issue_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_oid": "d39edefa3d6f86ec0b5f9147d48e5c0b381f4779",
+  "buggy_commit_sha": "bf8f0d671c50fba63d08f7d9142f8016225f77f4",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/vortexgpgpu.vortex_18.diff",
+  "diff_sha256": "c07a23b402122f95a0a644fe93155c23e900622cacbbdc2dabf299df3c5edaf3",
+  "fix_oids_sorted": [
+    "d39edefa3d6f86ec0b5f9147d48e5c0b381f4779"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "hw/rtl/libs/VX_mem_streamer.sv"
+  ],
+  "ground_truth_hunks": {
+    "hw/rtl/libs/VX_mem_streamer.sv": [
+      [
+        8,
+        14
+      ],
+      [
+        47,
+        57
+      ],
+      [
+        76,
+        83
+      ],
+      [
+        85,
+        125
+      ],
+      [
+        135,
+        147
+      ],
+      [
+        158,
+        168
+      ],
+      [
+        171,
+        241
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "hw/unit_tests/mem_streamer/mem_streamer/Makefile",
+    "hw/unit_tests/mem_streamer/mem_streamer/memsim.cpp",
+    "hw/unit_tests/mem_streamer/mem_streamer/ram.cpp"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/vortexgpgpu.vortex_18.raw.diff"
+}

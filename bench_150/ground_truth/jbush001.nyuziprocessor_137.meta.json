@@ -1,0 +1,40 @@
+{
+  "case_id": "jbush001.nyuziprocessor#137",
+  "issue_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_oid": "9565b43d621a97babd691727ab5e33e7d362a148",
+  "buggy_commit_sha": "0ac5bdacb816fc1f78b23692b65cee41b1aada31",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/jbush001.nyuziprocessor_137.diff",
+  "diff_sha256": "c9c2ee35286363e3788fae08745137df121d31d5768ff4ff464128516b84501f",
+  "fix_oids_sorted": [
+    "9565b43d621a97babd691727ab5e33e7d362a148",
+    "163ccaebf8ec9d090194e951739ae7c0540503fd"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "hardware/core/ifetch_tag_stage.sv"
+  ],
+  "ground_truth_hunks": {
+    "hardware/core/ifetch_tag_stage.sv": [
+      [
+        215,
+        229
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "tests/unit/test_ifetch_tag_stage.sv"
+  ],
+  "raw_diff_path": "ground_truth/jbush001.nyuziprocessor_137.raw.diff"
+}

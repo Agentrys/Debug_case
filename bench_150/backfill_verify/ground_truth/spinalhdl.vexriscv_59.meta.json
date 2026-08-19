@@ -1,0 +1,32 @@
+{
+  "case_id": "spinalhdl.vexriscv#59",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_oid": "434793711bab181860d0be8856fcc4cf4520bf2d",
+  "buggy_commit_sha": "b9922105f0f61a4c72d657ea6bd746a11820eb32",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/spinalhdl.vexriscv_59.diff",
+  "diff_sha256": "7d8cf51fbaf1e5f0d37d32b6791f95dcd844f6902dd5a5f53cb276f62e46bd08",
+  "fix_oids_sorted": [
+    "434793711bab181860d0be8856fcc4cf4520bf2d",
+    "6461efb05af43b70808d8fc6bd045c17274da3f8"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/vexriscv/demo/GenSmallAndProductive.scala",
+    "src/main/scala/vexriscv/demo/GenSmallAndProductiveICache.scala"
+  ],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/spinalhdl.vexriscv_59.raw.diff"
+}

@@ -1,0 +1,62 @@
+{
+  "case_id": "OSCPU.NutShell#62",
+  "issue_repo": {
+    "owner": "OSCPU",
+    "name": "NutShell"
+  },
+  "fix_repo": {
+    "owner": "Jiayuah",
+    "name": "NutShell"
+  },
+  "fix_oid": "d8f80ba6721de09c973c556708b10c0e9a89503a",
+  "buggy_commit_sha": "6c93f08f396dde91d55435ec6e5b3b656d75bc93",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/OSCPU.NutShell_62.diff",
+  "diff_sha256": "095a000a3a7fe2044fc1f39fabb23cce549f303d6dcbee71600300f5917bd6fc",
+  "fix_oids_sorted": [
+    "d8f80ba6721de09c973c556708b10c0e9a89503a"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/huancun/Common.scala",
+    "src/main/scala/huancun/SourceA.scala",
+    "src/main/scala/huancun/inclusive/MSHR.scala",
+    "src/main/scala/huancun/noninclusive/MSHR.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/huancun/Common.scala": [
+      [
+        76,
+        81
+      ]
+    ],
+    "src/main/scala/huancun/SourceA.scala": [
+      [
+        94,
+        100
+      ]
+    ],
+    "src/main/scala/huancun/inclusive/MSHR.scala": [
+      [
+        376,
+        381
+      ]
+    ],
+    "src/main/scala/huancun/noninclusive/MSHR.scala": [
+      [
+        914,
+        919
+      ],
+      [
+        1302,
+        1310
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/OSCPU.NutShell_62.raw.diff"
+}

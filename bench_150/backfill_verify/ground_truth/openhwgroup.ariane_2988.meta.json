@@ -1,0 +1,56 @@
+{
+  "case_id": "openhwgroup.ariane#2988",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_oid": "b484f5f3ee480068b6af1e038796e4db7a31a240",
+  "buggy_commit_sha": "f3d2ec446150b06c7a1a67e8b24aa0eeb4aaf83c",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_2988.diff",
+  "diff_sha256": "7a874f7376c7c0476c8063ed7ec080243f10e236838aed921e4dde983b29ea9d",
+  "fix_oids_sorted": [
+    "b484f5f3ee480068b6af1e038796e4db7a31a240",
+    "8202a7f714d708555021598a7baf3f97eda6b468",
+    "00d8acf4f82a4d30c4a22e24682dad84860989ce"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/cva6_mmu/cva6_mmu.sv",
+    "core/include/cv64a60ax_config_pkg.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/cva6_mmu/cva6_mmu.sv": [
+      [
+        170,
+        176
+      ],
+      [
+        170,
+        176
+      ]
+    ],
+    "core/include/cv64a60ax_config_pkg.sv": [
+      [
+        26,
+        31
+      ],
+      [
+        85,
+        91
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "config/gen_from_riscv_config/scripts/libs/utils.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_2988.raw.diff"
+}

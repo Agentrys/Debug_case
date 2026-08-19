@@ -1,0 +1,397 @@
+diff --git a/core/csr_regfile.sv b/core/csr_regfile.sv
+index 455a7fe53..f887b552c 100644
+--- a/core/csr_regfile.sv
++++ b/core/csr_regfile.sv
+@@ -12,6 +12,7 @@
+ // Date: 05.05.2017
+ // Description: CSR Register File as specified by RISC-V
+ 
++`include "utils_macros.svh"
+ 
+ module csr_regfile
+   import ariane_pkg::*;
+@@ -2812,7 +2813,7 @@ module csr_regfile
+   // check that eret and ex are never valid together
+   assert property (@(posedge clk_i) disable iff (!rst_ni !== '0) !(eret_o && ex_i.valid))
+   else begin
+-    $error("eret and exception should never be valid at the same time");
++    `ASSERT_ERROR("eret and exception should never be valid at the same time");
+     $stop();
+   end
+   //pragma translate_on
+diff --git a/core/cva6_fifo_v3.sv b/core/cva6_fifo_v3.sv
+index d1faa01b3..68cb394d8 100644
+--- a/core/cva6_fifo_v3.sv
++++ b/core/cva6_fifo_v3.sv
+@@ -13,6 +13,8 @@
+ // Additional contributions by:
+ //                 Angela Gonzalez - PlanV Technologies
+ 
++`include "utils_macros.svh"
++
+ module cva6_fifo_v3 #(
+     parameter bit FALL_THROUGH = 1'b0,  // fifo is in fall-through mode
+     parameter bit FPGA_ALTERA = 1'b0,  // FPGA Altera optimizations enabled
+@@ -216,16 +218,16 @@ module cva6_fifo_v3 #(
+   // pragma translate_off
+   initial begin
+     assert (DEPTH > 0)
+-    else $error("DEPTH must be greater than 0.");
++    else `ASSERT_ERROR("DEPTH must be greater than 0.");
+   end
+ 
+   full_write :
+   assert property (@(posedge clk_i) disable iff (~rst_ni) (full_o |-> ~push_i))
+-  else $fatal(1, "Trying to push new data although the FIFO is full.");
++  else `ASSERT_FATAL("Trying to push new data although the FIFO is full.");
+ 
+   empty_read :
+   assert property (@(posedge clk_i) disable iff (~rst_ni) (empty_o |-> ~pop_i))
+-  else $fatal(1, "Trying to pop data although the FIFO is empty.");
++  else `ASSERT_FATAL("Trying to pop data although the FIFO is empty.");
+   // pragma translate_on
+ 
+ endmodule  // fifo_v3
+diff --git a/core/cvxif_example/compressed_instr_decoder.sv b/core/cvxif_example/compressed_instr_decoder.sv
+index de2fbb391..a5f15c3ce 100644
+--- a/core/cvxif_example/compressed_instr_decoder.sv
++++ b/core/cvxif_example/compressed_instr_decoder.sv
+@@ -7,6 +7,8 @@
+ //
+ // Original Author: Guillaume Chauvon
+ 
++`include "utils_macros.svh"
++
+ module compressed_instr_decoder #(
+     parameter type                    copro_compressed_resp_t          = logic,
+     parameter int                     NbInstr                          = 1,
+@@ -44,6 +46,7 @@ module compressed_instr_decoder #(
+   end
+ 
+   assert property (@(posedge clk_i) $onehot0(sel))
+-  else $warning("This offloaded instruction is valid for multiple coprocessor instructions !");
++  else
++    `ASSERT_WARNING("This offloaded instruction is valid for multiple coprocessor instructions !");
+ 
+ endmodule
+diff --git a/core/cvxif_example/instr_decoder.sv b/core/cvxif_example/instr_decoder.sv
+index 8e952b6df..45628f88a 100644
+--- a/core/cvxif_example/instr_decoder.sv
++++ b/core/cvxif_example/instr_decoder.sv
+@@ -7,6 +7,8 @@
+ //
+ // Original Author: Guillaume Chauvon
+ 
++`include "utils_macros.svh"
++
+ module instr_decoder #(
+     parameter type               copro_issue_resp_t          = logic,
+     parameter type               opcode_t                    = logic,
+@@ -84,6 +86,7 @@ module instr_decoder #(
+   end
+ 
+   assert property (@(posedge clk_i) $onehot0(sel))
+-  else $warning("This offloaded instruction is valid for multiple coprocessor instructions !");
++  else
++    `ASSERT_WARNING("This offloaded instruction is valid for multiple coprocessor instructions !");
+ 
+ endmodule
+diff --git a/core/frontend/instr_queue.sv b/core/frontend/instr_queue.sv
+index c4380d866..f68509197 100644
+--- a/core/frontend/instr_queue.sv
++++ b/core/frontend/instr_queue.sv
+@@ -43,6 +43,8 @@
+ // the replay mechanism gets more complicated as it can be that a 32 bit instruction
+ // can not be pushed at once.
+ 
++`include "utils_macros.svh"
++
+ module instr_queue
+   import ariane_pkg::*;
+ #(
+@@ -551,12 +553,12 @@ module instr_queue
+   // pragma translate_off
+   replay_address_fifo :
+   assert property (@(posedge clk_i) disable iff (!rst_ni) replay_o |-> !i_fifo_address.push_i)
+-  else $fatal(1, "[instr_queue] Pushing address although replay asserted");
++  else `ASSERT_FATAL("[instr_queue] Pushing address although replay asserted");
+ 
+   output_select_onehot :
+   assert property (@(posedge clk_i) $onehot0(idx_ds_q))
+   else begin
+-    $error("Output select should be one-hot encoded");
++    `ASSERT_ERROR("Output select should be one-hot encoded");
+     $stop();
+   end
+   // pragma translate_on
+diff --git a/core/include/config_pkg.sv b/core/include/config_pkg.sv
+index 693b2c6ac..da2f6401e 100644
+--- a/core/include/config_pkg.sv
++++ b/core/include/config_pkg.sv
+@@ -7,6 +7,8 @@
+ //
+ // Original Author: Jean-Roch COULON - Thales
+ 
++`include "../include/utils_macros.svh"
++
+ package config_pkg;
+ 
+   // ---------------
+@@ -420,21 +422,32 @@ package config_pkg;
+   /// sense for all parameters, here is the place to sanity check them.
+   function automatic void check_cfg(cva6_cfg_t Cfg);
+     // pragma translate_off
+-    assert (Cfg.RASDepth > 0);
+-    assert (Cfg.BTBEntries == 0 || (2 ** $clog2(Cfg.BTBEntries) == Cfg.BTBEntries));
+-    assert (Cfg.BHTEntries == 0 || (2 ** $clog2(Cfg.BHTEntries) == Cfg.BHTEntries));
+-    assert (Cfg.NrNonIdempotentRules <= NrMaxRules);
+-    assert (Cfg.NrExecuteRegionRules <= NrMaxRules);
+-    assert (Cfg.NrCachedRegionRules <= NrMaxRules);
+-    assert (Cfg.NrPMPEntries <= 64);
+-    assert (!(Cfg.SuperscalarEn && Cfg.RVF));
++    assert (Cfg.RASDepth > 0)
++    else `ASSERT_FATAL("");
++    assert (Cfg.BTBEntries == 0 || (2 ** $clog2(Cfg.BTBEntries) == Cfg.BTBEntries))
++    else `ASSERT_FATAL("");
++    assert (Cfg.BHTEntries == 0 || (2 ** $clog2(Cfg.BHTEntries) == Cfg.BHTEntries))
++    else `ASSERT_FATAL("");
++    assert (Cfg.NrNonIdempotentRules <= NrMaxRules)
++    else `ASSERT_FATAL("");
++    assert (Cfg.NrExecuteRegionRules <= NrMaxRules)
++    else `ASSERT_FATAL("");
++    assert (Cfg.NrCachedRegionRules <= NrMaxRules)
++    else `ASSERT_FATAL("");
++    assert (Cfg.NrPMPEntries <= 64)
++    else `ASSERT_FATAL("");
++    assert (!(Cfg.SuperscalarEn && Cfg.RVF))
++    else `ASSERT_FATAL("");
+     assert (Cfg.FETCH_WIDTH == 32 || Cfg.FETCH_WIDTH == 64)
+-    else $fatal(1, "[frontend] fetch width != not supported");
++    else `ASSERT_FATAL("[frontend] fetch width != not supported");
+     // Support for disabling MIP.MSIP and MIE.MSIE in Hypervisor and Supervisor mode is not supported
+     // Software Interrupt can be disabled when there is only M machine mode in CVA6.
+-    assert (!(Cfg.RVS && !Cfg.SoftwareInterruptEn));
+-    assert (!(Cfg.RVH && !Cfg.SoftwareInterruptEn));
+-    assert (!(Cfg.RVZCMT && ~Cfg.MmuPresent));
++    assert (!(Cfg.RVS && !Cfg.SoftwareInterruptEn))
++    else `ASSERT_FATAL("");
++    assert (!(Cfg.RVH && !Cfg.SoftwareInterruptEn))
++    else `ASSERT_FATAL("");
++    assert (!(Cfg.RVZCMT && ~Cfg.MmuPresent))
++    else `ASSERT_FATAL("");
+     // pragma translate_on
+   endfunction
+ 
+diff --git a/core/include/utils_macros.svh b/core/include/utils_macros.svh
+new file mode 100644
+index 000000000..12630ec69
+--- /dev/null
++++ b/core/include/utils_macros.svh
+@@ -0,0 +1,33 @@
++// Copyright 2025 Thales DIS France SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Valentin Thomazic
++
++`ifndef UTILS_MACROS_SVH
++`define UTILS_MACROS_SVH
++
++`define ASSERT_WARNING(msg)\
++    `ifdef UVM\
++        uvm_pkg::uvm_report_warning("ASSERT FAILED", msg, uvm_pkg::UVM_NONE, 1)\
++    `else\
++        $warning("%0t: ASSERT FAILED %0s", $time, msg)\
++    `endif
++
++`define ASSERT_ERROR(msg)\
++    `ifdef UVM\
++        uvm_pkg::uvm_report_error("ASSERT FAILED", msg, uvm_pkg::UVM_NONE, 1)\
++    `else\
++        $error("%0t: ASSERT FAILED %0s", $time, msg)\
++    `endif
++
++`define ASSERT_FATAL(msg)\
++    `ifdef UVM\
++        uvm_pkg::uvm_report_fatal("ASSERT FAILED", msg, uvm_pkg::UVM_NONE, 1)\
++    `else\
++        $fatal("%0t: ASSERT FAILED %0s", $time, msg)\
++    `endif
++`endif
+diff --git a/core/issue_read_operands.sv b/core/issue_read_operands.sv
+index 40814e654..7c7964b58 100644
+--- a/core/issue_read_operands.sv
++++ b/core/issue_read_operands.sv
+@@ -13,6 +13,7 @@
+ // Description: Issues instruction from the scoreboard and fetches the operands
+ //              This also includes all the forwarding logic
+ 
++`include "utils_macros.svh"
+ 
+ module issue_read_operands
+   import ariane_pkg::*;
+@@ -1157,10 +1158,8 @@ module issue_read_operands
+   initial begin
+     assert (OPERANDS_PER_INSTR == 2 || (OPERANDS_PER_INSTR == 3 && CVA6Cfg.CvxifEn))
+     else
+-      $fatal(
+-          1,
+-          "If CVXIF is enable, ariane regfile can have either 2 or 3 read ports. Else it has 2 read ports."
+-      );
++      `ASSERT_FATAL(
++          "If CVXIF is enable, ariane regfile can have either 2 or 3 read ports. Else it has 2 read ports.");
+   end
+ 
+   // FPU does not declare that it will return a result the subsequent cycle so
+@@ -1174,7 +1173,8 @@ module issue_read_operands
+   initial begin
+     assert (!(CVA6Cfg.SuperscalarEn && CVA6Cfg.FpPresent))
+     else
+-      $fatal(1, "FPU is not yet supported in superscalar CVA6, see comments above this assertion.");
++      `ASSERT_FATAL(
++          "FPU is not yet supported in superscalar CVA6, see comments above this assertion.");
+   end
+ 
+   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
+@@ -1183,7 +1183,7 @@ module issue_read_operands
+     ) && !$isunknown(
+         fu_data_q[i].operand_b
+     )))
+-    else $warning("Got unknown value in one of the operands");
++    else `ASSERT_WARNING("Got unknown value in one of the operands");
+   end
+   //pragma translate_on
+ 
+diff --git a/core/load_unit.sv b/core/load_unit.sv
+index 8751b887d..0fc54a04f 100644
+--- a/core/load_unit.sv
++++ b/core/load_unit.sv
+@@ -20,6 +20,8 @@
+ // November, 2024 - Yannick Casamatta, Thales
+ //          OBI Protocol
+ 
++`include "utils_macros.svh"
++
+ module load_unit
+   import ariane_pkg::*;
+ #(
+@@ -487,20 +489,20 @@ module load_unit
+   //pragma translate_off
+   initial
+     assert (CVA6Cfg.DcacheIdWidth >= REQ_ID_BITS)
+-    else $fatal(1, "DcacheIdWidth parameter is not wide enough to encode pending loads");
++    else `ASSERT_FATAL("DcacheIdWidth parameter is not wide enough to encode pending loads");
+   // check invalid offsets, but only issue a warning as these conditions actually trigger a load address misaligned exception
+   addr_offset0 :
+   assert property (@(posedge clk_i) disable iff (~rst_ni)
+         ldbuf_w_q |->  (ldbuf_q[ldbuf_windex_q].operation inside {ariane_pkg::LW, ariane_pkg::LWU}) |-> ldbuf_q[ldbuf_windex_q].address_offset < 5)
+-  else $fatal(1, "invalid address offset used with {LW, LWU}");
++  else `ASSERT_FATAL("invalid address offset used with {LW, LWU}");
+   addr_offset1 :
+   assert property (@(posedge clk_i) disable iff (~rst_ni)
+         ldbuf_w_q |->  (ldbuf_q[ldbuf_windex_q].operation inside {ariane_pkg::LH, ariane_pkg::LHU}) |-> ldbuf_q[ldbuf_windex_q].address_offset < 7)
+-  else $fatal(1, "invalid address offset used with {LH, LHU}");
++  else `ASSERT_FATAL("invalid address offset used with {LH, LHU}");
+   addr_offset2 :
+   assert property (@(posedge clk_i) disable iff (~rst_ni)
+         ldbuf_w_q |->  (ldbuf_q[ldbuf_windex_q].operation inside {ariane_pkg::LB, ariane_pkg::LBU}) |-> ldbuf_q[ldbuf_windex_q].address_offset < 8)
+-  else $fatal(1, "invalid address offset used with {LB, LBU}");
++  else `ASSERT_FATAL("invalid address offset used with {LB, LBU}");
+   //pragma translate_on
+ 
+ endmodule
+diff --git a/core/scoreboard.sv b/core/scoreboard.sv
+index 062a02e95..461b82473 100644
+--- a/core/scoreboard.sv
++++ b/core/scoreboard.sv
+@@ -12,6 +12,8 @@
+ // Date: 08.04.2017
+ // Description: Scoreboard - keeps track of all decoded, issued and committed instructions
+ 
++`include "utils_macros.svh"
++
+ module scoreboard #(
+     parameter config_pkg::cva6_cfg_t CVA6Cfg = config_pkg::cva6_cfg_empty,
+     parameter type bp_resolve_t = logic,
+@@ -321,22 +323,22 @@ module scoreboard #(
+   //pragma translate_off
+   initial begin
+     assert (CVA6Cfg.NR_SB_ENTRIES == 2 ** CVA6Cfg.TRANS_ID_BITS)
+-    else $fatal(1, "Scoreboard size needs to be a power of two.");
++    else `ASSERT_FATAL("Scoreboard size needs to be a power of two.");
+   end
+   // assert that we never acknowledge a commit if the instruction is not valid
+   assert property (
+     @(posedge clk_i) disable iff (!rst_ni) commit_ack_i[0] |-> commit_instr_o[0].valid)
+-  else $fatal(1, "Commit acknowledged but instruction is not valid");
++  else `ASSERT_FATAL("Commit acknowledged but instruction is not valid");
+   if (CVA6Cfg.NrCommitPorts == 2) begin : gen_two_commit_ports
+     assert property (
+         @(posedge clk_i) disable iff (!rst_ni) commit_ack_i[1] |-> commit_instr_o[1].valid)
+-    else $fatal(1, "Commit acknowledged but instruction is not valid");
++    else `ASSERT_FATAL("Commit acknowledged but instruction is not valid");
+   end
+   // assert that we never give an issue ack signal if the instruction is not valid
+   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
+     assert property (
+       @(posedge clk_i) disable iff (!rst_ni) issue_ack_i[i] |-> issue_instr_valid_o[i])
+-    else $fatal(1, "Issue acknowledged but instruction is not valid");
++    else `ASSERT_FATAL("Issue acknowledged but instruction is not valid");
+   end
+ 
+   // there should never be more than one instruction writing the same destination register (except x0)
+@@ -346,10 +348,8 @@ module scoreboard #(
+       assert property (
+         @(posedge clk_i) disable iff (!rst_ni) wt_valid_i[i] && wt_valid_i[j] && (i != j) |-> (trans_id_i[i] != trans_id_i[j]))
+       else
+-        $fatal(
+-            1,
+-            "Two or more functional units are retiring instructions with the same transaction id!"
+-        );
++        `ASSERT_FATAL(
++            "Two or more functional units are retiring instructions with the same transaction id!");
+     end
+   end
+   //pragma translate_on
+diff --git a/core/store_buffer.sv b/core/store_buffer.sv
+index e32a028d1..abb330afd 100644
+--- a/core/store_buffer.sv
++++ b/core/store_buffer.sv
+@@ -13,6 +13,7 @@
+ // Description: Store queue persists store requests and pushes them to memory
+ //              if they are no longer speculative
+ 
++`include "utils_macros.svh"
+ 
+ module store_buffer
+   import ariane_pkg::*;
+@@ -292,20 +293,22 @@ module store_buffer
+   // as flush and commit is decided in the same stage
+   commit_and_flush :
+   assert property (@(posedge clk_i) rst_ni && flush_i |-> !commit_i)
+-  else $error("[Commit Queue] You are trying to commit and flush in the same cycle");
++  else `ASSERT_ERROR("[Commit Queue] You are trying to commit and flush in the same cycle");
+ 
+   speculative_buffer_overflow :
+   assert property (@(posedge clk_i) rst_ni && (speculative_status_cnt_q == DEPTH_SPEC) |-> !valid_i)
+   else
+-    $error("[Speculative Queue] You are trying to push new data although the buffer is not ready");
++    `ASSERT_ERROR(
++        "[Speculative Queue] You are trying to push new data although the buffer is not ready");
+ 
+   speculative_buffer_underflow :
+   assert property (@(posedge clk_i) rst_ni && (speculative_status_cnt_q == 0) |-> !commit_i)
+-  else $error("[Speculative Queue] You are committing although there are no stores to commit");
++  else
++    `ASSERT_ERROR("[Speculative Queue] You are committing although there are no stores to commit");
+ 
+   commit_buffer_overflow :
+   assert property (@(posedge clk_i) rst_ni && (commit_status_cnt_q == DEPTH_COMMIT) |-> !commit_i)
+-  else $error("[Commit Queue] You are trying to commit a store although the buffer is full");
++  else `ASSERT_ERROR("[Commit Queue] You are trying to commit a store although the buffer is full");
+   //pragma translate_on
+ endmodule
+ 

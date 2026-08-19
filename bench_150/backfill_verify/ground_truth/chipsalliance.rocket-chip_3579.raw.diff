@@ -1,0 +1,14 @@
+diff --git a/src/main/resources/META-INF/services/firrtl.options.RegisteredLibrary b/src/main/resources/META-INF/services/firrtl.options.RegisteredLibrary
+deleted file mode 100644
+index abfcceb05..000000000
+--- a/src/main/resources/META-INF/services/firrtl.options.RegisteredLibrary
++++ /dev/null
+@@ -1 +0,0 @@
+-firrtl.passes.memlib.MemLibOptions
+diff --git a/src/main/resources/META-INF/services/firrtl.options.RegisteredLibrary b/src/main/resources/META-INF/services/firrtl.options.RegisteredLibrary
+deleted file mode 100644
+index abfcceb05..000000000
+--- a/src/main/resources/META-INF/services/firrtl.options.RegisteredLibrary
++++ /dev/null
+@@ -1 +0,0 @@
+-firrtl.passes.memlib.MemLibOptions

@@ -1,0 +1,165 @@
+{
+  "case_id": "chipsalliance.rocket-chip#50",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "721238788643a7fd1aab55cb9326a95f26d59a13",
+  "buggy_commit_sha": "a5ea0967c24374e35bf2456b352d6822e8d30561",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_50.diff",
+  "diff_sha256": "0be2d6005f93331a87b33cd6448c5904f2b597b223419724a33d5313f53c6676",
+  "fix_oids_sorted": [
+    "721238788643a7fd1aab55cb9326a95f26d59a13",
+    "11b3cee07a6ddf8414409f85b98ea98ae93e8818",
+    "ab0e87c21de1eeb5086b60a995f476b4f3e1f66e"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/ahb.scala",
+    "uncore/src/main/scala/ahb.scala",
+    "src/main/scala/rocket/BTB.scala",
+    "src/main/scala/rocket/PTW.scala",
+    "src/main/scala/rocket/TLB.scala",
+    "src/main/scala/unittest/Configs.scala",
+    "src/main/scala/util/Replacement.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/ahb.scala": [
+      [
+        30,
+        36
+      ],
+      [
+        50,
+        62
+      ],
+      [
+        65,
+        71
+      ],
+      [
+        97,
+        103
+      ],
+      [
+        140,
+        146
+      ],
+      [
+        221,
+        230
+      ],
+      [
+        325,
+        331
+      ],
+      [
+        340,
+        346
+      ],
+      [
+        367,
+        373
+      ],
+      [
+        383,
+        393
+      ]
+    ],
+    "uncore/src/main/scala/ahb.scala": [
+      [
+        30,
+        36
+      ],
+      [
+        50,
+        62
+      ],
+      [
+        65,
+        71
+      ],
+      [
+        97,
+        103
+      ],
+      [
+        140,
+        146
+      ],
+      [
+        221,
+        230
+      ],
+      [
+        325,
+        331
+      ],
+      [
+        340,
+        346
+      ],
+      [
+        367,
+        373
+      ],
+      [
+        383,
+        393
+      ]
+    ],
+    "src/main/scala/rocket/BTB.scala": [
+      [
+        241,
+        247
+      ]
+    ],
+    "src/main/scala/rocket/PTW.scala": [
+      [
+        172,
+        178
+      ]
+    ],
+    "src/main/scala/rocket/TLB.scala": [
+      [
+        347,
+        354
+      ]
+    ],
+    "src/main/scala/unittest/Configs.scala": [
+      [
+        121,
+        126
+      ],
+      [
+        158,
+        161
+      ]
+    ],
+    "src/main/scala/util/Replacement.scala": [
+      [
+        3,
+        25
+      ],
+      [
+        37,
+        79
+      ],
+      [
+        87,
+        89
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_50.raw.diff"
+}

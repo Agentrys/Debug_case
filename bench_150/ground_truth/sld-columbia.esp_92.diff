@@ -1,0 +1,1341 @@
+diff --git a/rtl/caches/llc_wrapper.vhd b/rtl/caches/llc_wrapper.vhd
+index 12a9d099..be52da95 100644
+--- a/rtl/caches/llc_wrapper.vhd
++++ b/rtl/caches/llc_wrapper.vhd
+@@ -704,7 +704,7 @@ begin  -- architecture rtl
+     ahbmo.hsize <= HSIZE_DWORD;
+   end generate ariane_cache_word_gen;
+ 
+-  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 generate
++  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 or GLOB_CPU_ARCH = ibex generate
+     ahbmo.hsize <= HSIZE_WORD;
+   end generate leon3_cache_word_gen;
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 99b6dccb..08aa39ad 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -1123,10 +1123,23 @@ begin  -- architecture rtl of l2_wrapper
+ -------------------------------------------------------------------------------
+ -- FSM: Bridge from L2 cache frontend output to AHB master (L1 invalidation)
+ -------------------------------------------------------------------------------
+-  -- put writes of invalidate addresses coming from the L2 cache into a FIFO
+-  inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_data_in <= inval_data;
++  ahb_no_inval_gen: if GLOB_CPU_ARCH = ibex generate
++    inval_ready      <= '1';
++    inv_fifo_rdreq   <= '0';
++    inv_fifo_wrreq   <= '0';
++    inv_fifo_data_in <= (others => '0');
++
++    ahbmo.hbusreq    <= '0';
++    ahbmo.htrans     <=  HTRANS_IDLE;
++    ahbmo.hlock      <= '0';
++    ahbmo.haddr      <= (others => '0');
++  end generate ahb_no_inval_gen;
++
++  ahb_inval_gen: if GLOB_CPU_ARCH /= ibex generate
++    -- put writes of invalidate addresses coming from the L2 cache into a FIFO
++    inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_data_in <= inval_data;
+ 
+   fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out)
+ 
+@@ -1210,6 +1223,7 @@ begin  -- architecture rtl of l2_wrapper
+     ahbm_reg_next <= reg;
+ 
+   end process fsm_ahbm;
++  end generate ahb_inval_gen;
+   end generate ahb_frontend_gen;
+ 
+ -------------------------------------------------------------------------------
+diff --git a/rtl/caches/llc_wrapper.vhd b/rtl/caches/llc_wrapper.vhd
+index 12a9d099..be52da95 100644
+--- a/rtl/caches/llc_wrapper.vhd
++++ b/rtl/caches/llc_wrapper.vhd
+@@ -704,7 +704,7 @@ begin  -- architecture rtl
+     ahbmo.hsize <= HSIZE_DWORD;
+   end generate ariane_cache_word_gen;
+ 
+-  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 generate
++  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 or GLOB_CPU_ARCH = ibex generate
+     ahbmo.hsize <= HSIZE_WORD;
+   end generate leon3_cache_word_gen;
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 99b6dccb..08aa39ad 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -1123,10 +1123,23 @@ begin  -- architecture rtl of l2_wrapper
+ -------------------------------------------------------------------------------
+ -- FSM: Bridge from L2 cache frontend output to AHB master (L1 invalidation)
+ -------------------------------------------------------------------------------
+-  -- put writes of invalidate addresses coming from the L2 cache into a FIFO
+-  inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_data_in <= inval_data;
++  ahb_no_inval_gen: if GLOB_CPU_ARCH = ibex generate
++    inval_ready      <= '1';
++    inv_fifo_rdreq   <= '0';
++    inv_fifo_wrreq   <= '0';
++    inv_fifo_data_in <= (others => '0');
++
++    ahbmo.hbusreq    <= '0';
++    ahbmo.htrans     <=  HTRANS_IDLE;
++    ahbmo.hlock      <= '0';
++    ahbmo.haddr      <= (others => '0');
++  end generate ahb_no_inval_gen;
++
++  ahb_inval_gen: if GLOB_CPU_ARCH /= ibex generate
++    -- put writes of invalidate addresses coming from the L2 cache into a FIFO
++    inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_data_in <= inval_data;
+ 
+   fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out)
+ 
+@@ -1210,6 +1223,7 @@ begin  -- architecture rtl of l2_wrapper
+     ahbm_reg_next <= reg;
+ 
+   end process fsm_ahbm;
++  end generate ahb_inval_gen;
+   end generate ahb_frontend_gen;
+ 
+ -------------------------------------------------------------------------------
+diff --git a/rtl/caches/cachepackage.vhd b/rtl/caches/cachepackage.vhd
+index 1bd59bd6..00719f0f 100644
+--- a/rtl/caches/cachepackage.vhd
++++ b/rtl/caches/cachepackage.vhd
+@@ -157,6 +157,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       hindex_mst  : integer := 0;
+       pindex      : integer range 0 to NAPBSLV - 1 := 6;
+       pirq        : integer := 4;
+@@ -214,6 +215,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       mem_num     : integer := 1;
+       mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+       cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/rtl/caches/gencaches.vhd b/rtl/caches/gencaches.vhd
+index a8a81649..9472541b 100644
+--- a/rtl/caches/gencaches.vhd
++++ b/rtl/caches/gencaches.vhd
+@@ -13,6 +13,7 @@ package gencaches is
+   component l2
+     generic (
+       use_rtl : integer;
++      little_end : integer range 0 to 1;
+       sets : integer;
+       ways : integer
+       );
+diff --git a/rtl/caches/l2_acc_wrapper.vhd b/rtl/caches/l2_acc_wrapper.vhd
+index d2cfdd19..1451cdc4 100644
+--- a/rtl/caches/l2_acc_wrapper.vhd
++++ b/rtl/caches/l2_acc_wrapper.vhd
+@@ -34,6 +34,7 @@ entity l2_acc_wrapper is
+     tech        : integer := virtex7;
+     sets        : integer := 256;
+     ways        : integer := 8;
++    little_end  : integer range 0 to 1 := 1;
+     mem_num     : integer := 1;
+     mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+     cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -383,6 +384,7 @@ begin  -- architecture rtl of l2_acc_wrapper
+ 
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 08aa39ad..06730935 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -36,6 +36,7 @@ entity l2_wrapper is
+     hindex_mst  : integer := 0;
+     pindex      : integer range 0 to NAPBSLV - 1 := 6;
+     pirq        : integer := 4;
++    little_end  : integer range 0 to 1 := 1;
+     mem_hindex  : integer := 4;
+     mem_hconfig : ahb_config_type;
+     mem_num     : integer := 1;
+@@ -491,6 +492,7 @@ begin  -- architecture rtl of l2_wrapper
+   l2_cache_i : l2
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+     port map (
+diff --git a/rtl/tiles/tile_cpu.vhd b/rtl/tiles/tile_cpu.vhd
+index 6a6ef0ae..2356b656 100644
+--- a/rtl/tiles/tile_cpu.vhd
++++ b/rtl/tiles/tile_cpu.vhd
+@@ -1208,6 +1208,7 @@ begin
+         tech          => CFG_FABTECH,
+         sets          => CFG_L2_SETS,
+         ways          => CFG_L2_WAYS,
++        little_end    => GLOB_CPU_RISCV,
+         hindex_mst    => CFG_NCPU_TILE,
+         pindex        => 1,
+         pirq          => CFG_SLD_L2_CACHE_IRQ,
+diff --git a/tools/socketgen/templates/noc2axi_interface.vhd b/tools/socketgen/templates/noc2axi_interface.vhd
+index a79a065d..407950fc 100644
+--- a/tools/socketgen/templates/noc2axi_interface.vhd
++++ b/tools/socketgen/templates/noc2axi_interface.vhd
+@@ -37,6 +37,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/tools/socketgen/templates/noc_interface.vhd b/tools/socketgen/templates/noc_interface.vhd
+index b12012cd..7c582410 100644
+--- a/tools/socketgen/templates/noc_interface.vhd
++++ b/tools/socketgen/templates/noc_interface.vhd
+@@ -35,6 +35,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -272,6 +273,7 @@ begin
+         tech          => tech,
+         sets          => sets,
+         ways          => ways,
++        little_end    => little_end,
+         mem_num       => cacheable_mem_num,
+         mem_info      => cacheable_mem_info,
+         cache_y       => cache_y,
+diff --git a/tools/socketgen/templates/tile_acc.vhd b/tools/socketgen/templates/tile_acc.vhd
+index d98d0458..fd7c634f 100644
+--- a/tools/socketgen/templates/tile_acc.vhd
++++ b/tools/socketgen/templates/tile_acc.vhd
+@@ -275,7 +275,9 @@ architecture rtl of tile_acc is
+   constant io_x                : local_yx                           := tile_x(io_tile_id);
+   constant this_scatter_gather : integer range 0 to 1               := CFG_SCATTER_GATHER;
+ 
+-   -- Noc signals
++  constant little_end          : integer range 0 to 1               := GLOB_CPU_RISCV;
++
++  -- Noc signals
+   signal noc1_stop_in_s         : std_logic_vector(4 downto 0);
+   signal noc1_stop_out_s        : std_logic_vector(4 downto 0);
+   signal noc1_acc_stop_in       : std_ulogic;
+diff --git a/rtl/caches/llc_wrapper.vhd b/rtl/caches/llc_wrapper.vhd
+index 12a9d099..be52da95 100644
+--- a/rtl/caches/llc_wrapper.vhd
++++ b/rtl/caches/llc_wrapper.vhd
+@@ -704,7 +704,7 @@ begin  -- architecture rtl
+     ahbmo.hsize <= HSIZE_DWORD;
+   end generate ariane_cache_word_gen;
+ 
+-  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 generate
++  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 or GLOB_CPU_ARCH = ibex generate
+     ahbmo.hsize <= HSIZE_WORD;
+   end generate leon3_cache_word_gen;
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 99b6dccb..08aa39ad 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -1123,10 +1123,23 @@ begin  -- architecture rtl of l2_wrapper
+ -------------------------------------------------------------------------------
+ -- FSM: Bridge from L2 cache frontend output to AHB master (L1 invalidation)
+ -------------------------------------------------------------------------------
+-  -- put writes of invalidate addresses coming from the L2 cache into a FIFO
+-  inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_data_in <= inval_data;
++  ahb_no_inval_gen: if GLOB_CPU_ARCH = ibex generate
++    inval_ready      <= '1';
++    inv_fifo_rdreq   <= '0';
++    inv_fifo_wrreq   <= '0';
++    inv_fifo_data_in <= (others => '0');
++
++    ahbmo.hbusreq    <= '0';
++    ahbmo.htrans     <=  HTRANS_IDLE;
++    ahbmo.hlock      <= '0';
++    ahbmo.haddr      <= (others => '0');
++  end generate ahb_no_inval_gen;
++
++  ahb_inval_gen: if GLOB_CPU_ARCH /= ibex generate
++    -- put writes of invalidate addresses coming from the L2 cache into a FIFO
++    inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_data_in <= inval_data;
+ 
+   fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out)
+ 
+@@ -1210,6 +1223,7 @@ begin  -- architecture rtl of l2_wrapper
+     ahbm_reg_next <= reg;
+ 
+   end process fsm_ahbm;
++  end generate ahb_inval_gen;
+   end generate ahb_frontend_gen;
+ 
+ -------------------------------------------------------------------------------
+diff --git a/rtl/caches/cachepackage.vhd b/rtl/caches/cachepackage.vhd
+index 1bd59bd6..00719f0f 100644
+--- a/rtl/caches/cachepackage.vhd
++++ b/rtl/caches/cachepackage.vhd
+@@ -157,6 +157,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       hindex_mst  : integer := 0;
+       pindex      : integer range 0 to NAPBSLV - 1 := 6;
+       pirq        : integer := 4;
+@@ -214,6 +215,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       mem_num     : integer := 1;
+       mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+       cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/rtl/caches/gencaches.vhd b/rtl/caches/gencaches.vhd
+index a8a81649..9472541b 100644
+--- a/rtl/caches/gencaches.vhd
++++ b/rtl/caches/gencaches.vhd
+@@ -13,6 +13,7 @@ package gencaches is
+   component l2
+     generic (
+       use_rtl : integer;
++      little_end : integer range 0 to 1;
+       sets : integer;
+       ways : integer
+       );
+diff --git a/rtl/caches/l2_acc_wrapper.vhd b/rtl/caches/l2_acc_wrapper.vhd
+index d2cfdd19..1451cdc4 100644
+--- a/rtl/caches/l2_acc_wrapper.vhd
++++ b/rtl/caches/l2_acc_wrapper.vhd
+@@ -34,6 +34,7 @@ entity l2_acc_wrapper is
+     tech        : integer := virtex7;
+     sets        : integer := 256;
+     ways        : integer := 8;
++    little_end  : integer range 0 to 1 := 1;
+     mem_num     : integer := 1;
+     mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+     cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -383,6 +384,7 @@ begin  -- architecture rtl of l2_acc_wrapper
+ 
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 08aa39ad..06730935 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -36,6 +36,7 @@ entity l2_wrapper is
+     hindex_mst  : integer := 0;
+     pindex      : integer range 0 to NAPBSLV - 1 := 6;
+     pirq        : integer := 4;
++    little_end  : integer range 0 to 1 := 1;
+     mem_hindex  : integer := 4;
+     mem_hconfig : ahb_config_type;
+     mem_num     : integer := 1;
+@@ -491,6 +492,7 @@ begin  -- architecture rtl of l2_wrapper
+   l2_cache_i : l2
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+     port map (
+diff --git a/rtl/tiles/tile_cpu.vhd b/rtl/tiles/tile_cpu.vhd
+index 6a6ef0ae..2356b656 100644
+--- a/rtl/tiles/tile_cpu.vhd
++++ b/rtl/tiles/tile_cpu.vhd
+@@ -1208,6 +1208,7 @@ begin
+         tech          => CFG_FABTECH,
+         sets          => CFG_L2_SETS,
+         ways          => CFG_L2_WAYS,
++        little_end    => GLOB_CPU_RISCV,
+         hindex_mst    => CFG_NCPU_TILE,
+         pindex        => 1,
+         pirq          => CFG_SLD_L2_CACHE_IRQ,
+diff --git a/tools/socketgen/templates/noc2axi_interface.vhd b/tools/socketgen/templates/noc2axi_interface.vhd
+index a79a065d..407950fc 100644
+--- a/tools/socketgen/templates/noc2axi_interface.vhd
++++ b/tools/socketgen/templates/noc2axi_interface.vhd
+@@ -37,6 +37,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/tools/socketgen/templates/noc_interface.vhd b/tools/socketgen/templates/noc_interface.vhd
+index b12012cd..7c582410 100644
+--- a/tools/socketgen/templates/noc_interface.vhd
++++ b/tools/socketgen/templates/noc_interface.vhd
+@@ -35,6 +35,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -272,6 +273,7 @@ begin
+         tech          => tech,
+         sets          => sets,
+         ways          => ways,
++        little_end    => little_end,
+         mem_num       => cacheable_mem_num,
+         mem_info      => cacheable_mem_info,
+         cache_y       => cache_y,
+diff --git a/tools/socketgen/templates/tile_acc.vhd b/tools/socketgen/templates/tile_acc.vhd
+index d98d0458..fd7c634f 100644
+--- a/tools/socketgen/templates/tile_acc.vhd
++++ b/tools/socketgen/templates/tile_acc.vhd
+@@ -275,7 +275,9 @@ architecture rtl of tile_acc is
+   constant io_x                : local_yx                           := tile_x(io_tile_id);
+   constant this_scatter_gather : integer range 0 to 1               := CFG_SCATTER_GATHER;
+ 
+-   -- Noc signals
++  constant little_end          : integer range 0 to 1               := GLOB_CPU_RISCV;
++
++  -- Noc signals
+   signal noc1_stop_in_s         : std_logic_vector(4 downto 0);
+   signal noc1_stop_out_s        : std_logic_vector(4 downto 0);
+   signal noc1_acc_stop_in       : std_ulogic;
+diff --git a/rtl/caches/llc_wrapper.vhd b/rtl/caches/llc_wrapper.vhd
+index 12a9d099..be52da95 100644
+--- a/rtl/caches/llc_wrapper.vhd
++++ b/rtl/caches/llc_wrapper.vhd
+@@ -704,7 +704,7 @@ begin  -- architecture rtl
+     ahbmo.hsize <= HSIZE_DWORD;
+   end generate ariane_cache_word_gen;
+ 
+-  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 generate
++  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 or GLOB_CPU_ARCH = ibex generate
+     ahbmo.hsize <= HSIZE_WORD;
+   end generate leon3_cache_word_gen;
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 99b6dccb..08aa39ad 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -1123,10 +1123,23 @@ begin  -- architecture rtl of l2_wrapper
+ -------------------------------------------------------------------------------
+ -- FSM: Bridge from L2 cache frontend output to AHB master (L1 invalidation)
+ -------------------------------------------------------------------------------
+-  -- put writes of invalidate addresses coming from the L2 cache into a FIFO
+-  inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_data_in <= inval_data;
++  ahb_no_inval_gen: if GLOB_CPU_ARCH = ibex generate
++    inval_ready      <= '1';
++    inv_fifo_rdreq   <= '0';
++    inv_fifo_wrreq   <= '0';
++    inv_fifo_data_in <= (others => '0');
++
++    ahbmo.hbusreq    <= '0';
++    ahbmo.htrans     <=  HTRANS_IDLE;
++    ahbmo.hlock      <= '0';
++    ahbmo.haddr      <= (others => '0');
++  end generate ahb_no_inval_gen;
++
++  ahb_inval_gen: if GLOB_CPU_ARCH /= ibex generate
++    -- put writes of invalidate addresses coming from the L2 cache into a FIFO
++    inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_data_in <= inval_data;
+ 
+   fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out)
+ 
+@@ -1210,6 +1223,7 @@ begin  -- architecture rtl of l2_wrapper
+     ahbm_reg_next <= reg;
+ 
+   end process fsm_ahbm;
++  end generate ahb_inval_gen;
+   end generate ahb_frontend_gen;
+ 
+ -------------------------------------------------------------------------------
+diff --git a/rtl/caches/cachepackage.vhd b/rtl/caches/cachepackage.vhd
+index 1bd59bd6..00719f0f 100644
+--- a/rtl/caches/cachepackage.vhd
++++ b/rtl/caches/cachepackage.vhd
+@@ -157,6 +157,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       hindex_mst  : integer := 0;
+       pindex      : integer range 0 to NAPBSLV - 1 := 6;
+       pirq        : integer := 4;
+@@ -214,6 +215,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       mem_num     : integer := 1;
+       mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+       cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/rtl/caches/gencaches.vhd b/rtl/caches/gencaches.vhd
+index a8a81649..9472541b 100644
+--- a/rtl/caches/gencaches.vhd
++++ b/rtl/caches/gencaches.vhd
+@@ -13,6 +13,7 @@ package gencaches is
+   component l2
+     generic (
+       use_rtl : integer;
++      little_end : integer range 0 to 1;
+       sets : integer;
+       ways : integer
+       );
+diff --git a/rtl/caches/l2_acc_wrapper.vhd b/rtl/caches/l2_acc_wrapper.vhd
+index d2cfdd19..1451cdc4 100644
+--- a/rtl/caches/l2_acc_wrapper.vhd
++++ b/rtl/caches/l2_acc_wrapper.vhd
+@@ -34,6 +34,7 @@ entity l2_acc_wrapper is
+     tech        : integer := virtex7;
+     sets        : integer := 256;
+     ways        : integer := 8;
++    little_end  : integer range 0 to 1 := 1;
+     mem_num     : integer := 1;
+     mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+     cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -383,6 +384,7 @@ begin  -- architecture rtl of l2_acc_wrapper
+ 
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 08aa39ad..06730935 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -36,6 +36,7 @@ entity l2_wrapper is
+     hindex_mst  : integer := 0;
+     pindex      : integer range 0 to NAPBSLV - 1 := 6;
+     pirq        : integer := 4;
++    little_end  : integer range 0 to 1 := 1;
+     mem_hindex  : integer := 4;
+     mem_hconfig : ahb_config_type;
+     mem_num     : integer := 1;
+@@ -491,6 +492,7 @@ begin  -- architecture rtl of l2_wrapper
+   l2_cache_i : l2
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+     port map (
+diff --git a/rtl/tiles/tile_cpu.vhd b/rtl/tiles/tile_cpu.vhd
+index 6a6ef0ae..2356b656 100644
+--- a/rtl/tiles/tile_cpu.vhd
++++ b/rtl/tiles/tile_cpu.vhd
+@@ -1208,6 +1208,7 @@ begin
+         tech          => CFG_FABTECH,
+         sets          => CFG_L2_SETS,
+         ways          => CFG_L2_WAYS,
++        little_end    => GLOB_CPU_RISCV,
+         hindex_mst    => CFG_NCPU_TILE,
+         pindex        => 1,
+         pirq          => CFG_SLD_L2_CACHE_IRQ,
+diff --git a/tools/socketgen/templates/noc2axi_interface.vhd b/tools/socketgen/templates/noc2axi_interface.vhd
+index a79a065d..407950fc 100644
+--- a/tools/socketgen/templates/noc2axi_interface.vhd
++++ b/tools/socketgen/templates/noc2axi_interface.vhd
+@@ -37,6 +37,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/tools/socketgen/templates/noc_interface.vhd b/tools/socketgen/templates/noc_interface.vhd
+index b12012cd..7c582410 100644
+--- a/tools/socketgen/templates/noc_interface.vhd
++++ b/tools/socketgen/templates/noc_interface.vhd
+@@ -35,6 +35,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -272,6 +273,7 @@ begin
+         tech          => tech,
+         sets          => sets,
+         ways          => ways,
++        little_end    => little_end,
+         mem_num       => cacheable_mem_num,
+         mem_info      => cacheable_mem_info,
+         cache_y       => cache_y,
+diff --git a/tools/socketgen/templates/tile_acc.vhd b/tools/socketgen/templates/tile_acc.vhd
+index d98d0458..fd7c634f 100644
+--- a/tools/socketgen/templates/tile_acc.vhd
++++ b/tools/socketgen/templates/tile_acc.vhd
+@@ -275,7 +275,9 @@ architecture rtl of tile_acc is
+   constant io_x                : local_yx                           := tile_x(io_tile_id);
+   constant this_scatter_gather : integer range 0 to 1               := CFG_SCATTER_GATHER;
+ 
+-   -- Noc signals
++  constant little_end          : integer range 0 to 1               := GLOB_CPU_RISCV;
++
++  -- Noc signals
+   signal noc1_stop_in_s         : std_logic_vector(4 downto 0);
+   signal noc1_stop_out_s        : std_logic_vector(4 downto 0);
+   signal noc1_acc_stop_in       : std_ulogic;
+diff --git a/rtl/caches/llc_wrapper.vhd b/rtl/caches/llc_wrapper.vhd
+index 12a9d099..be52da95 100644
+--- a/rtl/caches/llc_wrapper.vhd
++++ b/rtl/caches/llc_wrapper.vhd
+@@ -704,7 +704,7 @@ begin  -- architecture rtl
+     ahbmo.hsize <= HSIZE_DWORD;
+   end generate ariane_cache_word_gen;
+ 
+-  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 generate
++  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 or GLOB_CPU_ARCH = ibex generate
+     ahbmo.hsize <= HSIZE_WORD;
+   end generate leon3_cache_word_gen;
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 99b6dccb..08aa39ad 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -1123,10 +1123,23 @@ begin  -- architecture rtl of l2_wrapper
+ -------------------------------------------------------------------------------
+ -- FSM: Bridge from L2 cache frontend output to AHB master (L1 invalidation)
+ -------------------------------------------------------------------------------
+-  -- put writes of invalidate addresses coming from the L2 cache into a FIFO
+-  inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_data_in <= inval_data;
++  ahb_no_inval_gen: if GLOB_CPU_ARCH = ibex generate
++    inval_ready      <= '1';
++    inv_fifo_rdreq   <= '0';
++    inv_fifo_wrreq   <= '0';
++    inv_fifo_data_in <= (others => '0');
++
++    ahbmo.hbusreq    <= '0';
++    ahbmo.htrans     <=  HTRANS_IDLE;
++    ahbmo.hlock      <= '0';
++    ahbmo.haddr      <= (others => '0');
++  end generate ahb_no_inval_gen;
++
++  ahb_inval_gen: if GLOB_CPU_ARCH /= ibex generate
++    -- put writes of invalidate addresses coming from the L2 cache into a FIFO
++    inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_data_in <= inval_data;
+ 
+   fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out)
+ 
+@@ -1210,6 +1223,7 @@ begin  -- architecture rtl of l2_wrapper
+     ahbm_reg_next <= reg;
+ 
+   end process fsm_ahbm;
++  end generate ahb_inval_gen;
+   end generate ahb_frontend_gen;
+ 
+ -------------------------------------------------------------------------------
+diff --git a/rtl/caches/cachepackage.vhd b/rtl/caches/cachepackage.vhd
+index 1bd59bd6..00719f0f 100644
+--- a/rtl/caches/cachepackage.vhd
++++ b/rtl/caches/cachepackage.vhd
+@@ -157,6 +157,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       hindex_mst  : integer := 0;
+       pindex      : integer range 0 to NAPBSLV - 1 := 6;
+       pirq        : integer := 4;
+@@ -214,6 +215,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       mem_num     : integer := 1;
+       mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+       cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/rtl/caches/gencaches.vhd b/rtl/caches/gencaches.vhd
+index a8a81649..9472541b 100644
+--- a/rtl/caches/gencaches.vhd
++++ b/rtl/caches/gencaches.vhd
+@@ -13,6 +13,7 @@ package gencaches is
+   component l2
+     generic (
+       use_rtl : integer;
++      little_end : integer range 0 to 1;
+       sets : integer;
+       ways : integer
+       );
+diff --git a/rtl/caches/l2_acc_wrapper.vhd b/rtl/caches/l2_acc_wrapper.vhd
+index d2cfdd19..1451cdc4 100644
+--- a/rtl/caches/l2_acc_wrapper.vhd
++++ b/rtl/caches/l2_acc_wrapper.vhd
+@@ -34,6 +34,7 @@ entity l2_acc_wrapper is
+     tech        : integer := virtex7;
+     sets        : integer := 256;
+     ways        : integer := 8;
++    little_end  : integer range 0 to 1 := 1;
+     mem_num     : integer := 1;
+     mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+     cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -383,6 +384,7 @@ begin  -- architecture rtl of l2_acc_wrapper
+ 
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 08aa39ad..06730935 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -36,6 +36,7 @@ entity l2_wrapper is
+     hindex_mst  : integer := 0;
+     pindex      : integer range 0 to NAPBSLV - 1 := 6;
+     pirq        : integer := 4;
++    little_end  : integer range 0 to 1 := 1;
+     mem_hindex  : integer := 4;
+     mem_hconfig : ahb_config_type;
+     mem_num     : integer := 1;
+@@ -491,6 +492,7 @@ begin  -- architecture rtl of l2_wrapper
+   l2_cache_i : l2
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+     port map (
+diff --git a/rtl/tiles/tile_cpu.vhd b/rtl/tiles/tile_cpu.vhd
+index 6a6ef0ae..2356b656 100644
+--- a/rtl/tiles/tile_cpu.vhd
++++ b/rtl/tiles/tile_cpu.vhd
+@@ -1208,6 +1208,7 @@ begin
+         tech          => CFG_FABTECH,
+         sets          => CFG_L2_SETS,
+         ways          => CFG_L2_WAYS,
++        little_end    => GLOB_CPU_RISCV,
+         hindex_mst    => CFG_NCPU_TILE,
+         pindex        => 1,
+         pirq          => CFG_SLD_L2_CACHE_IRQ,
+diff --git a/tools/socketgen/templates/noc2axi_interface.vhd b/tools/socketgen/templates/noc2axi_interface.vhd
+index a79a065d..407950fc 100644
+--- a/tools/socketgen/templates/noc2axi_interface.vhd
++++ b/tools/socketgen/templates/noc2axi_interface.vhd
+@@ -37,6 +37,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/tools/socketgen/templates/noc_interface.vhd b/tools/socketgen/templates/noc_interface.vhd
+index b12012cd..7c582410 100644
+--- a/tools/socketgen/templates/noc_interface.vhd
++++ b/tools/socketgen/templates/noc_interface.vhd
+@@ -35,6 +35,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -272,6 +273,7 @@ begin
+         tech          => tech,
+         sets          => sets,
+         ways          => ways,
++        little_end    => little_end,
+         mem_num       => cacheable_mem_num,
+         mem_info      => cacheable_mem_info,
+         cache_y       => cache_y,
+diff --git a/tools/socketgen/templates/tile_acc.vhd b/tools/socketgen/templates/tile_acc.vhd
+index d98d0458..fd7c634f 100644
+--- a/tools/socketgen/templates/tile_acc.vhd
++++ b/tools/socketgen/templates/tile_acc.vhd
+@@ -275,7 +275,9 @@ architecture rtl of tile_acc is
+   constant io_x                : local_yx                           := tile_x(io_tile_id);
+   constant this_scatter_gather : integer range 0 to 1               := CFG_SCATTER_GATHER;
+ 
+-   -- Noc signals
++  constant little_end          : integer range 0 to 1               := GLOB_CPU_RISCV;
++
++  -- Noc signals
+   signal noc1_stop_in_s         : std_logic_vector(4 downto 0);
+   signal noc1_stop_out_s        : std_logic_vector(4 downto 0);
+   signal noc1_acc_stop_in       : std_ulogic;
+diff --git a/rtl/caches/llc_wrapper.vhd b/rtl/caches/llc_wrapper.vhd
+index 12a9d099..be52da95 100644
+--- a/rtl/caches/llc_wrapper.vhd
++++ b/rtl/caches/llc_wrapper.vhd
+@@ -704,7 +704,7 @@ begin  -- architecture rtl
+     ahbmo.hsize <= HSIZE_DWORD;
+   end generate ariane_cache_word_gen;
+ 
+-  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 generate
++  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 or GLOB_CPU_ARCH = ibex generate
+     ahbmo.hsize <= HSIZE_WORD;
+   end generate leon3_cache_word_gen;
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 99b6dccb..08aa39ad 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -1123,10 +1123,23 @@ begin  -- architecture rtl of l2_wrapper
+ -------------------------------------------------------------------------------
+ -- FSM: Bridge from L2 cache frontend output to AHB master (L1 invalidation)
+ -------------------------------------------------------------------------------
+-  -- put writes of invalidate addresses coming from the L2 cache into a FIFO
+-  inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_data_in <= inval_data;
++  ahb_no_inval_gen: if GLOB_CPU_ARCH = ibex generate
++    inval_ready      <= '1';
++    inv_fifo_rdreq   <= '0';
++    inv_fifo_wrreq   <= '0';
++    inv_fifo_data_in <= (others => '0');
++
++    ahbmo.hbusreq    <= '0';
++    ahbmo.htrans     <=  HTRANS_IDLE;
++    ahbmo.hlock      <= '0';
++    ahbmo.haddr      <= (others => '0');
++  end generate ahb_no_inval_gen;
++
++  ahb_inval_gen: if GLOB_CPU_ARCH /= ibex generate
++    -- put writes of invalidate addresses coming from the L2 cache into a FIFO
++    inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_data_in <= inval_data;
+ 
+   fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out)
+ 
+@@ -1210,6 +1223,7 @@ begin  -- architecture rtl of l2_wrapper
+     ahbm_reg_next <= reg;
+ 
+   end process fsm_ahbm;
++  end generate ahb_inval_gen;
+   end generate ahb_frontend_gen;
+ 
+ -------------------------------------------------------------------------------
+diff --git a/rtl/caches/cachepackage.vhd b/rtl/caches/cachepackage.vhd
+index 1bd59bd6..00719f0f 100644
+--- a/rtl/caches/cachepackage.vhd
++++ b/rtl/caches/cachepackage.vhd
+@@ -157,6 +157,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       hindex_mst  : integer := 0;
+       pindex      : integer range 0 to NAPBSLV - 1 := 6;
+       pirq        : integer := 4;
+@@ -214,6 +215,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       mem_num     : integer := 1;
+       mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+       cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/rtl/caches/gencaches.vhd b/rtl/caches/gencaches.vhd
+index a8a81649..9472541b 100644
+--- a/rtl/caches/gencaches.vhd
++++ b/rtl/caches/gencaches.vhd
+@@ -13,6 +13,7 @@ package gencaches is
+   component l2
+     generic (
+       use_rtl : integer;
++      little_end : integer range 0 to 1;
+       sets : integer;
+       ways : integer
+       );
+diff --git a/rtl/caches/l2_acc_wrapper.vhd b/rtl/caches/l2_acc_wrapper.vhd
+index d2cfdd19..1451cdc4 100644
+--- a/rtl/caches/l2_acc_wrapper.vhd
++++ b/rtl/caches/l2_acc_wrapper.vhd
+@@ -34,6 +34,7 @@ entity l2_acc_wrapper is
+     tech        : integer := virtex7;
+     sets        : integer := 256;
+     ways        : integer := 8;
++    little_end  : integer range 0 to 1 := 1;
+     mem_num     : integer := 1;
+     mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+     cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -383,6 +384,7 @@ begin  -- architecture rtl of l2_acc_wrapper
+ 
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 08aa39ad..06730935 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -36,6 +36,7 @@ entity l2_wrapper is
+     hindex_mst  : integer := 0;
+     pindex      : integer range 0 to NAPBSLV - 1 := 6;
+     pirq        : integer := 4;
++    little_end  : integer range 0 to 1 := 1;
+     mem_hindex  : integer := 4;
+     mem_hconfig : ahb_config_type;
+     mem_num     : integer := 1;
+@@ -491,6 +492,7 @@ begin  -- architecture rtl of l2_wrapper
+   l2_cache_i : l2
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+     port map (
+diff --git a/rtl/tiles/tile_cpu.vhd b/rtl/tiles/tile_cpu.vhd
+index 6a6ef0ae..2356b656 100644
+--- a/rtl/tiles/tile_cpu.vhd
++++ b/rtl/tiles/tile_cpu.vhd
+@@ -1208,6 +1208,7 @@ begin
+         tech          => CFG_FABTECH,
+         sets          => CFG_L2_SETS,
+         ways          => CFG_L2_WAYS,
++        little_end    => GLOB_CPU_RISCV,
+         hindex_mst    => CFG_NCPU_TILE,
+         pindex        => 1,
+         pirq          => CFG_SLD_L2_CACHE_IRQ,
+diff --git a/tools/socketgen/templates/noc2axi_interface.vhd b/tools/socketgen/templates/noc2axi_interface.vhd
+index a79a065d..407950fc 100644
+--- a/tools/socketgen/templates/noc2axi_interface.vhd
++++ b/tools/socketgen/templates/noc2axi_interface.vhd
+@@ -37,6 +37,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/tools/socketgen/templates/noc_interface.vhd b/tools/socketgen/templates/noc_interface.vhd
+index b12012cd..7c582410 100644
+--- a/tools/socketgen/templates/noc_interface.vhd
++++ b/tools/socketgen/templates/noc_interface.vhd
+@@ -35,6 +35,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -272,6 +273,7 @@ begin
+         tech          => tech,
+         sets          => sets,
+         ways          => ways,
++        little_end    => little_end,
+         mem_num       => cacheable_mem_num,
+         mem_info      => cacheable_mem_info,
+         cache_y       => cache_y,
+diff --git a/tools/socketgen/templates/tile_acc.vhd b/tools/socketgen/templates/tile_acc.vhd
+index d98d0458..fd7c634f 100644
+--- a/tools/socketgen/templates/tile_acc.vhd
++++ b/tools/socketgen/templates/tile_acc.vhd
+@@ -275,7 +275,9 @@ architecture rtl of tile_acc is
+   constant io_x                : local_yx                           := tile_x(io_tile_id);
+   constant this_scatter_gather : integer range 0 to 1               := CFG_SCATTER_GATHER;
+ 
+-   -- Noc signals
++  constant little_end          : integer range 0 to 1               := GLOB_CPU_RISCV;
++
++  -- Noc signals
+   signal noc1_stop_in_s         : std_logic_vector(4 downto 0);
+   signal noc1_stop_out_s        : std_logic_vector(4 downto 0);
+   signal noc1_acc_stop_in       : std_ulogic;
+diff --git a/rtl/caches/llc_wrapper.vhd b/rtl/caches/llc_wrapper.vhd
+index 12a9d099..be52da95 100644
+--- a/rtl/caches/llc_wrapper.vhd
++++ b/rtl/caches/llc_wrapper.vhd
+@@ -704,7 +704,7 @@ begin  -- architecture rtl
+     ahbmo.hsize <= HSIZE_DWORD;
+   end generate ariane_cache_word_gen;
+ 
+-  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 generate
++  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 or GLOB_CPU_ARCH = ibex generate
+     ahbmo.hsize <= HSIZE_WORD;
+   end generate leon3_cache_word_gen;
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 99b6dccb..08aa39ad 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -1123,10 +1123,23 @@ begin  -- architecture rtl of l2_wrapper
+ -------------------------------------------------------------------------------
+ -- FSM: Bridge from L2 cache frontend output to AHB master (L1 invalidation)
+ -------------------------------------------------------------------------------
+-  -- put writes of invalidate addresses coming from the L2 cache into a FIFO
+-  inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_data_in <= inval_data;
++  ahb_no_inval_gen: if GLOB_CPU_ARCH = ibex generate
++    inval_ready      <= '1';
++    inv_fifo_rdreq   <= '0';
++    inv_fifo_wrreq   <= '0';
++    inv_fifo_data_in <= (others => '0');
++
++    ahbmo.hbusreq    <= '0';
++    ahbmo.htrans     <=  HTRANS_IDLE;
++    ahbmo.hlock      <= '0';
++    ahbmo.haddr      <= (others => '0');
++  end generate ahb_no_inval_gen;
++
++  ahb_inval_gen: if GLOB_CPU_ARCH /= ibex generate
++    -- put writes of invalidate addresses coming from the L2 cache into a FIFO
++    inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_data_in <= inval_data;
+ 
+   fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out)
+ 
+@@ -1210,6 +1223,7 @@ begin  -- architecture rtl of l2_wrapper
+     ahbm_reg_next <= reg;
+ 
+   end process fsm_ahbm;
++  end generate ahb_inval_gen;
+   end generate ahb_frontend_gen;
+ 
+ -------------------------------------------------------------------------------
+diff --git a/rtl/caches/cachepackage.vhd b/rtl/caches/cachepackage.vhd
+index 1bd59bd6..00719f0f 100644
+--- a/rtl/caches/cachepackage.vhd
++++ b/rtl/caches/cachepackage.vhd
+@@ -157,6 +157,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       hindex_mst  : integer := 0;
+       pindex      : integer range 0 to NAPBSLV - 1 := 6;
+       pirq        : integer := 4;
+@@ -214,6 +215,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       mem_num     : integer := 1;
+       mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+       cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/rtl/caches/gencaches.vhd b/rtl/caches/gencaches.vhd
+index a8a81649..9472541b 100644
+--- a/rtl/caches/gencaches.vhd
++++ b/rtl/caches/gencaches.vhd
+@@ -13,6 +13,7 @@ package gencaches is
+   component l2
+     generic (
+       use_rtl : integer;
++      little_end : integer range 0 to 1;
+       sets : integer;
+       ways : integer
+       );
+diff --git a/rtl/caches/l2_acc_wrapper.vhd b/rtl/caches/l2_acc_wrapper.vhd
+index d2cfdd19..1451cdc4 100644
+--- a/rtl/caches/l2_acc_wrapper.vhd
++++ b/rtl/caches/l2_acc_wrapper.vhd
+@@ -34,6 +34,7 @@ entity l2_acc_wrapper is
+     tech        : integer := virtex7;
+     sets        : integer := 256;
+     ways        : integer := 8;
++    little_end  : integer range 0 to 1 := 1;
+     mem_num     : integer := 1;
+     mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+     cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -383,6 +384,7 @@ begin  -- architecture rtl of l2_acc_wrapper
+ 
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 08aa39ad..06730935 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -36,6 +36,7 @@ entity l2_wrapper is
+     hindex_mst  : integer := 0;
+     pindex      : integer range 0 to NAPBSLV - 1 := 6;
+     pirq        : integer := 4;
++    little_end  : integer range 0 to 1 := 1;
+     mem_hindex  : integer := 4;
+     mem_hconfig : ahb_config_type;
+     mem_num     : integer := 1;
+@@ -491,6 +492,7 @@ begin  -- architecture rtl of l2_wrapper
+   l2_cache_i : l2
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+     port map (
+diff --git a/rtl/tiles/tile_cpu.vhd b/rtl/tiles/tile_cpu.vhd
+index 6a6ef0ae..2356b656 100644
+--- a/rtl/tiles/tile_cpu.vhd
++++ b/rtl/tiles/tile_cpu.vhd
+@@ -1208,6 +1208,7 @@ begin
+         tech          => CFG_FABTECH,
+         sets          => CFG_L2_SETS,
+         ways          => CFG_L2_WAYS,
++        little_end    => GLOB_CPU_RISCV,
+         hindex_mst    => CFG_NCPU_TILE,
+         pindex        => 1,
+         pirq          => CFG_SLD_L2_CACHE_IRQ,
+diff --git a/tools/socketgen/templates/noc2axi_interface.vhd b/tools/socketgen/templates/noc2axi_interface.vhd
+index a79a065d..407950fc 100644
+--- a/tools/socketgen/templates/noc2axi_interface.vhd
++++ b/tools/socketgen/templates/noc2axi_interface.vhd
+@@ -37,6 +37,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/tools/socketgen/templates/noc_interface.vhd b/tools/socketgen/templates/noc_interface.vhd
+index b12012cd..7c582410 100644
+--- a/tools/socketgen/templates/noc_interface.vhd
++++ b/tools/socketgen/templates/noc_interface.vhd
+@@ -35,6 +35,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -272,6 +273,7 @@ begin
+         tech          => tech,
+         sets          => sets,
+         ways          => ways,
++        little_end    => little_end,
+         mem_num       => cacheable_mem_num,
+         mem_info      => cacheable_mem_info,
+         cache_y       => cache_y,
+diff --git a/tools/socketgen/templates/tile_acc.vhd b/tools/socketgen/templates/tile_acc.vhd
+index d98d0458..fd7c634f 100644
+--- a/tools/socketgen/templates/tile_acc.vhd
++++ b/tools/socketgen/templates/tile_acc.vhd
+@@ -275,7 +275,9 @@ architecture rtl of tile_acc is
+   constant io_x                : local_yx                           := tile_x(io_tile_id);
+   constant this_scatter_gather : integer range 0 to 1               := CFG_SCATTER_GATHER;
+ 
+-   -- Noc signals
++  constant little_end          : integer range 0 to 1               := GLOB_CPU_RISCV;
++
++  -- Noc signals
+   signal noc1_stop_in_s         : std_logic_vector(4 downto 0);
+   signal noc1_stop_out_s        : std_logic_vector(4 downto 0);
+   signal noc1_acc_stop_in       : std_ulogic;
+diff --git a/rtl/caches/llc_wrapper.vhd b/rtl/caches/llc_wrapper.vhd
+index 12a9d099..be52da95 100644
+--- a/rtl/caches/llc_wrapper.vhd
++++ b/rtl/caches/llc_wrapper.vhd
+@@ -704,7 +704,7 @@ begin  -- architecture rtl
+     ahbmo.hsize <= HSIZE_DWORD;
+   end generate ariane_cache_word_gen;
+ 
+-  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 generate
++  leon3_cache_word_gen: if GLOB_CPU_ARCH = leon3 or GLOB_CPU_ARCH = ibex generate
+     ahbmo.hsize <= HSIZE_WORD;
+   end generate leon3_cache_word_gen;
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 99b6dccb..08aa39ad 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -1123,10 +1123,23 @@ begin  -- architecture rtl of l2_wrapper
+ -------------------------------------------------------------------------------
+ -- FSM: Bridge from L2 cache frontend output to AHB master (L1 invalidation)
+ -------------------------------------------------------------------------------
+-  -- put writes of invalidate addresses coming from the L2 cache into a FIFO
+-  inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
+-  inv_fifo_data_in <= inval_data;
++  ahb_no_inval_gen: if GLOB_CPU_ARCH = ibex generate
++    inval_ready      <= '1';
++    inv_fifo_rdreq   <= '0';
++    inv_fifo_wrreq   <= '0';
++    inv_fifo_data_in <= (others => '0');
++
++    ahbmo.hbusreq    <= '0';
++    ahbmo.htrans     <=  HTRANS_IDLE;
++    ahbmo.hlock      <= '0';
++    ahbmo.haddr      <= (others => '0');
++  end generate ahb_no_inval_gen;
++
++  ahb_inval_gen: if GLOB_CPU_ARCH /= ibex generate
++    -- put writes of invalidate addresses coming from the L2 cache into a FIFO
++    inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
++    inv_fifo_data_in <= inval_data;
+ 
+   fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out)
+ 
+@@ -1210,6 +1223,7 @@ begin  -- architecture rtl of l2_wrapper
+     ahbm_reg_next <= reg;
+ 
+   end process fsm_ahbm;
++  end generate ahb_inval_gen;
+   end generate ahb_frontend_gen;
+ 
+ -------------------------------------------------------------------------------
+diff --git a/rtl/caches/cachepackage.vhd b/rtl/caches/cachepackage.vhd
+index 1bd59bd6..00719f0f 100644
+--- a/rtl/caches/cachepackage.vhd
++++ b/rtl/caches/cachepackage.vhd
+@@ -157,6 +157,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       hindex_mst  : integer := 0;
+       pindex      : integer range 0 to NAPBSLV - 1 := 6;
+       pirq        : integer := 4;
+@@ -214,6 +215,7 @@ package cachepackage is
+       tech        : integer := virtex7;
+       sets        : integer := 256;
+       ways        : integer := 8;
++      little_end  : integer range 0 to 1 := 1;
+       mem_num     : integer := 1;
+       mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+       cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/rtl/caches/gencaches.vhd b/rtl/caches/gencaches.vhd
+index a8a81649..9472541b 100644
+--- a/rtl/caches/gencaches.vhd
++++ b/rtl/caches/gencaches.vhd
+@@ -13,6 +13,7 @@ package gencaches is
+   component l2
+     generic (
+       use_rtl : integer;
++      little_end : integer range 0 to 1;
+       sets : integer;
+       ways : integer
+       );
+diff --git a/rtl/caches/l2_acc_wrapper.vhd b/rtl/caches/l2_acc_wrapper.vhd
+index d2cfdd19..1451cdc4 100644
+--- a/rtl/caches/l2_acc_wrapper.vhd
++++ b/rtl/caches/l2_acc_wrapper.vhd
+@@ -34,6 +34,7 @@ entity l2_acc_wrapper is
+     tech        : integer := virtex7;
+     sets        : integer := 256;
+     ways        : integer := 8;
++    little_end  : integer range 0 to 1 := 1;
+     mem_num     : integer := 1;
+     mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
+     cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -383,6 +384,7 @@ begin  -- architecture rtl of l2_acc_wrapper
+ 
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+ 
+diff --git a/rtl/caches/l2_wrapper.vhd b/rtl/caches/l2_wrapper.vhd
+index 08aa39ad..06730935 100644
+--- a/rtl/caches/l2_wrapper.vhd
++++ b/rtl/caches/l2_wrapper.vhd
+@@ -36,6 +36,7 @@ entity l2_wrapper is
+     hindex_mst  : integer := 0;
+     pindex      : integer range 0 to NAPBSLV - 1 := 6;
+     pirq        : integer := 4;
++    little_end  : integer range 0 to 1 := 1;
+     mem_hindex  : integer := 4;
+     mem_hconfig : ahb_config_type;
+     mem_num     : integer := 1;
+@@ -491,6 +492,7 @@ begin  -- architecture rtl of l2_wrapper
+   l2_cache_i : l2
+     generic map (
+       use_rtl => CFG_CACHE_RTL,
++      little_end => little_end,
+       sets => sets,
+       ways => ways)
+     port map (
+diff --git a/rtl/tiles/tile_cpu.vhd b/rtl/tiles/tile_cpu.vhd
+index 6a6ef0ae..2356b656 100644
+--- a/rtl/tiles/tile_cpu.vhd
++++ b/rtl/tiles/tile_cpu.vhd
+@@ -1208,6 +1208,7 @@ begin
+         tech          => CFG_FABTECH,
+         sets          => CFG_L2_SETS,
+         ways          => CFG_L2_WAYS,
++        little_end    => GLOB_CPU_RISCV,
+         hindex_mst    => CFG_NCPU_TILE,
+         pindex        => 1,
+         pirq          => CFG_SLD_L2_CACHE_IRQ,
+diff --git a/tools/socketgen/templates/noc2axi_interface.vhd b/tools/socketgen/templates/noc2axi_interface.vhd
+index a79a065d..407950fc 100644
+--- a/tools/socketgen/templates/noc2axi_interface.vhd
++++ b/tools/socketgen/templates/noc2axi_interface.vhd
+@@ -37,6 +37,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+diff --git a/tools/socketgen/templates/noc_interface.vhd b/tools/socketgen/templates/noc_interface.vhd
+index b12012cd..7c582410 100644
+--- a/tools/socketgen/templates/noc_interface.vhd
++++ b/tools/socketgen/templates/noc_interface.vhd
+@@ -35,6 +35,7 @@ use std.textio.all;
+     scatter_gather : integer := 1;
+     sets           : integer := 256;
+     ways           : integer := 8;
++    little_end     : integer range 0 to 1 := 1;
+     cache_tile_id  : cache_attribute_array;
+     cache_y        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+     cache_x        : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
+@@ -272,6 +273,7 @@ begin
+         tech          => tech,
+         sets          => sets,
+         ways          => ways,
++        little_end    => little_end,
+         mem_num       => cacheable_mem_num,
+         mem_info      => cacheable_mem_info,
+         cache_y       => cache_y,
+diff --git a/tools/socketgen/templates/tile_acc.vhd b/tools/socketgen/templates/tile_acc.vhd
+index d98d0458..fd7c634f 100644
+--- a/tools/socketgen/templates/tile_acc.vhd
++++ b/tools/socketgen/templates/tile_acc.vhd
+@@ -275,7 +275,9 @@ architecture rtl of tile_acc is
+   constant io_x                : local_yx                           := tile_x(io_tile_id);
+   constant this_scatter_gather : integer range 0 to 1               := CFG_SCATTER_GATHER;
+ 
+-   -- Noc signals
++  constant little_end          : integer range 0 to 1               := GLOB_CPU_RISCV;
++
++  -- Noc signals
+   signal noc1_stop_in_s         : std_logic_vector(4 downto 0);
+   signal noc1_stop_out_s        : std_logic_vector(4 downto 0);
+   signal noc1_acc_stop_in       : std_ulogic;

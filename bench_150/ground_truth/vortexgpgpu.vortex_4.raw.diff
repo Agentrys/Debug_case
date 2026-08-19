@@ -1,0 +1,1096 @@
+diff --git a/hw/rtl/libs/VX_mem_streamer.sv b/hw/rtl/libs/VX_mem_streamer.sv
+index 59fc4c664..999aa34a1 100644
+--- a/hw/rtl/libs/VX_mem_streamer.sv
++++ b/hw/rtl/libs/VX_mem_streamer.sv
+@@ -1,231 +1,242 @@
+ `include "VX_platform.vh"
+ 
+-`TRACING_OFF
++// `TRACING_OFF
+ module VX_mem_streamer #(
+-    parameter NUM_REQS = 4,
+-	parameter ADDRW = 32,	
+-	parameter DATAW = 32,
+-	parameter TAGW = 32,
+-	parameter WORD_SIZE = 4,
+-	parameter QUEUE_SIZE = 16,
+-	parameter QUEUE_ADDRW = `CLOG2(QUEUE_SIZE),
+-	parameter PARTIAL_RESPONSE = 0
++  parameter NUM_REQS = 4,
++    parameter ADDRW = 32,
++    parameter DATAW = 32,
++    parameter TAGW = 32,
++    parameter WORD_SIZE = 4,
++    parameter QUEUE_SIZE = 16,
++    parameter QUEUE_ADDRW = `CLOG2(QUEUE_SIZE),
++    parameter PARTIAL_RESPONSE = 0
+ ) (
+     input  wire clk,
+     input  wire reset,
+ 
+-	// Input request
+-	input wire 								req_valid,
+-	input wire 								req_rw,
+-	input wire [NUM_REQS-1:0] 				req_mask,
+-	input wire [WORD_SIZE-1:0] 				req_byteen,
+-	input wire [NUM_REQS-1:0][ADDRW-1:0] 	req_addr,
+-	input wire [NUM_REQS-1:0][DATAW-1:0] 	req_data,
+-	input wire [TAGW-1:0]					req_tag,
+-	output wire 							req_ready,
+-
+-	// Output request
+-	output wire [NUM_REQS-1:0] 					mem_req_valid,
+-	output wire [NUM_REQS-1:0] 					mem_req_rw,
+-	output wire [NUM_REQS-1:0][WORD_SIZE-1:0] 	mem_req_byteen,
+-	output wire [NUM_REQS-1:0][ADDRW-1:0] 		mem_req_addr,
+-	output wire [NUM_REQS-1:0][DATAW-1:0] 		mem_req_data,
+-	output wire [NUM_REQS-1:0][QUEUE_ADDRW-1:0] mem_req_tag,
+-	input wire 	[NUM_REQS-1:0]					mem_req_ready,
+-
+-	// Input response
+-	input wire 								mem_rsp_valid,
+-	input wire [NUM_REQS-1:0] 				mem_rsp_mask,
+-	input wire [NUM_REQS-1:0][DATAW-1:0] 	mem_rsp_data,
+-	input wire [QUEUE_ADDRW-1:0] 			mem_rsp_tag,
+-	output wire 							mem_rsp_ready,
+-
+-	// Output response
+-	output wire 							rsp_valid,
+-	output wire [NUM_REQS-1:0] 				rsp_mask,
+-	output wire [NUM_REQS-1:0][DATAW-1:0] 	rsp_data,
+-	output wire [TAGW-1:0] 					rsp_tag,
+-	input wire 								rsp_ready
++    // Input request
++    input wire                           req_valid,
++    input wire                           req_rw,
++    input wire [NUM_REQS-1:0]            req_mask,
++    input wire [WORD_SIZE-1:0]           req_byteen,
++    input wire [NUM_REQS-1:0][ADDRW-1:0] req_addr,
++    input wire [NUM_REQS-1:0][DATAW-1:0] req_data,
++    input wire [TAGW-1:0]                req_tag,
++    output wire                          req_ready,
++
++    // Output request
++    output wire [NUM_REQS-1:0]                  mem_req_valid,
++    output wire [NUM_REQS-1:0]                  mem_req_rw,
++    output wire [NUM_REQS-1:0][WORD_SIZE-1:0]   mem_req_byteen,
++    output wire [NUM_REQS-1:0][ADDRW-1:0]       mem_req_addr,
++    output wire [NUM_REQS-1:0][DATAW-1:0]       mem_req_data,
++    output wire [NUM_REQS-1:0][QUEUE_ADDRW-1:0] mem_req_tag,
++    input wire 	[NUM_REQS-1:0]                  mem_req_ready,
++
++    // Input response
++    input wire                           mem_rsp_valid,
++    input wire [NUM_REQS-1:0]            mem_rsp_mask,
++    input wire [NUM_REQS-1:0][DATAW-1:0] mem_rsp_data,
++    input wire [QUEUE_ADDRW-1:0]         mem_rsp_tag,
++    output wire                          mem_rsp_ready,
++
++    // Output response
++    output wire                           rsp_valid,
++    output wire [NUM_REQS-1:0]            rsp_mask,
++    output wire [NUM_REQS-1:0][DATAW-1:0] rsp_data,
++    output wire [TAGW-1:0]                rsp_tag,
++    input wire                            rsp_ready
+   );
+ 
+-	localparam RSPW = 1 + NUM_REQS + (NUM_REQS * DATAW) + TAGW;
+-
+-	// Detect duplicate addresses
+-	wire [NUM_REQS-2:0] addr_matches;
+-	wire req_dup;
+-	wire [NUM_REQS-1:0] req_dup_mask;
+-
+-	// Pending queue
+-	wire [QUEUE_ADDRW-1:0] 	pq_waddr;
+-	wire 					pq_push;
+-	wire [QUEUE_ADDRW-1:0] 	pq_raddr;
+-	wire 					pq_pop;
+-	wire 					pq_full;
+-
+-	wire 							pq_req_valid;
+-	wire 							pq_req_rw, 		reqq_rw;
+-	wire [NUM_REQS-1:0] 			pq_req_mask, 	reqq_mask;
+-	wire [WORD_SIZE-1:0] 			pq_req_byteen, 	reqq_byteen;
+-	wire [NUM_REQS-1:0][ADDRW-1:0] 	pq_req_addr, 	reqq_addr;
+-	wire [NUM_REQS-1:0][DATAW-1:0] 	pq_req_data, 	reqq_data;
+-	wire [TAGW-1:0] 				pq_req_tag;
+-	wire [QUEUE_ADDRW-1:0]			reqq_tag;
+-
+-	// Index queue
+-	wire [QUEUE_ADDRW-1:0] 	iq_raddr;
+-	wire 					iq_pop;
+-	wire 					iq_full;
+-
+-	// Memory request
+-	wire [NUM_REQS-1:0] mem_req_fire;
+-	wire 				mem_req_new;
+-	reg  [NUM_REQS-1:0] req_sent_mask;
+-	wire [NUM_REQS-1:0] req_sent_mask_n;
+-	wire req_sent_all;
+-
+-	// Memory response
+-	wire 								mem_rsp_fire;
+-	reg  [QUEUE_SIZE-1:0][NUM_REQS-1:0]	rsp_rem_mask;
+-	wire [NUM_REQS-1:0] 				rsp_rem_mask_n;
+-
+-	// Response gather
+-	reg  [QUEUE_SIZE-1:0][RSPW-1:0] rg_rsp;
+-	wire [RSPW-1:0] rg_rsp_n;
+-
+-	wire req_en;
+-	wire rsp_en;
+-
+-	// Detect duplicate addresses
+-	for(genvar i = 0; i < NUM_REQS-1; i++) begin
+-		assign addr_matches[i] = (req_addr[i+1] == req_addr[0]) || ~req_mask[i+1];
+-	end
+-
+-	assign req_dup = req_mask[0] && (& addr_matches);
+-	assign req_dup_mask = req_mask & {{(NUM_REQS-1){~req_dup}}, 1'b1};
+-
+-	// Clear entry in PQ when all responses come back
+-	assign pq_pop = (mem_rsp_fire && (0 == rsp_rem_mask_n)) || req_rw;
+-
+-	// Select entry in PQ
+-	assign pq_raddr = mem_rsp_fire ? mem_rsp_tag : iq_raddr;
+-
+-	assign pq_push = ~pq_full || ~iq_full;
+-
+-	assign req_ready = pq_push;
+-				
+-	// Save incoming requests into a PQ
+-	VX_index_buffer #(
+-		.DATAW	(1 + 1 + NUM_REQS + WORD_SIZE + (NUM_REQS * ADDRW) + (NUM_REQS * DATAW) + TAGW),
+-		.SIZE	(QUEUE_SIZE)
+-	) pending_queue (
+-		.clk			(clk),
+-		.reset			(reset),
+-		.write_addr		(pq_waddr),
+-		.acquire_slot	(pq_push),
+-		.read_addr		(pq_raddr),
+-		.write_data		({req_valid,    req_rw,    req_dup_mask, req_byteen,    req_addr,    req_data,    req_tag}),
+-		.read_data		({pq_req_valid, pq_req_rw, pq_req_mask,  pq_req_byteen, pq_req_addr, pq_req_data, pq_req_tag}),
+-		.release_addr	(pq_raddr),
+-		.release_slot	(pq_pop),
+-		.full			(pq_full),
+-		`UNUSED_PIN 	(empty)
+-	);
+-
+-	// Clear entry from IQ when all requests have been sent
+-	assign iq_pop = req_sent_all;
+-
+-	// Save PQ addresses into an IQ
+-	VX_fifo_queue #(
+-		.DATAW	(QUEUE_ADDRW),
+-		.SIZE	(QUEUE_SIZE)
+-	) idx_queue (
+-		.clk		(clk),
+-		.reset		(reset),
+-		.push		(pq_push),
+-		.pop		(iq_pop),
+-		.data_in	(pq_waddr),
+-		.data_out	(iq_raddr),
+-		.full		(iq_full),
+-		`UNUSED_PIN (empty),
+-		`UNUSED_PIN (alm_full),
+-		`UNUSED_PIN (alm_empty),
+-		`UNUSED_PIN (size)
+-	);
+-
+-	// Memory response
+-	// TODO: Fix mem_rsp_ready
+-	assign mem_rsp_ready = ~rsp_ready;
+-	assign mem_rsp_fire = mem_rsp_valid && mem_rsp_ready;
+-	assign rsp_rem_mask_n = rsp_rem_mask[pq_raddr] & ~mem_rsp_mask;
+-	assign rg_rsp_n = rg_rsp[pq_raddr];
+-
+-	always @(posedge clk) begin
+-		if (pq_push) begin
+-			rsp_rem_mask[pq_waddr] <= req_dup_mask;
+-			rg_rsp[pq_waddr] <= 0;
+-		end
+-		if (mem_rsp_fire) begin
+-			rsp_rem_mask[pq_raddr]	<= rsp_rem_mask_n;
+-			rg_rsp[pq_raddr] <=  rg_rsp_n | {mem_rsp_valid, mem_rsp_mask, mem_rsp_data, pq_req_tag};
+-		end
+-	end
+-
+-	// Stall request pipeline in case of an invalid request
+-	assign req_en = pq_req_valid;
+-
+-	// TODO:
+-	// Stall logic if the host is not ready to receive a response
+-
+-	// Partial response
+-	assign rsp_en = PARTIAL_RESPONSE ? mem_rsp_fire : (0 == rsp_rem_mask_n);
+-
+-	VX_pipe_register #(
+-		.DATAW	(1 + NUM_REQS + WORD_SIZE + (NUM_REQS * ADDRW) + (NUM_REQS * DATAW) + QUEUE_ADDRW),
+-		.RESETW (1)
+-	) req_pipe_reg (
+-		.clk		(clk),
+-		.reset		(reset),
+-		.enable		(req_en),
+-		.data_in	({pq_req_rw, pq_req_mask, pq_req_byteen, pq_req_addr, pq_req_data, pq_raddr}),
+-		.data_out	({reqq_rw,    reqq_mask,    reqq_byteen,    reqq_addr,    reqq_data,    reqq_tag})
+-	);
+-
+-	VX_pipe_register #(
+-		.DATAW	(1 + NUM_REQS + (NUM_REQS * DATAW) + TAGW),
+-		.RESETW (1)
+-	) rsp_pipe_reg (
+-		.clk		(clk),
+-		.reset		(reset),
+-		.enable		(rsp_en),
+-		.data_in	(rg_rsp_n),
+-		.data_out	({rsp_valid, rsp_mask, rsp_data, rsp_tag})
+-	);
+-
+-	// Memory request
+-	assign mem_req_valid 	= reqq_mask & ~req_sent_mask & {NUM_REQS{req_sent_all}};
+-	assign mem_req_rw 		= {NUM_REQS{reqq_rw}};
+-	assign mem_req_addr 	= reqq_addr;
+-	assign mem_req_byteen 	= {NUM_REQS{reqq_byteen}};
+-	assign mem_req_data 	= reqq_data;
+-	assign mem_req_tag 		= {NUM_REQS{reqq_tag}};
+-
+-	assign mem_req_fire = mem_req_valid & mem_req_ready;
+-    assign mem_req_new = &(mem_req_ready | req_sent_mask | ~req_mask);
+-	assign req_sent_mask_n = req_sent_mask | mem_req_fire;
+-	assign req_sent_all = (req_mask == req_sent_mask);
+-
+-	always @(posedge clk) begin
+-		if (reset) begin
+-			req_sent_mask <= 0;
+-		end else begin
+-			if(mem_req_new) begin
+-				req_sent_mask <= 0;
+-			end
+-			else begin
+-				req_sent_mask <= req_sent_mask_n;
+-			end
+-		end
+-	end
++    localparam RSPW = TAGW + NUM_REQS + (NUM_REQS * DATAW) + 1;
++
++    // Detect duplicate addresses
++    wire [NUM_REQS-2:0] addr_matches;
++    wire req_dup;
++    wire [NUM_REQS-1:0] req_dup_mask;
++
++    // Pending queue
++    wire                           sreq_rw;
++    wire [NUM_REQS-1:0]            sreq_mask;
++    wire [WORD_SIZE-1:0]           sreq_byteen;
++    wire [NUM_REQS-1:0][ADDRW-1:0] sreq_addr;
++    wire [NUM_REQS-1:0][DATAW-1:0] sreq_data;
++    wire [QUEUE_ADDRW-1:0]         sreq_tag;
++
++    wire sreq_push;
++    wire sreq_pop;
++    wire sreq_full;
++    wire sreq_empty;
++
++    wire                   stag_push;
++    wire                   stag_pop;
++    wire [QUEUE_ADDRW-1:0] stag_waddr;
++    wire [QUEUE_ADDRW-1:0] stag_raddr;
++    wire                   stag_full;
++    wire                   stag_empty;
++    wire [TAGW-1:0]        stag_dout;
++
++    // Memory request
++    wire                                 mreq_en;
++    wire [NUM_REQS-1:0]                  mreq_valid;
++    wire [NUM_REQS-1:0]                  mreq_rw;
++    wire [NUM_REQS-1:0][WORD_SIZE-1:0]   mreq_byteen;
++    wire [NUM_REQS-1:0][ADDRW-1:0]       mreq_addr;
++    wire [NUM_REQS-1:0][DATAW-1:0]       mreq_data;
++    wire [NUM_REQS-1:0][QUEUE_ADDRW-1:0] mreq_tag;
++
++    wire [NUM_REQS-1:0] mem_req_fire;
++    reg  [NUM_REQS-1:0] req_sent_mask;
++    wire [NUM_REQS-1:0] req_sent_mask_n;
++    wire                req_sent_all;
++
++    // Memory response
++    wire                                mem_rsp_fire;
++    reg  [QUEUE_SIZE-1:0][RSPW-1:0]     rsp;
++    wire [RSPW-1:0]                     rsp_in;
++    reg  [RSPW-1:0]                     rsp_out;
++    reg  [QUEUE_SIZE-1:0][NUM_REQS-1:0] rsp_rem_mask;
++    wire [NUM_REQS-1:0]                 rsp_rem_mask_n;
++
++    //////////////////////////////////////////////////////////////////
++
++    // Detect duplicate addresses
++
++    for(genvar i = 0; i < NUM_REQS-1; i++) begin
++        assign addr_matches[i] = (req_addr[i+1] == req_addr[0]) || ~req_mask[i+1];
++    end
++
++    assign req_dup = req_mask[0] && (& addr_matches);
++    assign req_dup_mask = req_mask & {{(NUM_REQS-1){~req_dup}}, 1'b1};
++
++    //////////////////////////////////////////////////////////////////
++
++    // Save incoming requests into a pending queue
++
++    assign sreq_push = req_valid && !sreq_full && !stag_full;
++    assign sreq_pop  = req_sent_all && !sreq_empty;
++    assign req_ready = !sreq_full && !stag_full;
++
++    VX_fifo_queue #(
++        .DATAW	(1 + NUM_REQS + WORD_SIZE + (NUM_REQS * ADDRW) + (NUM_REQS * DATAW) + QUEUE_ADDRW),
++        .SIZE	(QUEUE_SIZE)
++    ) store_req (
++        .clk        (clk),
++        .reset      (reset),
++        .push       (sreq_push),
++        .pop        (sreq_pop),
++        .data_in    ({req_rw,  req_dup_mask, req_byteen,  req_addr,  req_data,  stag_waddr}),
++        .data_out   ({sreq_rw, sreq_mask,    sreq_byteen, sreq_addr, sreq_data, sreq_tag}),
++        .full       (sreq_full),
++        .empty      (sreq_empty),
++        `UNUSED_PIN (alm_full),
++        `UNUSED_PIN (alm_empty),
++        `UNUSED_PIN (size)
++    );
++
++    assign stag_push = sreq_push;
++    assign stag_pop  = mem_rsp_fire && (0 == rsp_rem_mask_n) && !stag_empty;
++    assign stag_raddr = mem_rsp_tag;
++
++    VX_index_buffer #(
++        .DATAW	(TAGW),
++        .SIZE	(QUEUE_SIZE)
++    ) store_tag (
++        .clk          (clk),
++        .reset        (reset),
++        .write_addr   (stag_waddr),
++        .acquire_slot (stag_push),
++        .read_addr    (stag_raddr),
++        .write_data   (req_tag),
++        .read_data    (stag_dout),
++        .release_addr (stag_raddr),
++        .release_slot (stag_pop),
++        .full         (stag_full),
++        .empty        (stag_empty)
++    );
++
++    //////////////////////////////////////////////////////////////////
++
++    // Memory response
++    assign mem_rsp_ready = 1'b1;
++    assign mem_rsp_fire = mem_rsp_valid && mem_rsp_ready;
++
++    // Evaluate remaning responses
++    assign rsp_rem_mask_n = rsp_rem_mask[stag_raddr] & ~mem_rsp_mask;
++
++    always @(posedge clk) begin
++        if (sreq_push)
++            rsp_rem_mask[stag_waddr] <= req_dup_mask;
++        if (mem_rsp_fire)
++            rsp_rem_mask[stag_raddr] <= rsp_rem_mask_n;
++    end
++
++    // Store response till ready to send
++    assign rsp_in = rsp[stag_raddr] | {stag_dout, mem_rsp_mask, mem_rsp_data, mem_rsp_valid};
++
++    always @(posedge clk) begin
++        rsp_out <= 0;
++        if (reset)
++            rsp <= 0;
++        if (sreq_push)
++            rsp[stag_waddr] <= 0;
++        if(mem_rsp_fire) begin
++            rsp[stag_raddr] <= rsp_in;
++            if ((PARTIAL_RESPONSE || (0 == rsp_rem_mask_n)) && rsp_in[0] && rsp_ready)
++                rsp_out <= rsp_in;
++        end
++    end
++
++    // Send response
++    VX_pipe_register #(
++        .DATAW	(RSPW),
++        .RESETW (1)
++    ) rsp_pipe_reg (
++        .clk      (clk),
++        .reset    (reset),
++        .enable   (1'b1),
++        .data_in  ({rsp_out}),
++        .data_out ({rsp_tag, rsp_mask, rsp_data, rsp_valid})
++    );
++
++    //////////////////////////////////////////////////////////////////
++
++    // Memory request
++    assign mreq_valid  = sreq_mask & ~req_sent_mask & {NUM_REQS{!sreq_empty}};
++    assign mreq_rw     = {NUM_REQS{sreq_rw}};
++    assign mreq_byteen = {NUM_REQS{sreq_byteen}};
++    assign mreq_addr   = sreq_addr;
++    assign mreq_data   = sreq_data;
++    assign mreq_tag    = {NUM_REQS{sreq_tag}};
++    assign mreq_en     = 1'b1;
++
++    assign mem_req_fire    = mreq_valid & mem_req_ready;
++    assign req_sent_mask_n = req_sent_mask | mem_req_fire;
++    assign req_sent_all    = (req_sent_mask_n == sreq_mask);
++
++    always @(posedge clk) begin
++        if (reset)
++            req_sent_mask <= 0;
++        else begin
++            if (req_sent_all)
++                req_sent_mask <= 0;
++            else
++                req_sent_mask <= req_sent_mask_n;
++        end
++    end
++
++    VX_pipe_register #(
++        .DATAW	(NUM_REQS + NUM_REQS + (NUM_REQS * WORD_SIZE) + (NUM_REQS * ADDRW) + (NUM_REQS * DATAW) + (NUM_REQS * QUEUE_ADDRW)),
++        .RESETW (1)
++    ) req_pipe_reg (
++        .clk      (clk),
++        .reset    (reset),
++        .enable	  (mreq_en),
++        .data_in  ({mreq_valid,    mreq_rw,    mreq_byteen,    mreq_addr,    mreq_data,    mreq_tag}),
++        .data_out ({mem_req_valid, mem_req_rw, mem_req_byteen, mem_req_addr, mem_req_data, mem_req_tag})
++    );
++
++    //////////////////////////////////////////////////////////////////
+ 
+ endmodule
+-`TRACING_ON
+\ No newline at end of file
++// `TRACING_ON
+\ No newline at end of file
+diff --git a/hw/unit_tests/mem_streamer/Makefile b/hw/unit_tests/mem_streamer/mem_streamer/Makefile
+similarity index 83%
+rename from hw/unit_tests/mem_streamer/Makefile
+rename to hw/unit_tests/mem_streamer/mem_streamer/Makefile
+index b906fbba8..73ec72507 100644
+--- a/hw/unit_tests/mem_streamer/Makefile
++++ b/hw/unit_tests/mem_streamer/mem_streamer/Makefile
+@@ -2,11 +2,11 @@
+ # Makefile to compile and test the memory stream unit
+ #---------------------------------------------------------
+ 
+-TOP = VX_mem_streamer_test
+-PARAMS += -GNUM_REQS=4 -GADDRW=8 -GDATAW=8 -GTAGW=8 -GWORD_SIZE=1 -GQUEUE_SIZE=4 
++TOP = VX_mem_streamer
++PARAMS += -GNUM_REQS=4 -GADDRW=8 -GDATAW=8 -GTAGW=8 -GWORD_SIZE=1 -GQUEUE_SIZE=4
+ 
+-RTL_DIR = ../../rtl
+-DPI_DIR = ../../dpi
++RTL_DIR = ../../../rtl
++DPI_DIR = ../../../dpi
+ 
+ RTL_INCLUDE = -I$(RTL_DIR) -I$(RTL_DIR)/libs -I$(DPI_DIR)
+ 
+@@ -21,10 +21,10 @@ VL_FLAGS += --trace
+ VL_FLAGS += $(RTL_INCLUDE)
+ VL_FLAGS += $(PARAMS)
+ 
+-SRCS += memsim.cpp $(DPI_DIR)/util_dpi.cpp
++SRCS += memsim.cpp ram.cpp $(DPI_DIR)/util_dpi.cpp
+ 
+ CXXFLAGS += -std=c++11 -Wall -Wextra -Wfatal-errors -Wno-array-bounds -Wno-maybe-uninitialized
+-CXXFLAGS += -I../../../dpi
++CXXFLAGS += -I../../../../dpi -I../../../../
+ 
+ default: run
+ 
+@@ -46,12 +46,12 @@ run: build
+ waves: trace.vcd
+ 	@echo 
+ 	@echo "### TRACE ###"
+-	gtkwave trace.vcd
++	gtkwave -o trace.vcd
+ 
+ clean:
+ 	@echo
+ 	@echo "### CLEAN ###"
+-	-rm -rf obj_dir *.vcd
++	-rm -rf obj_dir *.vcd *.log
+ 
+ #---------------------------------------------------------
+ 
+diff --git a/hw/unit_tests/mem_streamer/mem_streamer/memsim.cpp b/hw/unit_tests/mem_streamer/mem_streamer/memsim.cpp
+new file mode 100644
+index 000000000..3e2cac455
+--- /dev/null
++++ b/hw/unit_tests/mem_streamer/mem_streamer/memsim.cpp
+@@ -0,0 +1,161 @@
++#include <random>
++#include "memsim.h"
++#include "ram.h"
++
++static bool trace_enabled = false;
++static uint64_t trace_start_time = 0;
++static uint64_t trace_stop_time = -1ull;
++static uint64_t timestamp = 0;
++
++double sc_time_stamp() { 
++  	return timestamp;
++}
++
++bool sim_trace_enabled() {
++	if (timestamp >= trace_start_time 
++	&& timestamp < trace_stop_time)
++			return true;
++	return trace_enabled;
++}
++
++void sim_trace_enable (bool enable) {
++  	trace_enabled = enable;
++}
++
++//////////////////////////////////////////////////////
++
++int generate_rand (int min, int max) {
++	int range = max - min + 1;
++	return rand() % range + min;
++}
++
++//////////////////////////////////////////////////////
++
++int generate_rand_mask (int mask) {
++	int result = 0;
++	for (int i = 0; i < 4; i++) {
++		int bit = mask & 0b1;
++		int rand_bit = generate_rand (0, bit);
++		result |= (rand_bit << i);
++		mask = mask >> 1;
++	}
++	return result;
++}
++
++//////////////////////////////////////////////////////
++
++MemSim::MemSim() {
++	msu_ = new VVX_mem_streamer();
++
++	// Enable tracing
++	Verilated::traceEverOn(true);
++    trace_ = new VerilatedVcdC;
++    msu_->trace(trace_, 99);
++    trace_->open("trace.vcd");
++}
++
++//////////////////////////////////////////////////////
++
++MemSim::~MemSim() {
++	trace_->close();
++	delete msu_;
++}
++
++//////////////////////////////////////////////////////
++
++void MemSim::eval() {
++	msu_->eval();
++	trace_->dump(timestamp++);
++}
++
++//////////////////////////////////////////////////////
++
++void MemSim::step() {
++	msu_->clk = 0;
++	this->eval();
++
++	msu_->clk = 1;
++	this->eval();
++}
++
++//////////////////////////////////////////////////////
++
++void MemSim::reset() {
++	msu_->reset = 1;
++	this->step();
++
++	msu_->reset = 0;
++	this->step();
++
++}
++
++//////////////////////////////////////////////////////
++
++void MemSim::attach_core() {
++	if (msu_->req_ready) {
++		msu_->req_valid 	= generate_rand(0, 1);
++		msu_->req_rw 		= false;
++		msu_->req_mask 		= generate_rand(0b0001, 0b1111);
++		msu_->req_byteen 	= 0b1;
++		msu_->req_addr 		= generate_rand(0, 0x10000000);
++		msu_->req_data 		= 0x00000000;
++		msu_->req_tag 		= generate_rand(0x00, 0xFF);
++	}
++	msu_->rsp_ready = true;
++}
++
++//////////////////////////////////////////////////////
++
++void MemSim::attach_ram (RAM *ram) {
++
++	req_t req;
++	req.valid 			= msu_->mem_req_valid;
++	req.rw 				= msu_->mem_req_rw;
++	req.byteen			= msu_->mem_req_byteen;
++	req.addr 			= msu_->mem_req_addr;
++	req.data 			= msu_->mem_req_data;
++	req.tag 			= msu_->mem_req_tag;
++	msu_->mem_req_ready = ram->is_ready();
++
++	ram->insert_req(req);
++
++	rsp_t rsp;
++	rsp = ram->schedule_rsp();
++
++	msu_->mem_rsp_valid = rsp.valid;
++	msu_->mem_rsp_mask 	= rsp.mask;
++	msu_->mem_rsp_data 	= rsp.data;
++	msu_->mem_rsp_tag 	= rsp.tag;
++	rsp.ready 			= msu_->mem_rsp_ready;
++
++	ram->halt_rsp(rsp);
++}
++
++//////////////////////////////////////////////////////
++
++void MemSim::run(RAM *ram) {
++	this->reset();
++
++	while (sc_time_stamp() < SIM_TIME) {
++		this->step();
++		std::cout<<"========================="<<"\n";
++		std::cout<<"Cycle: "<<sc_time_stamp()<<"\n";
++		this->attach_core();
++		this->attach_ram(ram);
++	}
++}
++
++//////////////////////////////////////////////////////
++
++int main (int argc, char** argv, char** env) {
++    Verilated::commandArgs(argc, argv);
++
++	MemSim memsim;
++	RAM ram;	
++
++	memsim.run(&ram);
++
++	return 0;
++}
++
++//////////////////////////////////////////////////////
+\ No newline at end of file
+diff --git a/hw/unit_tests/mem_streamer/mem_streamer/memsim.h b/hw/unit_tests/mem_streamer/mem_streamer/memsim.h
+new file mode 100644
+index 000000000..2ce5b37f9
+--- /dev/null
++++ b/hw/unit_tests/mem_streamer/mem_streamer/memsim.h
+@@ -0,0 +1,34 @@
++#pragma once
++
++#include <iostream>
++#include <unordered_map>
++#include <vector>
++#include <verilated.h>
++#include <verilated_vcd_c.h>
++#include "VVX_mem_streamer.h"
++#include "VVX_mem_streamer__Syms.h"
++#include "ram.h"
++
++#define SIM_TIME 1000
++
++int generate_rand (int min, int max);
++int generate_rand_mask (int mask);
++
++class MemSim {
++    private:
++        VVX_mem_streamer *msu_;
++        VerilatedVcdC *trace_;
++
++        void eval();
++        void step();
++        void reset();
++
++        void attach_core();
++        void attach_ram(RAM *ram);
++
++    public:
++        MemSim();
++        virtual ~MemSim();
++
++        void run(RAM *ram);  
++};
+diff --git a/hw/unit_tests/mem_streamer/mem_streamer/ram.cpp b/hw/unit_tests/mem_streamer/mem_streamer/ram.cpp
+new file mode 100644
+index 000000000..94f4f9245
+--- /dev/null
++++ b/hw/unit_tests/mem_streamer/mem_streamer/ram.cpp
+@@ -0,0 +1,121 @@
++#include "ram.h"
++#include "memsim.h"
++
++RAM::RAM() {
++
++    ram_.clear();
++    is_rsp_active_ = false;
++    is_rsp_stall_ = false;
++}
++
++//////////////////////////////////////////////////////
++
++bool RAM::check_duplicate_req(req_t req) {
++    for(int i = 0; i < ram_.size(); i++) {
++        if (ram_[i].addr == req.addr) {
++            std::cout<<"RAM: Duplicate entry. Do not insert..."<<std::endl;
++            return true;
++        }
++    }
++    return false;
++}
++
++//////////////////////////////////////////////////////
++
++int RAM::simulate_cycle_delay() {
++
++    std::cout<<"RAM: # entries: "<<ram_.size()<<std::endl;
++
++    int dequeue_index = -1;
++
++    for (int i = 0; i < ram_.size(); i++) {
++        if (!is_rsp_stall_) {
++            if (ram_[i].cycles_left > 0) {
++                ram_[i].cycles_left -= 1;
++            }
++        }
++
++        std::cout<<"RAM: # cycles left: "<<ram_[i].cycles_left<<std::endl;
++
++        if (ram_[i].cycles_left == 0) {
++            dequeue_index = i;
++        }
++    }
++    return dequeue_index;
++}
++
++//////////////////////////////////////////////////////
++
++void RAM::insert_req(req_t req) {
++    if ( !(this->check_duplicate_req(req)) && req.valid) {
++        req_t r;
++        r.valid     = req.valid;
++        r.rw        = req.rw;
++        r.byteen    = req.byteen;
++        r.addr      = req.addr;
++        r.data      = req.data;
++        r.tag       = req.tag & 0b11;
++
++        // Store metadata
++        r.cycles_left = MEM_LATENCY;
++
++        std::cout<<"RAM: Insert entry... "<<std::endl;
++        ram_.push_back(r);
++    }
++}
++
++uint8_t RAM::is_ready() {    
++    return generate_rand(0b1000, 0b1111);
++}
++
++//////////////////////////////////////////////////////
++
++rsp_t RAM::schedule_rsp() {
++    rsp_t rsp;
++    int dequeue_index = this->simulate_cycle_delay();
++
++    if (!is_rsp_active_) {
++        if (dequeue_index != -1) {
++
++            std::cout<<"RAM: Scheduling response... "<<std::endl;
++
++            is_rsp_active_ = true;
++            rsp.valid   = 1;
++            rsp.mask    = generate_rand_mask(ram_[dequeue_index].valid);
++            rsp.data    = generate_rand(0x20000000, 0x30000000);
++            rsp.tag     = ram_[dequeue_index].tag;
++
++            std::cout<<std::hex;
++            std::cout<<"RAM: Response mask: "<<+rsp.mask<<" | Required mask: "<<+ram_[dequeue_index].valid<<std::endl;
++
++            ram_[dequeue_index].rsp_sent_mask = rsp.mask;
++            ram_[dequeue_index].valid = ram_[dequeue_index].valid & ~ram_[dequeue_index].rsp_sent_mask;
++
++            if (0 == ram_[dequeue_index].valid) {
++                ram_.erase(ram_.begin() + dequeue_index);
++                is_rsp_stall_ = false;
++                std::cout<<"RAM: Clear entry... "<<std::endl;
++            } else {
++                is_rsp_stall_ = true;
++                std::cout<<"RAM: Stall... "<<std::endl;
++            }
++        } else {
++            rsp.valid = false;
++        }
++    } else {
++        rsp.valid = false;
++    }
++    return rsp;
++}
++
++//////////////////////////////////////////////////////
++
++// Schedule response for only one cycle
++void RAM::halt_rsp(rsp_t rsp) {
++    if (is_rsp_active_ && rsp.valid && rsp.ready) {
++        std::cout<<"RAM: Halt response..."<<std::endl;
++        is_rsp_active_ = false;
++    }
++}
++
++//////////////////////////////////////////////////////
+diff --git a/hw/unit_tests/mem_streamer/mem_streamer/ram.h b/hw/unit_tests/mem_streamer/mem_streamer/ram.h
+new file mode 100644
+index 000000000..b18a77a83
+--- /dev/null
++++ b/hw/unit_tests/mem_streamer/mem_streamer/ram.h
+@@ -0,0 +1,51 @@
++#pragma once
++
++#include <iostream>
++#include <vector>
++
++#define MEM_LATENCY 4
++
++typedef struct {
++    uint8_t     valid;
++    bool        rw;
++    uint8_t     byteen;
++    uint32_t    addr;
++    uint32_t    data;
++    uint8_t     tag;
++    uint8_t     ready;
++
++    // Metadata
++    uint8_t     rsp_sent_mask;
++    double      cycles_left;
++} req_t;
++
++typedef struct {
++    bool        valid;
++    uint8_t     mask;
++    uint32_t    data;
++    uint8_t     tag;
++    bool        ready;
++} rsp_t;
++
++class RAM {
++
++    private:
++        std::vector<req_t> ram_;
++
++        bool is_rsp_active_;
++        bool is_rsp_stall_;
++
++        bool    check_duplicate_req(req_t req);
++        int     simulate_cycle_delay();
++    
++    public:
++        RAM();
++        
++        uint8_t is_ready();
++        void    insert_req(req_t req);
++        rsp_t   schedule_rsp();
++        void    halt_rsp(rsp_t rsp);
++
++};
++
++//////////////////////////////////////////////////////
+diff --git a/hw/unit_tests/mem_streamer/memsim.cpp b/hw/unit_tests/mem_streamer/memsim.cpp
+deleted file mode 100644
+index 80bd2ad1a..000000000
+--- a/hw/unit_tests/mem_streamer/memsim.cpp
++++ /dev/null
+@@ -1,104 +0,0 @@
+-#include <iostream>
+-#include <verilated.h>
+-#include "memsim.h"
+-
+-// Number of clock edges that we'll simulate
+-#define SIM_TIME 50
+-
+-static bool trace_enabled = false;
+-static uint64_t trace_start_time = 0;
+-static uint64_t trace_stop_time = -1ull;
+-static uint64_t timestamp = 0;
+-
+-double sc_time_stamp() { 
+-  	return timestamp;
+-}
+-
+-bool sim_trace_enabled() {
+-	if (timestamp >= trace_start_time 
+-	&& timestamp < trace_stop_time)
+-			return true;
+-	return trace_enabled;
+-}
+-
+-void sim_trace_enable (bool enable) {
+-  	trace_enabled = enable;
+-}
+-
+-void generate_req(req_t *req) {
+-	req->valid = 1;
+-	req->rw = 0;
+-	req->byteen = 1;
+-	req->addr = 0x04030201;
+-	req->data = 0x12345678;
+-	req->tag = 0xAB;
+-}
+-
+-MemSim::MemSim() {
+-	msu_ = new VVX_mem_streamer_test();
+-
+-	// Enable tracing
+-	Verilated::traceEverOn(true);
+-    trace_ = new VerilatedVcdC;
+-    msu_->trace(trace_, 99);
+-    trace_->open("trace.vcd");
+-}
+-
+-MemSim::~MemSim() {
+-	trace_->close();
+-	delete msu_;
+-}
+-
+-void MemSim::eval() {
+-	msu_->eval();
+-	trace_->dump(timestamp++);
+-}
+-
+-void MemSim::step() {
+-	msu_->clk = 0;
+-	this->eval();
+-
+-	msu_->clk = 1;
+-	this->eval();
+-}
+-
+-void MemSim::reset() {
+-	msu_->reset = 1;
+-	this->step();
+-
+-	msu_->reset = 0;
+-	this->step();
+-}
+-
+-void MemSim::set_core_req(req_t *core_req) {
+-	msu_->req_valid 	= core_req->valid;
+-	msu_->req_rw 		= core_req->rw;
+-	msu_->req_mask 		= core_req->mask;
+-	msu_->req_byteen 	= core_req->byteen;
+-	msu_->req_addr 		= core_req->addr;
+-	msu_->req_data 		= core_req->data;
+-	msu_->req_tag 		= core_req->tag;
+-}
+-
+-int main (int argc, char** argv, char** env) {
+-    Verilated::commandArgs(argc, argv);
+-
+-	MemSim memsim;
+-	req_t input;
+-
+-	generate_req(&input);
+-
+-	memsim.step();
+-	memsim.reset();
+-	memsim.set_core_req(&input);
+-	memsim.step();
+-	memsim.step();
+-	memsim.step();
+-	memsim.step();
+-	memsim.step();
+-	memsim.step();
+-	memsim.step();
+-	memsim.step();
+-	
+-	return 0;
+-}
+diff --git a/hw/unit_tests/mem_streamer/memsim.h b/hw/unit_tests/mem_streamer/memsim.h
+deleted file mode 100644
+index 0c55756fc..000000000
+--- a/hw/unit_tests/mem_streamer/memsim.h
++++ /dev/null
+@@ -1,45 +0,0 @@
+-#pragma once
+-
+-#include <iostream>
+-#include <map>
+-#include <verilated.h>
+-#include <verilated_vcd_c.h>
+-#include "VVX_mem_streamer_test.h"
+-#include "VVX_mem_streamer_test__Syms.h"
+-
+-// Input request
+-typedef struct {
+-    uint8_t valid;
+-    uint8_t rw;
+-    uint8_t mask;
+-    uint8_t byteen;
+-    uint32_t addr;
+-    uint32_t data;
+-    uint32_t tag;
+-    uint8_t ready;
+-} req_t;
+-
+-// Output response
+-typedef struct {
+-    uint8_t valid;
+-    uint8_t mask;
+-    uint32_t* data;
+-    uint32_t tag;
+-    uint8_t ready;
+-} rsp_t;
+-
+-class MemSim {
+-    private:
+-        VVX_mem_streamer_test *msu_;
+-        VerilatedVcdC *trace_;
+-
+-        void eval();
+-
+-    public:
+-        MemSim();
+-        virtual ~MemSim();
+-
+-        void step();
+-        void reset();
+-        void set_core_req(req_t *req);
+-};
+diff --git a/sim/simx/tensor_unit.cpp b/sim/simx/tensor_unit.cpp
+index 1bb6da3a3..e973a2e8d 100644
+--- a/sim/simx/tensor_unit.cpp
++++ b/sim/simx/tensor_unit.cpp
+@@ -225,7 +225,18 @@ public:
+       int delay = 0;
+       switch (tcu_type) {
+       case TcuType::WMMA:
++#ifdef SIMX_FIX_TCU_MODEL
++        // FIDELITY-FIX #4: match RTL TCU_DSP FEDP PIPE_LATENCY per uop.
++        // decode.cpp already expands each WMMA into m_steps*n_steps*k_steps
++        // uops (32 for NT=8), so throughput at 1 uop/cyc matches RTL by
++        // default; we only need to deepen the per-uop pipeline.
++        // PIPE_LATENCY (VX_tcu_fp.sv TCU_DSP branch, TCU_TC_K=2):
++        //   FCVT(1) + FMUL(8) + FACC(ceil(log2(2*TC_K+1))*FADD=3*11=33) + 1 = 43
++        // Outputs.push uses (2 + delay) cyc total, so delay=41 → 43 cyc.
++        delay = 41;
++#else
+         delay = 4;
++#endif
+         break;
+       default:
+         std::abort();

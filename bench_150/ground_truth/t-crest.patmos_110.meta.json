@@ -1,0 +1,31 @@
+{
+  "case_id": "t-crest.patmos#110",
+  "issue_repo": {
+    "owner": "t-crest",
+    "name": "patmos"
+  },
+  "fix_repo": {
+    "owner": "michael-platzer",
+    "name": "patmos"
+  },
+  "fix_oid": "c68e8e86208fd0f10168ccd68e577d96e7d27dff",
+  "buggy_commit_sha": "a16f0c87b7c85c6a19deeb1251c1f86301473302",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/t-crest.patmos_110.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "c68e8e86208fd0f10168ccd68e577d96e7d27dff",
+    "d4a658a0370390de5a7295f53cde5148fd143d55"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "hardware/Patmos-harness.cpp"
+  ],
+  "raw_diff_path": "ground_truth/t-crest.patmos_110.raw.diff"
+}

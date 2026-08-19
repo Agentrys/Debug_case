@@ -1,0 +1,32 @@
+{
+  "case_id": "pulp-platform.idma#94",
+  "issue_repo": {
+    "owner": "pulp-platform",
+    "name": "iDMA"
+  },
+  "fix_repo": {
+    "owner": "DanielKellerM",
+    "name": "iDMA"
+  },
+  "fix_oid": "0f223a203e71f483a098b66d7bc7c7a4da6d5a96",
+  "buggy_commit_sha": "e618e4df6d806d3a010aa70d99be735394263eef",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/pulp-platform.idma_94.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "0f223a203e71f483a098b66d7bc7c7a4da6d5a96",
+    "371c02030d68168a9ac0d01efddcf012a2c71cc5",
+    "62002b9cbbde9f617d43c0280383b6bdef9da0a6"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "requirements.txt"
+  ],
+  "raw_diff_path": "ground_truth/pulp-platform.idma_94.raw.diff"
+}

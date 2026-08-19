@@ -1,0 +1,66 @@
+diff --git a/rtl/verilog/mor1kx_utils.vh b/rtl/verilog/mor1kx_utils.vh
+index 409fbba..fa2dc47 100644
+--- a/rtl/verilog/mor1kx_utils.vh
++++ b/rtl/verilog/mor1kx_utils.vh
+@@ -99,7 +99,7 @@ function integer calc_rf_addr_width;
+ input integer rf_addr_width;
+ input integer rf_num_shadow_gpr;
+ begin
+-	calc_rf_addr_width = rf_addr_width + ((rf_num_shadow_gpr == 1) ? 1 :
++	calc_rf_addr_width = rf_addr_width + ((rf_num_shadow_gpr <= 1) ? 1 :
+ 			`clog2(rf_num_shadow_gpr));
+ end
+ endfunction
+diff --git a/rtl/verilog/mor1kx_utils.vh b/rtl/verilog/mor1kx_utils.vh
+index 409fbba..fa2dc47 100644
+--- a/rtl/verilog/mor1kx_utils.vh
++++ b/rtl/verilog/mor1kx_utils.vh
+@@ -99,7 +99,7 @@ function integer calc_rf_addr_width;
+ input integer rf_addr_width;
+ input integer rf_num_shadow_gpr;
+ begin
+-	calc_rf_addr_width = rf_addr_width + ((rf_num_shadow_gpr == 1) ? 1 :
++	calc_rf_addr_width = rf_addr_width + ((rf_num_shadow_gpr <= 1) ? 1 :
+ 			`clog2(rf_num_shadow_gpr));
+ end
+ endfunction
+diff --git a/rtl/verilog/mor1kx_rf_cappuccino.v b/rtl/verilog/mor1kx_rf_cappuccino.v
+index a2bd8d6..91096d3 100644
+--- a/rtl/verilog/mor1kx_rf_cappuccino.v
++++ b/rtl/verilog/mor1kx_rf_cappuccino.v
+@@ -272,14 +272,16 @@ if (FEATURE_DEBUGUNIT!="NONE" || FEATURE_FASTCONTEXTS!="NONE" ||
+ 			  spr_gpr_re & spr_gpr_read_ack;
+ 
+    wire [RF_ADDR_WIDTH-1:0] wb_rfd_adr_expand;
+-   assign wb_rfd_adr_expand[RF_ADDR_WIDTH-1:OPTION_RF_ADDR_WIDTH] = 0;
+    assign wb_rfd_adr_expand[OPTION_RF_ADDR_WIDTH-1:0] = wb_rfd_adr_i;
++
+    assign rf_wren =  wb_rf_wb_i | spr_gpr_we;
+    assign rf_wradr = wb_rf_wb_i ? wb_rfd_adr_expand : spr_bus_addr_i[RF_ADDR_WIDTH-1:0];
+    assign rf_wrdat = wb_rf_wb_i ? result_i : spr_bus_dat_i;
+ 
+    // Zero-pad unused parts of vector
+    if (OPTION_RF_NUM_SHADOW_GPR > 0) begin
++      assign wb_rfd_adr_expand[RF_ADDR_WIDTH-1:OPTION_RF_ADDR_WIDTH] =
++             {(RF_ADDR_WIDTH-OPTION_RF_ADDR_WIDTH){1'b0}};
+       assign rfa_rdad[RF_ADDR_WIDTH-1:OPTION_RF_ADDR_WIDTH] =
+              {(RF_ADDR_WIDTH-OPTION_RF_ADDR_WIDTH){1'b0}};
+       assign rfb_rdad[RF_ADDR_WIDTH-1:OPTION_RF_ADDR_WIDTH] =
+diff --git a/rtl/verilog/mor1kx_utils.vh b/rtl/verilog/mor1kx_utils.vh
+index 409fbba..b8d37ad 100644
+--- a/rtl/verilog/mor1kx_utils.vh
++++ b/rtl/verilog/mor1kx_utils.vh
+@@ -99,8 +99,11 @@ function integer calc_rf_addr_width;
+ input integer rf_addr_width;
+ input integer rf_num_shadow_gpr;
+ begin
+-	calc_rf_addr_width = rf_addr_width + ((rf_num_shadow_gpr == 1) ? 1 :
+-			`clog2(rf_num_shadow_gpr));
++	if (rf_num_shadow_gpr == 0)
++		calc_rf_addr_width = rf_addr_width;
++	else
++		calc_rf_addr_width = rf_addr_width
++			+ ((rf_num_shadow_gpr == 1) ? 1 : `clog2(rf_num_shadow_gpr));
+ end
+ endfunction
+ 

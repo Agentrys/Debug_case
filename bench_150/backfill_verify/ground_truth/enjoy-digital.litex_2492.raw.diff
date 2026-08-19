@@ -1,0 +1,287 @@
+diff --git a/litex/build/yosys_nextpnr_toolchain.py b/litex/build/yosys_nextpnr_toolchain.py
+index cdf9efab2..8cdcd166f 100644
+--- a/litex/build/yosys_nextpnr_toolchain.py
++++ b/litex/build/yosys_nextpnr_toolchain.py
+@@ -90,6 +90,7 @@ class YosysNextPNRToolchain(GenericToolchain):
+         nowidelut    = False,
+         abc9         = False,
+         flow3        = False,
++        use_slang    = False,
+         timingstrict = False,
+         ignoreloops  = False,
+         seed         = 1,
+@@ -106,6 +107,8 @@ class YosysNextPNRToolchain(GenericToolchain):
+             use new ABC9 flow (Yosys)
+         flow3 : str
+             use ABC9 with flow3 (Yosys)
++        use_slang : bool
++            use Yosys's slang frontend for SystemVerilog sources.
+         timingstrict : list
+             check timing failures (nextpnr)
+         ignoreloops : str
+@@ -116,6 +119,7 @@ class YosysNextPNRToolchain(GenericToolchain):
+ 
+         self._nowidelut   = nowidelut
+         self._abc9        = abc9 
++        self._use_slang   = use_slang
+         if flow3:
+             self._abc9 = True
+             cmd = "scratchpad -copy abc9.script.flow3 abc9.script"
+@@ -139,6 +143,7 @@ class YosysNextPNRToolchain(GenericToolchain):
+             template     = self._yosys_template,
+             yosys_cmds   = self._yosys_cmds,
+             yosys_opts   = self._synth_opts,
++            use_slang    = self._use_slang,
+             synth_format = self.synth_fmt,
+             nowidelut    = self._nowidelut,
+             abc9         = self._abc9,
+diff --git a/litex/build/yosys_wrapper.py b/litex/build/yosys_wrapper.py
+index e8ccb38cd..24fe78893 100644
+--- a/litex/build/yosys_wrapper.py
++++ b/litex/build/yosys_wrapper.py
+@@ -19,6 +19,8 @@ class YosysWrapper():
+         template     = [],
+         yosys_opts   = "",
+         yosys_cmds   = [],
++        use_slang    = False,
++        slang_opts   = "",
+         synth_format = "json",
+         **kwargs)    :
+         """
+@@ -38,6 +40,10 @@ class YosysWrapper():
+             Yosys options to use for synth_xxx
+         yosys_cmds : list
+             optionals commands called before synth_xxx
++        use_slang : bool
++            use Yosys's slang frontend for SystemVerilog sources.
++        slang_opts : str
++            options to pass to read_slang.
+         synth_format : str
+             Yosys ouptput format
+         kwargs: dict
+@@ -58,6 +64,8 @@ class YosysWrapper():
+         self._yosys_opts   = yosys_opts
+         self._yosys_cmds   = yosys_cmds
+         self._quiet        = "" if not kwargs.pop("quiet", False) else '-Qq'
++        self._use_slang    = use_slang or getattr(platform, "yosys_use_slang", False)
++        self._slang_opts   = slang_opts or getattr(platform, "yosys_slang_opts", "")
+ 
+         self._target = target
+ 
+@@ -76,15 +84,24 @@ class YosysWrapper():
+         """
+         includes = ""
+         reads = []
++        slang_files = []
+         for path in self._platform.verilog_include_paths:
+             includes += " -I" + path
+         for filename, language, library, *copy in self._platform.sources:
+             # yosys has no such function read_systemverilog
+             if language == "systemverilog":
++                if self._use_slang:
++                    slang_files.append(filename)
++                    continue
+                 language = "verilog -sv"
+             if language is None:
+                 continue
+             reads.append(f'read_{language}{includes} "{filename}"')
++        if slang_files:
++            opts  = f" {self._slang_opts}" if self._slang_opts else ""
++            files = " ".join(f'"{filename}"' for filename in slang_files)
++            reads.insert(0, "plugin -i slang")
++            reads.append(f"read_slang{opts}{includes} {files}")
+         return "\n".join(reads)
+ 
+     _default_template = [
+@@ -145,6 +162,7 @@ def yosys_args(parser):
+     parser.add_argument("--yosys-nowidelut", action="store_true", help="Use Yosys's nowidelut mode.")
+     parser.add_argument("--yosys-abc9",      action="store_true", help="Use Yosys's abc9 mode.")
+     parser.add_argument("--yosys-flow3",     action="store_true", help="Use Yosys's abc9 mode with the flow3 script.")
++    parser.add_argument("--yosys-slang",     action="store_true", help="Use Yosys's slang SystemVerilog frontend.")
+     parser.add_argument("--yosys-quiet",     action="store_true", help="Use Yosys's '-Qq' to be quiet")
+ 
+ def yosys_argdict(args):
+@@ -152,5 +170,6 @@ def yosys_argdict(args):
+         "nowidelut": args.yosys_nowidelut,
+         "abc9":      args.yosys_abc9,
+         "flow3":     args.yosys_flow3,
++        "use_slang": args.yosys_slang,
+         "quiet":     args.yosys_quiet,
+     }
+diff --git a/litex/soc/cores/cpu/ibex/core.py b/litex/soc/cores/cpu/ibex/core.py
+index 4db89a227..836f57dc5 100644
+--- a/litex/soc/cores/cpu/ibex/core.py
++++ b/litex/soc/cores/cpu/ibex/core.py
+@@ -263,7 +263,8 @@ class Ibex(CPU):
+ 
+         platform.add_sources(os.path.join(ibexdir, "vendor", "lowrisc_ip", "ip", "prim_generic", "rtl"),
+             "prim_generic_ram_1p.sv",
+-            "prim_generic_buf.sv"
++            "prim_generic_buf.sv",
++            "prim_generic_flop.sv"
+         )
+ 
+         rtl_base = os.path.join(ibexdir, "rtl")
+@@ -279,7 +280,26 @@ class Ibex(CPU):
+             "ibex_csr.sv",
+             "ibex_top.sv"
+             )
+-        platform.add_source(os.path.join(ibexdir, "dv", "uvm", "core_ibex", "common", "prim", "prim_buf.sv"))
++        platform.add_sources(os.path.join(ibexdir, "dv", "uvm", "core_ibex", "common", "prim"),
++            "prim_buf.sv",
++            "prim_flop.sv"
++        )
++
++        regfiles = {
++            "ff"   : 0,
++            "fpga" : 1,
++        }
++        regfile = getattr(platform, "ibex_regfile", "ff")
++        if regfile not in regfiles:
++            raise ValueError("Ibex: unknown ibex_regfile {}, expected one of {}.".format(
++                repr(regfile), ", ".join(regfiles)))
++        if regfile == "fpga":
++            platform.add_source(os.path.join(rtl_base, "ibex_register_file_fpga.sv"))
++
++        platform.yosys_use_slang  = True
++        platform.yosys_slang_opts = "--ignore-unknown-modules --relax-enum-conversions --ignore-initial --top ibex_top -G RegFile={}".format(
++            regfiles[regfile])
++
+     def set_reset_address(self, reset_address):
+         self.reset_address = reset_address
+         self.cpu_params.update(i_boot_addr_i=Signal(32, reset=reset_address))
+diff --git a/test/build/test_yosys_wrapper.py b/test/build/test_yosys_wrapper.py
+new file mode 100644
+index 000000000..760e42100
+--- /dev/null
++++ b/test/build/test_yosys_wrapper.py
+@@ -0,0 +1,54 @@
++#
++# This file is part of LiteX.
++#
++# Copyright (c) 2026 Florent Kermarrec <florent@enjoy-digital.fr>
++# SPDX-License-Identifier: BSD-2-Clause
++
++import argparse
++import unittest
++
++from litex.build.yosys_wrapper import YosysWrapper, yosys_args, yosys_argdict
++
++
++class _Platform:
++    def __init__(self):
++        self.verilog_include_paths = ["/include"]
++        self.sources = [
++            ("/src/top.v",  "verilog",       "work"),
++            ("/src/pkg.sv", "systemverilog", "work"),
++        ]
++
++
++class TestYosysWrapper(unittest.TestCase):
++    def test_systemverilog_defaults_to_read_verilog_sv(self):
++        wrapper = YosysWrapper(_Platform(), "top", target="gowin")
++
++        read_files = wrapper._import_sources()
++
++        self.assertIn('read_verilog -sv -I/include "/src/pkg.sv"', read_files)
++        self.assertNotIn("read_slang", read_files)
++
++    def test_slang_frontend_groups_systemverilog_sources(self):
++        platform = _Platform()
++        platform.yosys_use_slang  = True
++        platform.yosys_slang_opts = "--ignore-initial --top top"
++
++        wrapper = YosysWrapper(platform, "top", target="gowin")
++        read_files = wrapper._import_sources()
++
++        self.assertIn("plugin -i slang", read_files)
++        self.assertIn('read_verilog -I/include "/src/top.v"', read_files)
++        self.assertIn('read_slang --ignore-initial --top top -I/include "/src/pkg.sv"', read_files)
++        self.assertNotIn("read_verilog -sv", read_files)
++
++    def test_yosys_slang_argdict(self):
++        parser = argparse.ArgumentParser()
++        yosys_args(parser)
++
++        args = parser.parse_args(["--yosys-slang"])
++
++        self.assertTrue(yosys_argdict(args)["use_slang"])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/test/cores/test_cpu_ibex.py b/test/cores/test_cpu_ibex.py
+new file mode 100644
+index 000000000..5a24172f4
+--- /dev/null
++++ b/test/cores/test_cpu_ibex.py
+@@ -0,0 +1,69 @@
++#
++# This file is part of LiteX.
++#
++# Copyright (c) 2026 Florent Kermarrec <florent@enjoy-digital.fr>
++# SPDX-License-Identifier: BSD-2-Clause
++
++import os
++import tempfile
++import unittest
++from types import SimpleNamespace
++from unittest import mock
++
++from litex.build.generic_platform import GenericPlatform
++from litex.soc.cores.cpu.ibex import core as ibex_core
++
++
++def _create_ibex_tree(root):
++    rtl = os.path.join(root, "rtl")
++    os.makedirs(rtl)
++    with open(os.path.join(rtl, "ibex_core.f"), "w", encoding="utf-8") as f:
++        f.write("// comment\n")
++        f.write("\n")
++        f.write("ibex_if_stage.sv\n")
++
++
++class TestIbexSources(unittest.TestCase):
++    def _add_sources(self, platform, root):
++        with mock.patch.object(ibex_core, "get_data_mod", return_value=SimpleNamespace(data_location=root)):
++            ibex_core.Ibex.add_sources(platform)
++
++    def test_add_sources_requests_yosys_slang(self):
++        with tempfile.TemporaryDirectory() as root:
++            _create_ibex_tree(root)
++            platform = GenericPlatform("unit", [])
++
++            self._add_sources(platform, root)
++
++        sources = [os.path.relpath(source[0], root) for source in platform.sources]
++        self.assertTrue(platform.yosys_use_slang)
++        self.assertIn("--top ibex_top", platform.yosys_slang_opts)
++        self.assertIn("-G RegFile=0", platform.yosys_slang_opts)
++        self.assertIn(os.path.join("vendor", "lowrisc_ip", "ip", "prim_generic", "rtl", "prim_generic_flop.sv"), sources)
++        self.assertIn(os.path.join("dv", "uvm", "core_ibex", "common", "prim", "prim_flop.sv"), sources)
++        self.assertNotIn(os.path.join("rtl", "ibex_register_file_fpga.sv"), sources)
++
++    def test_add_sources_can_select_fpga_regfile_for_yosys_slang(self):
++        with tempfile.TemporaryDirectory() as root:
++            _create_ibex_tree(root)
++            platform = GenericPlatform("unit", [])
++            platform.ibex_regfile = "fpga"
++
++            self._add_sources(platform, root)
++
++        sources = [os.path.relpath(source[0], root) for source in platform.sources]
++        self.assertIn("-G RegFile=1", platform.yosys_slang_opts)
++        self.assertIn(os.path.join("rtl", "ibex_register_file_fpga.sv"), sources)
++
++    def test_add_sources_rejects_unknown_regfile(self):
++        with tempfile.TemporaryDirectory() as root:
++            _create_ibex_tree(root)
++            platform = GenericPlatform("unit", [])
++            platform.ibex_regfile = "missing"
++
++            with self.assertRaisesRegex(ValueError, "ibex_regfile"):
++                self._add_sources(platform, root)
++
++
++if __name__ == "__main__":
++    unittest.main()

@@ -1,0 +1,49 @@
+{
+  "case_id": "openhwgroup.ariane#43",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "sld-columbia",
+    "name": "ariane"
+  },
+  "fix_oid": "cef04f5609c25a25a6932a86b211d9a8adec64b0",
+  "buggy_commit_sha": "67d4310e4061a27c8dfa880259e7c208a2fdeb1a",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openhwgroup.ariane_43.diff",
+  "diff_sha256": "62d29f1a8ba60b635965a2f9c58da7d20f74fd706d17f3b6e176ddd4ebe290f8",
+  "fix_oids_sorted": [
+    "cef04f5609c25a25a6932a86b211d9a8adec64b0",
+    "a1a97a9bb0bd8b29efa75e7e61389ebe18622c80"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "piton/design/chipset/io_ctrl/rtl/uart_top.v"
+  ],
+  "ground_truth_hunks": {
+    "piton/design/chipset/io_ctrl/rtl/uart_top.v": [
+      [
+        44,
+        49
+      ],
+      [
+        131,
+        136
+      ],
+      [
+        235,
+        243
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "piton/design/chipset/rtl/chipset_impl.v.pyv",
+    "utils/Makefile"
+  ],
+  "raw_diff_path": "ground_truth/openhwgroup.ariane_43.raw.diff"
+}

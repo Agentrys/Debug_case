@@ -1,0 +1,13 @@
+diff --git a/Bender.yml b/Bender.yml
+index 3ed92459..31efb432 100644
+--- a/Bender.yml
++++ b/Bender.yml
+@@ -68,7 +68,7 @@ sources:
+   # Wrapper-generated CSR files (from parent tt-oca-hw project)
+   - ../../hw/periph/i3ccore_wrap/data/registers/rtl/I3CCSR_pkg.sv
+   - ../../hw/periph/i3ccore_wrap/data/registers/rtl/I3CCSR.sv
+-  - ../../hw/periph/i3ccore_wrap/i3c_pkg.sv
++  - src/i3c_pkg.sv
+   - src/interrupt.sv
+ 
+   ################################################################

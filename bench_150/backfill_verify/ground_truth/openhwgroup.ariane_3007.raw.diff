@@ -1,0 +1,128 @@
+diff --git a/perf-model/README.md b/perf-model/README.md
+index 77ba8575a..4980c732b 100644
+--- a/perf-model/README.md
++++ b/perf-model/README.md
+@@ -9,6 +9,41 @@ To cite this model, please head to the end of this document.
+ 
+ ## Getting started
+ 
++### Generate an RVFI trace
++
++To generate an RVFI trace, follow the instructions in the CVA6 repository to run a simulation.
++The RVFI trace will be in `verif/sim/out_<date>/<simulator>/<test-name>.log`.
++
++
++### Running the model
++
++```bash
++python3 model.py verif/sim/out_<date>/<simulator>/<test-name>.log
++```
++
++The annotated trace is generated in an `annotated.log` file in the current directory.
++
++It prints a lot of debug information so that you can see all the events (note: it slows down model execution).
++To disable these prints, modify the instantiation with `Model(debug=False)` in the `main` function.
++
++At the end of the simulation, the model prints statistics with the `print_stats` call in the `main` function.
++These statistics can be performed on the timed part, which is filtered with the `filter_timed_part` function.
++Feel free to modify the `filter_timed_part` function to suit your needs.
++
++
++### Exploring design space
++
++In `model.py`, the `main` function runs the model with arguments which override default values.
++Generic parameters are available in `Model.__init__`.
++You can add new parameters to explore here.
++
++To perform exploration, run the model in a loop, like `issue_commit_graph` does.
++The `display_scores` function is meant to print a 3D plot if you have `matplotlib`.
++`issue_commit_graph` prints the scores so that you can store it and display the figure without re-running the model.
++
++
++## Comparing the model and the RTL
++
+ ### Adapt RVFI trace generation
+ 
+ The regular expression expects the cycle number to be in the RVFI trace.
+@@ -24,28 +59,26 @@ To emit cycle number in RVFI trace, modify `corev_apu/tb/rvfi_tracer.sv` in CVA6
+ ```
+ 
+ 
+-### Generate an RVFI trace
+-
+-To generate an RVFI trace, follow the instructions in the CVA6 repository to run a simulation.
+-The RVFI trace will be in `verif/sim/out_<date>/<simulator>/<test-name>.log`.
+-
++### Calculate instruction duration
+ 
+-### Running the model
++Run `cycle_diff.py` for each script.
+ 
+ ```bash
+-python3 model.py verif/sim/out_<date>/<simulator>/<test-name>.log
++python3 perf-model/cycle_diff.py annotated.log
++mv traceout.log model.log
++python3 perf-model/cycle_diff.py verif/sim/out_<date>/<simulator>/<test-name>.log
+ ```
+ 
++Note: the `cycles_diff.py` script filters the "timed" part of the program.
++To do this, it tries to find `csrr minstret` instructions.
++Feel free to modify the script to suit your needs.
+ 
+-### Exploring design space
+ 
+-In `model.py`, the `main` function runs the model with arguments which override default values.
+-Generic parameters are available in `Model.__init__`.
+-You can add new parameters to explore here.
++### List the differences
+ 
+-To perform exploration, run the model in a loop, like `issue_commit_graph` does.
+-The `display_scores` function is meant to print a 3D plot if you have `matplotlib`.
+-`issue_commit_graph` prints the scores so that you can store it and display the figure without re-running the model.
++```bash
++diff -y traceout.log model.log | less
++```
+ 
+ 
+ ## Files
+diff --git a/perf-model/model.py b/perf-model/model.py
+index 736298a89..00bbb152e 100644
+--- a/perf-model/model.py
++++ b/perf-model/model.py
+@@ -347,7 +347,7 @@ class Model:
+     """Models the scheduling of CVA6"""
+ 
+     re_instr = re.compile(
+-        r"([a-z]+)\s+0:\s*0x00000000([0-9a-f]+)\s*\(([0-9a-fx]+)\)\s*@\s*([0-9]+)\s*(.*)"
++        r"([a-z]+)\s+0:\s*0x0*([0-9a-f]+)\s*\(([0-9a-fx]+)\)\s*(@\s*[0-9]+)?\s*(.*)"
+     )
+ 
+     def __init__(
+@@ -549,14 +549,14 @@ class Model:
+ 
+ def write_trace(output_file, instructions):
+     """Write cycle-annotated trace"""
+-    pattern = re.compile(r"@\s*[0-9]+")
++    pattern = re.compile(r"\)\s*(@\s*[0-9]+)? ")
+ 
+     lines = []
+     for instr in instructions:
+         commit_event = instr.events[-1]
+         assert commit_event.kind == EventKind.commit
+         cycle = commit_event.cycle
+-        annotated = re.sub(pattern, f"@ {cycle}", instr.line)
++        annotated = re.sub(pattern, f") @ {cycle} ", instr.line)
+         #if EventKind.STRUCT in [e.kind for e in instr.events]:
+         #    annotated += " #STRUCT"
+         #if EventKind.RAW in [e.kind for e in instr.events]:
+@@ -660,7 +660,9 @@ def main(input_file: str):
+     model.run()
+ 
+     write_trace('annotated.log', model.retired)
+-    print_stats(filter_timed_part(model.retired))
++
++    #print_stats(filter_timed_part(model.retired))
++    print_stats(model.retired)
+ 
+ if __name__ == "__main__":
+     main(sys.argv[1])

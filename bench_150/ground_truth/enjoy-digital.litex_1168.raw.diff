@@ -1,0 +1,92 @@
+diff --git a/litex/soc/cores/cpu/rocket/core.py b/litex/soc/cores/cpu/rocket/core.py
+index d7785cc6..c948560f 100644
+--- a/litex/soc/cores/cpu/rocket/core.py
++++ b/litex/soc/cores/cpu/rocket/core.py
+@@ -118,6 +118,7 @@ class Rocket(CPU):
+         flags =  "-mno-save-restore "
+         flags += GCC_FLAGS[self.variant]
+         flags += "-D__rocket__ "
++        flags += "-mcmodel=medany"
+         return flags
+ 
+     def __init__(self, platform, variant="standard"):
+diff --git a/litex/soc/software/bios/Makefile b/litex/soc/software/bios/Makefile
+index aa48af35..2771549d 100755
+--- a/litex/soc/software/bios/Makefile
++++ b/litex/soc/software/bios/Makefile
+@@ -6,8 +6,7 @@ ifdef TFTP_SERVER_PORT
+ CFLAGS += -DTFTP_SERVER_PORT=$(TFTP_SERVER_PORT)
+ endif
+ 
+-OBJECTS = isr.o			\
+-	  boot-helper.o		\
++OBJECTS = boot-helper.o	\
+ 	  boot.o			\
+ 	  helpers.o			\
+ 	  cmd_bios.o		\
+diff --git a/litex/soc/software/demo/Makefile b/litex/soc/software/demo/Makefile
+index 1ea2d681..d58e3594 100644
+--- a/litex/soc/software/demo/Makefile
++++ b/litex/soc/software/demo/Makefile
+@@ -3,7 +3,7 @@ BUILD_DIR?=../build/
+ include $(BUILD_DIR)/software/include/generated/variables.mak
+ include $(SOC_DIRECTORY)/software/common.mak
+ 
+-OBJECTS   = isr.o donut.o helloc.o main.o crt0.o
++OBJECTS   = donut.o helloc.o main.o crt0.o
+ ifdef WITH_CXX
+ 	OBJECTS += hellocpp.o
+ endif
+diff --git a/litex/soc/software/demo/isr.c b/litex/soc/software/demo/isr.c
+deleted file mode 100644
+index 79766318..00000000
+--- a/litex/soc/software/demo/isr.c
++++ /dev/null
+@@ -1,29 +0,0 @@
+-// This file is Copyright (c) 2020 Florent Kermarrec <florent@enjoy-digital.fr>
+-// License: BSD
+-
+-#include <generated/csr.h>
+-#include <generated/soc.h>
+-#include <irq.h>
+-#include <libbase/uart.h>
+-
+-void isr(void);
+-
+-#ifdef CONFIG_CPU_HAS_INTERRUPT
+-
+-void isr(void)
+-{
+-	__attribute__((unused)) unsigned int irqs;
+-
+-	irqs = irq_pending() & irq_getmask();
+-
+-#ifndef UART_POLLING
+-	if(irqs & (1 << UART_INTERRUPT))
+-		uart_isr();
+-#endif
+-}
+-
+-#else
+-
+-void isr(void){};
+-
+-#endif
+diff --git a/litex/soc/software/libbase/Makefile b/litex/soc/software/libbase/Makefile
+index 0891d3c2..6b8736b1 100755
+--- a/litex/soc/software/libbase/Makefile
++++ b/litex/soc/software/libbase/Makefile
+@@ -10,7 +10,8 @@ OBJECTS =  \
+ 	memtest.o  \
+ 	uart.o     \
+ 	spiflash.o \
+-	i2c.o
++	i2c.o \
++	isr.o
+ 
+ all: libbase.a
+ 
+diff --git a/litex/soc/software/bios/isr.c b/litex/soc/software/libbase/isr.c
+similarity index 100%
+rename from litex/soc/software/bios/isr.c
+rename to litex/soc/software/libbase/isr.c

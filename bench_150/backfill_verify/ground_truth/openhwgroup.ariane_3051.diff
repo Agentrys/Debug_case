@@ -1,0 +1,36 @@
+diff --git a/core/compressed_decoder.sv b/core/compressed_decoder.sv
+index 26c0289a..76385e5e 100644
+--- a/core/compressed_decoder.sv
++++ b/core/compressed_decoder.sv
+@@ -227,6 +227,7 @@ module compressed_decoder #(
+                     1'b0,
+                     riscv::OpcodeStore
+                   };
++                  if (instr_i[6] == 1'b1) illegal_instr_o = 1'b1;
+                 end
+ 
+                 default: begin
+diff --git a/core/compressed_decoder.sv b/core/compressed_decoder.sv
+index 26c0289a..76385e5e 100644
+--- a/core/compressed_decoder.sv
++++ b/core/compressed_decoder.sv
+@@ -227,6 +227,7 @@ module compressed_decoder #(
+                     1'b0,
+                     riscv::OpcodeStore
+                   };
++                  if (instr_i[6] == 1'b1) illegal_instr_o = 1'b1;
+                 end
+ 
+                 default: begin
+diff --git a/core/compressed_decoder.sv b/core/compressed_decoder.sv
+index 26c0289a..76385e5e 100644
+--- a/core/compressed_decoder.sv
++++ b/core/compressed_decoder.sv
+@@ -227,6 +227,7 @@ module compressed_decoder #(
+                     1'b0,
+                     riscv::OpcodeStore
+                   };
++                  if (instr_i[6] == 1'b1) illegal_instr_o = 1'b1;
+                 end
+ 
+                 default: begin

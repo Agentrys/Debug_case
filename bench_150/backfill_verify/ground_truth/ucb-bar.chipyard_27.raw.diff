@@ -1,0 +1,2989 @@
+diff --git a/macros/src/main/scala/MacroCompiler.scala b/macros/src/main/scala/MacroCompiler.scala
+index f032a979..a9025e55 100644
+--- a/macros/src/main/scala/MacroCompiler.scala
++++ b/macros/src/main/scala/MacroCompiler.scala
+@@ -91,6 +91,17 @@ class MacroCompilerPass(mems: Option[Seq[Macro]],
+                         libs: Option[Seq[Macro]],
+                         costMetric: CostMetric = CostMetric.default,
+                         mode: MacroCompilerAnnotation.CompilerMode = MacroCompilerAnnotation.Default) extends firrtl.passes.Pass {
++  // Helper function to check the legality of bitPairs.
++  // e.g. ((0,21), (22,43)) is legal
++  // ((0,21), (22,21)) is illegal and will throw an assert
++  private def checkBitPairs(bitPairs: Seq[(BigInt, BigInt)]): Unit = {
++    bitPairs.foldLeft(BigInt(-1))((lastBit, nextPair) => {
++      assert(lastBit + 1 == nextPair._1, s"Pair's first bit ${nextPair._1} does not follow last bit ${lastBit}");
++      assert(nextPair._2 >= nextPair._1, s"Pair ${nextPair} in bitPairs ${bitPairs} is illegal");
++      nextPair._2
++    })
++  }
++
+   def compile(mem: Macro, lib: Macro): Option[(Module, ExtModule)] = {
+     val pairedPorts = mem.sortedPorts zip lib.sortedPorts
+ 
+@@ -103,23 +114,33 @@ class MacroCompilerPass(mems: Option[Seq[Macro]],
+      * width=8 memories.
+      */
+     val bitPairs = ArrayBuffer[(BigInt, BigInt)]()
+-    var currentLSB = 0
++    var currentLSB: BigInt = 0
+ 
+     // Process every bit in the mem width.
+     for (memBit <- 0 until mem.src.width) {
+       val bitsInCurrentMem = memBit - currentLSB
+ 
+-      // Helper function to check if it's time to split memories.
+-      // @param effectiveLibWidth Split memory when we have this many bits.
+-      def splitMemory(effectiveLibWidth: Int): Unit = {
+-        if (bitsInCurrentMem == effectiveLibWidth) {
+-          bitPairs += ((currentLSB, memBit - 1))
+-          currentLSB = memBit
+-        }
+-      }
+-
++      // We'll need to find a bitPair that works for *all* the ports of the memory.
++      // e.g. unmasked read port and masked write port.
++      // For each port, store a tentative candidate for the split.
++      // Afterwards, figure out which one to use.
++      val bitPairCandidates = ArrayBuffer[(BigInt, BigInt)]()
+       for ((memPort, libPort) <- pairedPorts) {
+ 
++        // Sanity check to make sure we only split once per bit, once per port.
++        var alreadySplit: Boolean = false
++
++        // Helper function to check if it's time to split memories.
++        // @param effectiveLibWidth Split memory when we have this many bits.
++        def splitMemory(effectiveLibWidth: Int): Unit = {
++          assert (!alreadySplit)
++
++          if (bitsInCurrentMem == effectiveLibWidth) {
++            bitPairCandidates += ((currentLSB, memBit - 1))
++            alreadySplit = true
++          }
++        }
++
+         // Make sure we don't have a maskGran larger than the width of the memory.
+         assert (memPort.src.effectiveMaskGran <= memPort.src.width)
+         assert (libPort.src.effectiveMaskGran <= libPort.src.width)
+@@ -204,9 +225,23 @@ class MacroCompilerPass(mems: Option[Seq[Macro]],
+           }
+         }
+       }
++
++      // Choose an actual bit pair to add.
++      // We'll have to choose the smallest one (e.g. unmasked read port might be more tolerant of a bigger split than the masked write port).
++      if (bitPairCandidates.length == 0) {
++        // No pair needed to split, just continue
++      } else {
++        val bestPair = bitPairCandidates.reduceLeft((leftPair, rightPair) => {
++          if (leftPair._2 - leftPair._1 + 1 > rightPair._2 - rightPair._1 + 1) leftPair else rightPair
++        })
++        bitPairs += bestPair
++        currentLSB = bestPair._2 + BigInt(1) // advance the LSB pointer
++      }
+     }
+     // Add in the last chunk if there are any leftovers
+     bitPairs += ((currentLSB, mem.src.width.toInt - 1))
++    // Check bit pairs
++    checkBitPairs(bitPairs)
+ 
+     // Depth mapping
+     val stmts = ArrayBuffer[Statement]()
+diff --git a/macros/src/test/resources/lib-BOOMTest.json b/macros/src/test/resources/lib-BOOMTest.json
+new file mode 100644
+index 00000000..8246bc3d
+--- /dev/null
++++ b/macros/src/test/resources/lib-BOOMTest.json
+@@ -0,0 +1,1165 @@
++[
++  {
++    "family": "1rw",
++    "width": 8,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_1024x8",
++    "type": "sram",
++    "depth": 1024
++  },
++  {
++    "family": "1rw",
++    "width": 46,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_128x46",
++    "type": "sram",
++    "depth": 128
++  },
++  {
++    "family": "1rw",
++    "width": 48,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_128x48",
++    "type": "sram",
++    "depth": 128
++  },
++  {
++    "family": "1rw",
++    "width": 8,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_128x8",
++    "type": "sram",
++    "depth": 128
++  },
++  {
++    "family": "1rw",
++    "width": 128,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_256x128",
++    "type": "sram",
++    "depth": 256
++  },
++  {
++    "family": "1rw",
++    "width": 32,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_256x32",
++    "type": "sram",
++    "depth": 256
++  },
++  {
++    "family": "1rw",
++    "width": 46,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_256x46",
++    "type": "sram",
++    "depth": 256
++  },
++  {
++    "family": "1rw",
++    "width": 48,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_256x48",
++    "type": "sram",
++    "depth": 256
++  },
++  {
++    "family": "1rw",
++    "width": 8,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_256x8",
++    "type": "sram",
++    "depth": 256
++  },
++  {
++    "family": "1rw",
++    "width": 50,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_32x50",
++    "type": "sram",
++    "depth": 32
++  },
++  {
++    "family": "1rw",
++    "width": 128,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_512x128",
++    "type": "sram",
++    "depth": 512
++  },
++  {
++    "family": "1rw",
++    "width": 32,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_512x32",
++    "type": "sram",
++    "depth": 512
++  },
++  {
++    "family": "1rw",
++    "width": 8,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_512x8",
++    "type": "sram",
++    "depth": 512
++  },
++  {
++    "family": "1rw",
++    "width": 128,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_64x128",
++    "type": "sram",
++    "depth": 64
++  },
++  {
++    "family": "1rw",
++    "width": 32,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_64x32",
++    "type": "sram",
++    "depth": 64
++  },
++  {
++    "family": "1rw",
++    "width": 34,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_64x34",
++    "type": "sram",
++    "depth": 64
++  },
++  {
++    "family": "1rw",
++    "width": 8,
++    "ports": [
++      {
++        "chip enable port name": "CSB",
++        "write enable port name": "WEB",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE",
++        "chip enable port polarity": "active low",
++        "address port name": "A",
++        "read enable port name": "OEB",
++        "input port name": "I",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_1rw_64x8",
++    "type": "sram",
++    "depth": 64
++  },
++  {
++    "family": "2rw",
++    "width": 16,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_128x16",
++    "type": "sram",
++    "depth": 128
++  },
++  {
++    "family": "2rw",
++    "width": 32,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_128x32",
++    "type": "sram",
++    "depth": 128
++  },
++  {
++    "family": "2rw",
++    "width": 4,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_128x4",
++    "type": "sram",
++    "depth": 128
++  },
++  {
++    "family": "2rw",
++    "width": 8,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_128x8",
++    "type": "sram",
++    "depth": 128
++  },
++  {
++    "family": "2rw",
++    "width": 16,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_16x16",
++    "type": "sram",
++    "depth": 16
++  },
++  {
++    "family": "2rw",
++    "width": 32,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_16x32",
++    "type": "sram",
++    "depth": 16
++  },
++  {
++    "family": "2rw",
++    "width": 4,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_16x4",
++    "type": "sram",
++    "depth": 16
++  },
++  {
++    "family": "2rw",
++    "width": 8,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_16x8",
++    "type": "sram",
++    "depth": 16
++  },
++  {
++    "family": "2rw",
++    "width": 16,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_32x16",
++    "type": "sram",
++    "depth": 32
++  },
++  {
++    "family": "2rw",
++    "width": 22,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_32x22",
++    "type": "sram",
++    "depth": 32
++  },
++  {
++    "family": "2rw",
++    "width": 32,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_32x32",
++    "type": "sram",
++    "depth": 32
++  },
++  {
++    "family": "2rw",
++    "width": 39,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_32x39",
++    "type": "sram",
++    "depth": 32
++  },
++  {
++    "family": "2rw",
++    "width": 4,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_32x4",
++    "type": "sram",
++    "depth": 32
++  },
++  {
++    "family": "2rw",
++    "width": 8,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_32x8",
++    "type": "sram",
++    "depth": 32
++  },
++  {
++    "family": "2rw",
++    "width": 16,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_64x16",
++    "type": "sram",
++    "depth": 64
++  },
++  {
++    "family": "2rw",
++    "width": 32,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_64x32",
++    "type": "sram",
++    "depth": 64
++  },
++  {
++    "family": "2rw",
++    "width": 4,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_64x4",
++    "type": "sram",
++    "depth": 64
++  },
++  {
++    "family": "2rw",
++    "width": 8,
++    "ports": [
++      {
++        "chip enable port name": "CSB1",
++        "write enable port name": "WEB1",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O1",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE1",
++        "chip enable port polarity": "active low",
++        "address port name": "A1",
++        "read enable port name": "OEB1",
++        "input port name": "I1",
++        "input port polarity": "active high"
++      },
++      {
++        "chip enable port name": "CSB2",
++        "write enable port name": "WEB2",
++        "address port polarity": "active high",
++        "output port polarity": "active high",
++        "output port name": "O2",
++        "write enable port polarity": "active low",
++        "read enable port polarity": "active low",
++        "clock port polarity": "positive edge",
++        "clock port name": "CE2",
++        "chip enable port polarity": "active low",
++        "address port name": "A2",
++        "read enable port name": "OEB2",
++        "input port name": "I2",
++        "input port polarity": "active high"
++      }
++    ],
++    "name": "my_sram_2rw_64x8",
++    "type": "sram",
++    "depth": 64
++  }
++]
+diff --git a/macros/src/test/scala/MacroCompilerSpec.scala b/macros/src/test/scala/MacroCompilerSpec.scala
+index 720bb812..b5efbf9d 100644
+--- a/macros/src/test/scala/MacroCompilerSpec.scala
++++ b/macros/src/test/scala/MacroCompilerSpec.scala
+@@ -301,47 +301,77 @@ trait HasSimpleTestGenerator {
+       } else ""
+     }
+ 
++    /** Helper function to generate a port.
++     * @param prefix Memory port prefix (e.g. "x" for ports like "x_clk")
++     * @param addrWidth Address port width
++     * @param width data width
++     * @param write Has a write port?
++     * @param writeEnable Has a write enable port?
++     * @param read Has a read port?
++     * @param readEnable Has a read enable port?
++     * @param mask Mask granularity (# bits) of the port or None. */
++    def generatePort(prefix: String, addrWidth: Int, width: Int, write: Boolean, writeEnable: Boolean, read: Boolean, readEnable: Boolean, mask: Option[Int]): String = {
++      val readStr = if (read) s"output ${prefix}_dout : UInt<$width>" else ""
++      val writeStr = if (write) s"input ${prefix}_din : UInt<$width>" else ""
++      val readEnableStr = if (readEnable) s"input ${prefix}_read_en : UInt<1>" else ""
++      val writeEnableStr = if (writeEnable) s"input ${prefix}_write_en : UInt<1>" else ""
++      val maskStr = mask match {
++        case Some(maskBits: Int) => s"input ${prefix}_mask : UInt<${maskBits}>"
++        case _ => ""
++      }
++s"""
++    input ${prefix}_clk : Clock
++    input ${prefix}_addr : UInt<$addrWidth>
++    ${writeStr}
++    ${readStr}
++    ${readEnableStr}
++    ${writeEnableStr}
++    ${maskStr}
++"""
++    }
++
++    /** Helper function to generate a RW footer port.
++     * @param prefix Memory port prefix (e.g. "x" for ports like "x_clk")
++     * @param readEnable Has a read enable port?
++     * @param mask Mask granularity (# bits) of the port or None. */
++    def generateReadWriteFooterPort(prefix: String, readEnable: Boolean, mask: Option[Int]): String = {
++      generatePort(libPortPrefix, lib_addr_width, libWidth,
++        write=true, writeEnable=true, read=true, readEnable=readEnable, mask)
++    }
++
++    /** Helper function to generate a RW header port.
++     * @param prefix Memory port prefix (e.g. "x" for ports like "x_clk")
++     * @param readEnable Has a read enable port?
++     * @param mask Mask granularity (# bits) of the port or None. */
++    def generateReadWriteHeaderPort(prefix: String, readEnable: Boolean, mask: Option[Int]): String = {
++      generatePort(memPortPrefix, mem_addr_width, memWidth,
++        write=true, writeEnable=true, read=true, readEnable=readEnable, mask)
++    }
++
++    // Generate the header memory ports.
++    def generateHeaderPorts(): String = {
++      require (memSRAM.ports.size == 1, "Header generator only supports single RW port mem")
++      generateReadWriteHeaderPort(memPortPrefix, memSRAM.ports(0).readEnable.isDefined, if (memHasMask) Some(memMaskBits) else None)
++    }
++
+     // Generate the header (contains the circuit statement and the target memory
+     // module.
+     def generateHeader(): String = {
+-      require (memSRAM.ports.size == 1, "Header generator only supports single port mem")
+-
+-      val readEnable = if (memSRAM.ports(0).readEnable.isDefined) s"input ${memPortPrefix}_read_en : UInt<1>" else ""
+-      val headerMask = if (memHasMask) s"input ${memPortPrefix}_mask : UInt<${memMaskBits}>" else ""
+       s"""
+ circuit $mem_name :
+   module $mem_name :
+-    input ${memPortPrefix}_clk : Clock
+-    input ${memPortPrefix}_addr : UInt<$mem_addr_width>
+-    input ${memPortPrefix}_din : UInt<$memWidth>
+-    output ${memPortPrefix}_dout : UInt<$memWidth>
+-    ${readEnable}
+-    input ${memPortPrefix}_write_en : UInt<1>
+-    ${headerMask}
++${generateHeaderPorts}
+   """
+     }
+ 
+     // Generate the target memory ports.
+     def generateFooterPorts(): String = {
+-      require (libSRAM.ports.size == 1, "Footer generator only supports single port lib")
+-
+-      val readEnable = if (libSRAM.ports(0).readEnable.isDefined) s"input ${libPortPrefix}_read_en : UInt<1>" else ""
+-      val footerMask = if (libHasMask) s"input ${libPortPrefix}_mask : UInt<${libMaskBits}>" else ""
+-      s"""
+-    input ${libPortPrefix}_clk : Clock
+-    input ${libPortPrefix}_addr : UInt<$lib_addr_width>
+-    input ${libPortPrefix}_din : UInt<$libWidth>
+-    output ${libPortPrefix}_dout : UInt<$libWidth>
+-    ${readEnable}
+-    input ${libPortPrefix}_write_en : UInt<1>
+-    ${footerMask}
+-  """
++      require (libSRAM.ports.size == 1, "Footer generator only supports single RW port mem")
++      generateReadWriteFooterPort(libPortPrefix, libSRAM.ports(0).readEnable.isDefined, if (libHasMask) Some(libMaskBits) else None)
+     }
+ 
+     // Generate the footer (contains the target memory extmodule declaration by default).
+     def generateFooter(): String = {
+-      require (libSRAM.ports.size == 1, "Footer generator only supports single port lib")
+-
+       s"""
+   extmodule $lib_name :
+ ${generateFooterPorts}
+diff --git a/macros/src/test/scala/MultiPort.scala b/macros/src/test/scala/MultiPort.scala
+new file mode 100644
+index 00000000..ac1fb2f8
+--- /dev/null
++++ b/macros/src/test/scala/MultiPort.scala
+@@ -0,0 +1,392 @@
++package barstools.macros
++
++// Test that the memory compiler works fine for compiling multi-port memories.
++// TODO: extend test generator to also automatically generate multi-ported memories.
++
++class SplitWidth_2rw extends MacroCompilerSpec with HasSRAMGenerator with HasSimpleWidthTestGenerator {
++  import mdf.macrolib._
++
++  override lazy val depth = 1024
++  override lazy val memWidth = 64
++  override lazy val memMaskGran = Some(16)
++  override lazy val libWidth = 16
++
++  override def generateMemSRAM() = {
++    SRAMMacro(
++      name=mem_name,
++      width=memWidth,
++      depth=memDepth,
++      family="2rw",
++      ports=Seq(generateTestPort(
++        "portA", memWidth, memDepth, maskGran=memMaskGran,
++        write=true, writeEnable=true,
++        read=true, readEnable=true
++      ), generateTestPort(
++        "portB", memWidth, memDepth, maskGran=memMaskGran,
++        write=true, writeEnable=true,
++        read=true, readEnable=true
++      ))
++    )
++  }
++
++  override def generateLibSRAM() = {
++    SRAMMacro(
++      name=lib_name,
++      width=libWidth,
++      depth=libDepth,
++      family="2rw",
++      ports=Seq(generateTestPort(
++        "portA", libWidth, libDepth,
++        write=true, writeEnable=true,
++        read=true, readEnable=true
++      ), generateTestPort(
++        "portB", libWidth, libDepth,
++        write=true, writeEnable=true,
++        read=true, readEnable=true
++      ))
++    )
++  }
++
++  override def generateHeaderPorts() = {
++    generateReadWriteHeaderPort("portA", true, Some(memMaskBits)) + "\n" + generateReadWriteHeaderPort("portB", true, Some(memMaskBits))
++  }
++
++  override def generateFooterPorts() = {
++    generateReadWriteFooterPort("portA", true, None) + "\n" + generateReadWriteFooterPort("portB", true, None)
++  }
++
++  override def generateBody() =
++"""
++    inst mem_0_0 of awesome_lib_mem
++    inst mem_0_1 of awesome_lib_mem
++    inst mem_0_2 of awesome_lib_mem
++    inst mem_0_3 of awesome_lib_mem
++    mem_0_0.portA_clk <= portA_clk
++    mem_0_0.portA_addr <= portA_addr
++    node portA_dout_0_0 = bits(mem_0_0.portA_dout, 15, 0)
++    mem_0_0.portA_din <= bits(portA_din, 15, 0)
++    mem_0_0.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_0.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 0, 0)), UInt<1>("h1"))
++    mem_0_1.portA_clk <= portA_clk
++    mem_0_1.portA_addr <= portA_addr
++    node portA_dout_0_1 = bits(mem_0_1.portA_dout, 15, 0)
++    mem_0_1.portA_din <= bits(portA_din, 31, 16)
++    mem_0_1.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_1.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 1, 1)), UInt<1>("h1"))
++    mem_0_2.portA_clk <= portA_clk
++    mem_0_2.portA_addr <= portA_addr
++    node portA_dout_0_2 = bits(mem_0_2.portA_dout, 15, 0)
++    mem_0_2.portA_din <= bits(portA_din, 47, 32)
++    mem_0_2.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_2.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 2, 2)), UInt<1>("h1"))
++    mem_0_3.portA_clk <= portA_clk
++    mem_0_3.portA_addr <= portA_addr
++    node portA_dout_0_3 = bits(mem_0_3.portA_dout, 15, 0)
++    mem_0_3.portA_din <= bits(portA_din, 63, 48)
++    mem_0_3.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_3.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 3, 3)), UInt<1>("h1"))
++    node portA_dout_0 = cat(portA_dout_0_3, cat(portA_dout_0_2, cat(portA_dout_0_1, portA_dout_0_0)))
++    mem_0_0.portB_clk <= portB_clk
++    mem_0_0.portB_addr <= portB_addr
++    node portB_dout_0_0 = bits(mem_0_0.portB_dout, 15, 0)
++    mem_0_0.portB_din <= bits(portB_din, 15, 0)
++    mem_0_0.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_0.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 0, 0)), UInt<1>("h1"))
++    mem_0_1.portB_clk <= portB_clk
++    mem_0_1.portB_addr <= portB_addr
++    node portB_dout_0_1 = bits(mem_0_1.portB_dout, 15, 0)
++    mem_0_1.portB_din <= bits(portB_din, 31, 16)
++    mem_0_1.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_1.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 1, 1)), UInt<1>("h1"))
++    mem_0_2.portB_clk <= portB_clk
++    mem_0_2.portB_addr <= portB_addr
++    node portB_dout_0_2 = bits(mem_0_2.portB_dout, 15, 0)
++    mem_0_2.portB_din <= bits(portB_din, 47, 32)
++    mem_0_2.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_2.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 2, 2)), UInt<1>("h1"))
++    mem_0_3.portB_clk <= portB_clk
++    mem_0_3.portB_addr <= portB_addr
++    node portB_dout_0_3 = bits(mem_0_3.portB_dout, 15, 0)
++    mem_0_3.portB_din <= bits(portB_din, 63, 48)
++    mem_0_3.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_3.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 3, 3)), UInt<1>("h1"))
++    node portB_dout_0 = cat(portB_dout_0_3, cat(portB_dout_0_2, cat(portB_dout_0_1, portB_dout_0_0)))
++    portA_dout <= mux(UInt<1>("h1"), portA_dout_0, UInt<1>("h0"))
++    portB_dout <= mux(UInt<1>("h1"), portB_dout_0, UInt<1>("h0"))
++"""
++
++  compileExecuteAndTest(mem, lib, v, output)
++}
++
++class SplitWidth_1r_1w extends MacroCompilerSpec with HasSRAMGenerator with HasSimpleWidthTestGenerator {
++  import mdf.macrolib._
++
++  override lazy val depth = 1024
++  override lazy val memWidth = 64
++  override lazy val memMaskGran = Some(16)
++  override lazy val libWidth = 16
++
++  override def generateMemSRAM() = {
++    SRAMMacro(
++      name=mem_name,
++      width=memWidth,
++      depth=memDepth,
++      family="1r1w",
++      ports=Seq(generateTestPort(
++        "portA", memWidth, memDepth, maskGran=memMaskGran,
++        write=false, writeEnable=false,
++        read=true, readEnable=true
++      ), generateTestPort(
++        "portB", memWidth, memDepth, maskGran=memMaskGran,
++        write=true, writeEnable=true,
++        read=false, readEnable=false
++      ))
++    )
++  }
++
++  override def generateLibSRAM() = {
++    SRAMMacro(
++      name=lib_name,
++      width=libWidth,
++      depth=libDepth,
++      family="1r1w",
++      ports=Seq(generateTestPort(
++        "portA", libWidth, libDepth,
++        write=false, writeEnable=false,
++        read=true, readEnable=true
++      ), generateTestPort(
++        "portB", libWidth, libDepth,
++        write=true, writeEnable=true,
++        read=false, readEnable=false
++      ))
++    )
++  }
++
++  override def generateHeaderPorts() = {
++    generatePort("portA", mem_addr_width, memWidth,
++        write=false, writeEnable=false, read=true, readEnable=true, Some(memMaskBits)) + "\n" +
++    generatePort("portB", mem_addr_width, memWidth,
++        write=true, writeEnable=true, read=false, readEnable=false, Some(memMaskBits))
++  }
++
++  override def generateFooterPorts() = {
++    generatePort("portA", lib_addr_width, libWidth,
++        write=false, writeEnable=false, read=true, readEnable=true, None) + "\n" +
++    generatePort("portB", lib_addr_width, libWidth,
++        write=true, writeEnable=true, read=false, readEnable=false, None)
++  }
++
++  override def generateBody() =
++"""
++    inst mem_0_0 of awesome_lib_mem
++    inst mem_0_1 of awesome_lib_mem
++    inst mem_0_2 of awesome_lib_mem
++    inst mem_0_3 of awesome_lib_mem
++    mem_0_0.portB_clk <= portB_clk
++    mem_0_0.portB_addr <= portB_addr
++    mem_0_0.portB_din <= bits(portB_din, 15, 0)
++    mem_0_0.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 0, 0)), UInt<1>("h1"))
++    mem_0_1.portB_clk <= portB_clk
++    mem_0_1.portB_addr <= portB_addr
++    mem_0_1.portB_din <= bits(portB_din, 31, 16)
++    mem_0_1.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 1, 1)), UInt<1>("h1"))
++    mem_0_2.portB_clk <= portB_clk
++    mem_0_2.portB_addr <= portB_addr
++    mem_0_2.portB_din <= bits(portB_din, 47, 32)
++    mem_0_2.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 2, 2)), UInt<1>("h1"))
++    mem_0_3.portB_clk <= portB_clk
++    mem_0_3.portB_addr <= portB_addr
++    mem_0_3.portB_din <= bits(portB_din, 63, 48)
++    mem_0_3.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 3, 3)), UInt<1>("h1"))
++    mem_0_0.portA_clk <= portA_clk
++    mem_0_0.portA_addr <= portA_addr
++    node portA_dout_0_0 = bits(mem_0_0.portA_dout, 15, 0)
++    mem_0_0.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_1.portA_clk <= portA_clk
++    mem_0_1.portA_addr <= portA_addr
++    node portA_dout_0_1 = bits(mem_0_1.portA_dout, 15, 0)
++    mem_0_1.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_2.portA_clk <= portA_clk
++    mem_0_2.portA_addr <= portA_addr
++    node portA_dout_0_2 = bits(mem_0_2.portA_dout, 15, 0)
++    mem_0_2.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_3.portA_clk <= portA_clk
++    mem_0_3.portA_addr <= portA_addr
++    node portA_dout_0_3 = bits(mem_0_3.portA_dout, 15, 0)
++    mem_0_3.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    node portA_dout_0 = cat(portA_dout_0_3, cat(portA_dout_0_2, cat(portA_dout_0_1, portA_dout_0_0)))
++    portA_dout <= mux(UInt<1>("h1"), portA_dout_0, UInt<1>("h0"))
++"""
++
++  compileExecuteAndTest(mem, lib, v, output)
++}
++
++class SplitWidth_2rw_differentMasks extends MacroCompilerSpec with HasSRAMGenerator with HasSimpleWidthTestGenerator {
++  import mdf.macrolib._
++
++  override lazy val depth = 1024
++  override lazy val memWidth = 64
++  override lazy val memMaskGran = Some(16)
++  override lazy val libWidth = 16
++
++  lazy val memMaskGranB = 8 // these generators are run at constructor time
++
++  override def generateMemSRAM() = {
++    println(memMaskGranB)
++    SRAMMacro(
++      name=mem_name,
++      width=memWidth,
++      depth=memDepth,
++      family="2rw",
++      ports=Seq(generateTestPort(
++        "portA", memWidth, memDepth, maskGran=memMaskGran,
++        write=true, writeEnable=true,
++        read=true, readEnable=true
++      ), generateTestPort(
++        "portB", memWidth, memDepth, maskGran=Some(memMaskGranB),
++        write=true, writeEnable=true,
++        read=true, readEnable=true
++      ))
++    )
++  }
++
++  override def generateLibSRAM() = {
++    SRAMMacro(
++      name=lib_name,
++      width=libWidth,
++      depth=libDepth,
++      family="2rw",
++      ports=Seq(generateTestPort(
++        "portA", libWidth, libDepth,
++        write=true, writeEnable=true,
++        read=true, readEnable=true
++      ), generateTestPort(
++        "portB", libWidth, libDepth,
++        write=true, writeEnable=true,
++        read=true, readEnable=true
++      ))
++    )
++  }
++
++  override def generateHeaderPorts() = {
++    generateReadWriteHeaderPort("portA", true, Some(memMaskBits)) + "\n" + generateReadWriteHeaderPort("portB", true, Some(memWidth / memMaskGranB))
++  }
++
++  override def generateFooterPorts() = {
++    generateReadWriteFooterPort("portA", true, None) + "\n" + generateReadWriteFooterPort("portB", true, None)
++  }
++
++  override def generateBody() =
++"""
++    inst mem_0_0 of awesome_lib_mem
++    inst mem_0_1 of awesome_lib_mem
++    inst mem_0_2 of awesome_lib_mem
++    inst mem_0_3 of awesome_lib_mem
++    inst mem_0_4 of awesome_lib_mem
++    inst mem_0_5 of awesome_lib_mem
++    inst mem_0_6 of awesome_lib_mem
++    inst mem_0_7 of awesome_lib_mem
++    mem_0_0.portA_clk <= portA_clk
++    mem_0_0.portA_addr <= portA_addr
++    node portA_dout_0_0 = bits(mem_0_0.portA_dout, 7, 0)
++    mem_0_0.portA_din <= bits(portA_din, 7, 0)
++    mem_0_0.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_0.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 0, 0)), UInt<1>("h1"))
++    mem_0_1.portA_clk <= portA_clk
++    mem_0_1.portA_addr <= portA_addr
++    node portA_dout_0_1 = bits(mem_0_1.portA_dout, 7, 0)
++    mem_0_1.portA_din <= bits(portA_din, 15, 8)
++    mem_0_1.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_1.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 0, 0)), UInt<1>("h1"))
++    mem_0_2.portA_clk <= portA_clk
++    mem_0_2.portA_addr <= portA_addr
++    node portA_dout_0_2 = bits(mem_0_2.portA_dout, 7, 0)
++    mem_0_2.portA_din <= bits(portA_din, 23, 16)
++    mem_0_2.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_2.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 1, 1)), UInt<1>("h1"))
++    mem_0_3.portA_clk <= portA_clk
++    mem_0_3.portA_addr <= portA_addr
++    node portA_dout_0_3 = bits(mem_0_3.portA_dout, 7, 0)
++    mem_0_3.portA_din <= bits(portA_din, 31, 24)
++    mem_0_3.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_3.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 1, 1)), UInt<1>("h1"))
++    mem_0_4.portA_clk <= portA_clk
++    mem_0_4.portA_addr <= portA_addr
++    node portA_dout_0_4 = bits(mem_0_4.portA_dout, 7, 0)
++    mem_0_4.portA_din <= bits(portA_din, 39, 32)
++    mem_0_4.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_4.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 2, 2)), UInt<1>("h1"))
++    mem_0_5.portA_clk <= portA_clk
++    mem_0_5.portA_addr <= portA_addr
++    node portA_dout_0_5 = bits(mem_0_5.portA_dout, 7, 0)
++    mem_0_5.portA_din <= bits(portA_din, 47, 40)
++    mem_0_5.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_5.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 2, 2)), UInt<1>("h1"))
++    mem_0_6.portA_clk <= portA_clk
++    mem_0_6.portA_addr <= portA_addr
++    node portA_dout_0_6 = bits(mem_0_6.portA_dout, 7, 0)
++    mem_0_6.portA_din <= bits(portA_din, 55, 48)
++    mem_0_6.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_6.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 3, 3)), UInt<1>("h1"))
++    mem_0_7.portA_clk <= portA_clk
++    mem_0_7.portA_addr <= portA_addr
++    node portA_dout_0_7 = bits(mem_0_7.portA_dout, 7, 0)
++    mem_0_7.portA_din <= bits(portA_din, 63, 56)
++    mem_0_7.portA_read_en <= and(portA_read_en, UInt<1>("h1"))
++    mem_0_7.portA_write_en <= and(and(portA_write_en, bits(portA_mask, 3, 3)), UInt<1>("h1"))
++    node portA_dout_0 = cat(portA_dout_0_7, cat(portA_dout_0_6, cat(portA_dout_0_5, cat(portA_dout_0_4, cat(portA_dout_0_3, cat(portA_dout_0_2, cat(portA_dout_0_1, portA_dout_0_0)))))))
++    mem_0_0.portB_clk <= portB_clk
++    mem_0_0.portB_addr <= portB_addr
++    node portB_dout_0_0 = bits(mem_0_0.portB_dout, 7, 0)
++    mem_0_0.portB_din <= bits(portB_din, 7, 0)
++    mem_0_0.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_0.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 0, 0)), UInt<1>("h1"))
++    mem_0_1.portB_clk <= portB_clk
++    mem_0_1.portB_addr <= portB_addr
++    node portB_dout_0_1 = bits(mem_0_1.portB_dout, 7, 0)
++    mem_0_1.portB_din <= bits(portB_din, 15, 8)
++    mem_0_1.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_1.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 1, 1)), UInt<1>("h1"))
++    mem_0_2.portB_clk <= portB_clk
++    mem_0_2.portB_addr <= portB_addr
++    node portB_dout_0_2 = bits(mem_0_2.portB_dout, 7, 0)
++    mem_0_2.portB_din <= bits(portB_din, 23, 16)
++    mem_0_2.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_2.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 2, 2)), UInt<1>("h1"))
++    mem_0_3.portB_clk <= portB_clk
++    mem_0_3.portB_addr <= portB_addr
++    node portB_dout_0_3 = bits(mem_0_3.portB_dout, 7, 0)
++    mem_0_3.portB_din <= bits(portB_din, 31, 24)
++    mem_0_3.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_3.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 3, 3)), UInt<1>("h1"))
++    mem_0_4.portB_clk <= portB_clk
++    mem_0_4.portB_addr <= portB_addr
++    node portB_dout_0_4 = bits(mem_0_4.portB_dout, 7, 0)
++    mem_0_4.portB_din <= bits(portB_din, 39, 32)
++    mem_0_4.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_4.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 4, 4)), UInt<1>("h1"))
++    mem_0_5.portB_clk <= portB_clk
++    mem_0_5.portB_addr <= portB_addr
++    node portB_dout_0_5 = bits(mem_0_5.portB_dout, 7, 0)
++    mem_0_5.portB_din <= bits(portB_din, 47, 40)
++    mem_0_5.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_5.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 5, 5)), UInt<1>("h1"))
++    mem_0_6.portB_clk <= portB_clk
++    mem_0_6.portB_addr <= portB_addr
++    node portB_dout_0_6 = bits(mem_0_6.portB_dout, 7, 0)
++    mem_0_6.portB_din <= bits(portB_din, 55, 48)
++    mem_0_6.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_6.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 6, 6)), UInt<1>("h1"))
++    mem_0_7.portB_clk <= portB_clk
++    mem_0_7.portB_addr <= portB_addr
++    node portB_dout_0_7 = bits(mem_0_7.portB_dout, 7, 0)
++    mem_0_7.portB_din <= bits(portB_din, 63, 56)
++    mem_0_7.portB_read_en <= and(portB_read_en, UInt<1>("h1"))
++    mem_0_7.portB_write_en <= and(and(portB_write_en, bits(portB_mask, 7, 7)), UInt<1>("h1"))
++    node portB_dout_0 = cat(portB_dout_0_7, cat(portB_dout_0_6, cat(portB_dout_0_5, cat(portB_dout_0_4, cat(portB_dout_0_3, cat(portB_dout_0_2, cat(portB_dout_0_1, portB_dout_0_0)))))))
++    portA_dout <= mux(UInt<1>("h1"), portA_dout_0, UInt<1>("h0"))
++    portB_dout <= mux(UInt<1>("h1"), portB_dout_0, UInt<1>("h0"))
++"""
++
++  compileExecuteAndTest(mem, lib, v, output)
++}
+diff --git a/macros/src/test/scala/SpecificExamples.scala b/macros/src/test/scala/SpecificExamples.scala
+index 2775f9a7..338569d6 100644
+--- a/macros/src/test/scala/SpecificExamples.scala
++++ b/macros/src/test/scala/SpecificExamples.scala
+@@ -21,6 +21,1217 @@ class GenerateSomeVerilog extends MacroCompilerSpec with HasSRAMGenerator with H
+   }
+ }
+ 
++class BOOMTest extends MacroCompilerSpec with HasSRAMGenerator {
++  val mem = s"mem-BOOMTest.json"
++  val lib = s"lib-BOOMTest.json"
++  val v = s"BOOMTest.v"
++
++  override val libPrefix = "macros/src/test/resources"
++
++  val memSRAMs = mdf.macrolib.Utils.readMDFFromString(
++"""
++[ {
++  "type" : "sram",
++  "name" : "_T_182_ext",
++  "width" : 88,
++  "depth" : 64,
++  "ports" : [ {
++    "address port name" : "R0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "R0_clk",
++    "clock port polarity" : "active high",
++    "chip enable port name" : "R0_en",
++    "chip enable port polarity" : "active high",
++    "output port name" : "R0_data",
++    "output port polarity" : "active high"
++  }, {
++    "address port name" : "W0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "W0_clk",
++    "clock port polarity" : "active high",
++    "chip enable port name" : "W0_en",
++    "chip enable port polarity" : "active high",
++    "input port name" : "W0_data",
++    "input port polarity" : "active high",
++    "mask port name" : "W0_mask",
++    "mask port polarity" : "active high",
++    "mask granularity" : 22
++  } ]
++}, {
++  "type" : "sram",
++  "name" : "_T_84_ext",
++  "width" : 64,
++  "depth" : 512,
++  "ports" : [ {
++    "address port name" : "R0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "R0_clk",
++    "clock port polarity" : "active high",
++    "chip enable port name" : "R0_en",
++    "chip enable port polarity" : "active high",
++    "output port name" : "R0_data",
++    "output port polarity" : "active high"
++  }, {
++    "address port name" : "W0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "W0_clk",
++    "clock port polarity" : "active high",
++    "chip enable port name" : "W0_en",
++    "chip enable port polarity" : "active high",
++    "input port name" : "W0_data",
++    "input port polarity" : "active high",
++    "mask port name" : "W0_mask",
++    "mask port polarity" : "active high",
++    "mask granularity" : 64
++  } ]
++}, {
++  "type" : "sram",
++  "name" : "tag_array_ext",
++  "width" : 80,
++  "depth" : 64,
++  "ports" : [ {
++    "address port name" : "RW0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "RW0_clk",
++    "clock port polarity" : "active high",
++    "write enable port name" : "RW0_wmode",
++    "write enable port polarity" : "active high",
++    "chip enable port name" : "RW0_en",
++    "chip enable port polarity" : "active high",
++    "output port name" : "RW0_rdata",
++    "output port polarity" : "active high",
++    "input port name" : "RW0_wdata",
++    "input port polarity" : "active high",
++    "mask port name" : "RW0_wmask",
++    "mask port polarity" : "active high",
++    "mask granularity" : 20
++  } ]
++}, {
++  "type" : "sram",
++  "name" : "_T_886_ext",
++  "width" : 64,
++  "depth" : 512,
++  "ports" : [ {
++    "address port name" : "RW0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "RW0_clk",
++    "clock port polarity" : "active high",
++    "write enable port name" : "RW0_wmode",
++    "write enable port polarity" : "active high",
++    "chip enable port name" : "RW0_en",
++    "chip enable port polarity" : "active high",
++    "output port name" : "RW0_rdata",
++    "output port polarity" : "active high",
++    "input port name" : "RW0_wdata",
++    "input port polarity" : "active high"
++  } ]
++}, {
++  "type" : "sram",
++  "name" : "entries_info_ext",
++  "width" : 40,
++  "depth" : 24,
++  "ports" : [ {
++    "address port name" : "R0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "R0_clk",
++    "clock port polarity" : "active high",
++    "chip enable port name" : "R0_en",
++    "chip enable port polarity" : "active high",
++    "output port name" : "R0_data",
++    "output port polarity" : "active high"
++  }, {
++    "address port name" : "W0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "W0_clk",
++    "clock port polarity" : "active high",
++    "chip enable port name" : "W0_en",
++    "chip enable port polarity" : "active high",
++    "input port name" : "W0_data",
++    "input port polarity" : "active high"
++  } ]
++}, {
++  "type" : "sram",
++  "name" : "smem_ext",
++  "width" : 32,
++  "depth" : 32,
++  "ports" : [ {
++    "address port name" : "RW0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "RW0_clk",
++    "clock port polarity" : "active high",
++    "write enable port name" : "RW0_wmode",
++    "write enable port polarity" : "active high",
++    "chip enable port name" : "RW0_en",
++    "chip enable port polarity" : "active high",
++    "output port name" : "RW0_rdata",
++    "output port polarity" : "active high",
++    "input port name" : "RW0_wdata",
++    "input port polarity" : "active high",
++    "mask port name" : "RW0_wmask",
++    "mask port polarity" : "active high",
++    "mask granularity" : 1
++  } ]
++}, {
++  "type" : "sram",
++  "name" : "smem_0_ext",
++  "width" : 32,
++  "depth" : 64,
++  "ports" : [ {
++    "address port name" : "RW0_addr",
++    "address port polarity" : "active high",
++    "clock port name" : "RW0_clk",
++    "clock port polarity" : "active high",
++    "write enable port name" : "RW0_wmode",
++    "write enable port polarity" : "active high",
++    "chip enable port name" : "RW0_en",
++    "chip enable port polarity" : "active high",
++    "output port name" : "RW0_rdata",
++    "output port polarity" : "active high",
++    "input port name" : "RW0_wdata",
++    "input port polarity" : "active high",
++    "mask port name" : "RW0_wmask",
++    "mask port polarity" : "active high",
++    "mask granularity" : 1
++  } ]
++} ]
++""").getOrElse(List())
++
++  writeToMem(mem, memSRAMs)
++
++  val output = // TODO: check correctness...
++"""
++circuit smem_0_ext :
++  module _T_182_ext :
++    input R0_clk : Clock
++    input R0_addr : UInt<6>
++    output R0_data : UInt<88>
++    input R0_en : UInt<1>
++    input W0_clk : Clock
++    input W0_addr : UInt<6>
++    input W0_data : UInt<88>
++    input W0_en : UInt<1>
++    input W0_mask : UInt<4>
++
++    node R0_addr_sel = bits(R0_addr, 5, 5)
++    reg R0_addr_sel_reg : UInt<1>, R0_clk with :
++      reset => (UInt<1>("h0"), R0_addr_sel_reg)
++    R0_addr_sel_reg <= mux(R0_en, R0_addr_sel, R0_addr_sel_reg)
++    node W0_addr_sel = bits(W0_addr, 5, 5)
++    inst mem_0_0 of my_sram_2rw_32x22
++    inst mem_0_1 of my_sram_2rw_32x22
++    inst mem_0_2 of my_sram_2rw_32x22
++    inst mem_0_3 of my_sram_2rw_32x22
++    mem_0_0.CE1 <= W0_clk
++    mem_0_0.A1 <= W0_addr
++    mem_0_0.I1 <= bits(W0_data, 21, 0)
++    mem_0_0.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_0.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_0.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_1.CE1 <= W0_clk
++    mem_0_1.A1 <= W0_addr
++    mem_0_1.I1 <= bits(W0_data, 43, 22)
++    mem_0_1.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_1.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 1, 1)), eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_1.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_2.CE1 <= W0_clk
++    mem_0_2.A1 <= W0_addr
++    mem_0_2.I1 <= bits(W0_data, 65, 44)
++    mem_0_2.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_2.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 2, 2)), eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_2.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_3.CE1 <= W0_clk
++    mem_0_3.A1 <= W0_addr
++    mem_0_3.I1 <= bits(W0_data, 87, 66)
++    mem_0_3.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_3.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 3, 3)), eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_3.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<1>("h0"))))
++    mem_0_0.CE2 <= R0_clk
++    mem_0_0.A2 <= R0_addr
++    node R0_data_0_0 = bits(mem_0_0.O2, 21, 0)
++    mem_0_0.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_0.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_0.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_1.CE2 <= R0_clk
++    mem_0_1.A2 <= R0_addr
++    node R0_data_0_1 = bits(mem_0_1.O2, 21, 0)
++    mem_0_1.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_1.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_1.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_2.CE2 <= R0_clk
++    mem_0_2.A2 <= R0_addr
++    node R0_data_0_2 = bits(mem_0_2.O2, 21, 0)
++    mem_0_2.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_2.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_2.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_3.CE2 <= R0_clk
++    mem_0_3.A2 <= R0_addr
++    node R0_data_0_3 = bits(mem_0_3.O2, 21, 0)
++    mem_0_3.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_3.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<1>("h0"))))
++    mem_0_3.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<1>("h0"))))
++    node R0_data_0 = cat(R0_data_0_3, cat(R0_data_0_2, cat(R0_data_0_1, R0_data_0_0)))
++    inst mem_1_0 of my_sram_2rw_32x22
++    inst mem_1_1 of my_sram_2rw_32x22
++    inst mem_1_2 of my_sram_2rw_32x22
++    inst mem_1_3 of my_sram_2rw_32x22
++    mem_1_0.CE1 <= W0_clk
++    mem_1_0.A1 <= W0_addr
++    mem_1_0.I1 <= bits(W0_data, 21, 0)
++    mem_1_0.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_0.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_0.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_1.CE1 <= W0_clk
++    mem_1_1.A1 <= W0_addr
++    mem_1_1.I1 <= bits(W0_data, 43, 22)
++    mem_1_1.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_1.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 1, 1)), eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_1.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_2.CE1 <= W0_clk
++    mem_1_2.A1 <= W0_addr
++    mem_1_2.I1 <= bits(W0_data, 65, 44)
++    mem_1_2.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_2.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 2, 2)), eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_2.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_3.CE1 <= W0_clk
++    mem_1_3.A1 <= W0_addr
++    mem_1_3.I1 <= bits(W0_data, 87, 66)
++    mem_1_3.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_3.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 3, 3)), eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_3.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<1>("h1"))))
++    mem_1_0.CE2 <= R0_clk
++    mem_1_0.A2 <= R0_addr
++    node R0_data_1_0 = bits(mem_1_0.O2, 21, 0)
++    mem_1_0.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_0.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_0.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_1.CE2 <= R0_clk
++    mem_1_1.A2 <= R0_addr
++    node R0_data_1_1 = bits(mem_1_1.O2, 21, 0)
++    mem_1_1.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_1.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_1.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_2.CE2 <= R0_clk
++    mem_1_2.A2 <= R0_addr
++    node R0_data_1_2 = bits(mem_1_2.O2, 21, 0)
++    mem_1_2.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_2.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_2.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_3.CE2 <= R0_clk
++    mem_1_3.A2 <= R0_addr
++    node R0_data_1_3 = bits(mem_1_3.O2, 21, 0)
++    mem_1_3.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_3.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<1>("h1"))))
++    mem_1_3.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<1>("h1"))))
++    node R0_data_1 = cat(R0_data_1_3, cat(R0_data_1_2, cat(R0_data_1_1, R0_data_1_0)))
++    R0_data <= mux(eq(R0_addr_sel_reg, UInt<1>("h0")), R0_data_0, mux(eq(R0_addr_sel_reg, UInt<1>("h1")), R0_data_1, UInt<1>("h0")))
++
++  extmodule my_sram_2rw_32x22 :
++    input CE1 : Clock
++    input A1 : UInt<5>
++    input I1 : UInt<22>
++    output O1 : UInt<22>
++    input CSB1 : UInt<1>
++    input OEB1 : UInt<1>
++    input WEB1 : UInt<1>
++    input CE2 : Clock
++    input A2 : UInt<5>
++    input I2 : UInt<22>
++    output O2 : UInt<22>
++    input CSB2 : UInt<1>
++    input OEB2 : UInt<1>
++    input WEB2 : UInt<1>
++
++    defname = my_sram_2rw_32x22
++
++
++  module _T_84_ext :
++    input R0_clk : Clock
++    input R0_addr : UInt<9>
++    output R0_data : UInt<64>
++    input R0_en : UInt<1>
++    input W0_clk : Clock
++    input W0_addr : UInt<9>
++    input W0_data : UInt<64>
++    input W0_en : UInt<1>
++    input W0_mask : UInt<1>
++
++    node R0_addr_sel = bits(R0_addr, 8, 7)
++    reg R0_addr_sel_reg : UInt<2>, R0_clk with :
++      reset => (UInt<1>("h0"), R0_addr_sel_reg)
++    R0_addr_sel_reg <= mux(R0_en, R0_addr_sel, R0_addr_sel_reg)
++    node W0_addr_sel = bits(W0_addr, 8, 7)
++    inst mem_0_0 of my_sram_2rw_128x32
++    inst mem_0_1 of my_sram_2rw_128x32
++    mem_0_0.CE1 <= W0_clk
++    mem_0_0.A1 <= W0_addr
++    mem_0_0.I1 <= bits(W0_data, 31, 0)
++    mem_0_0.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<2>("h0"))))
++    mem_0_0.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<2>("h0"))))
++    mem_0_0.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<2>("h0"))))
++    mem_0_1.CE1 <= W0_clk
++    mem_0_1.A1 <= W0_addr
++    mem_0_1.I1 <= bits(W0_data, 63, 32)
++    mem_0_1.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<2>("h0"))))
++    mem_0_1.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<2>("h0"))))
++    mem_0_1.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<2>("h0"))))
++    mem_0_0.CE2 <= R0_clk
++    mem_0_0.A2 <= R0_addr
++    node R0_data_0_0 = bits(mem_0_0.O2, 31, 0)
++    mem_0_0.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<2>("h0"))))
++    mem_0_0.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<2>("h0"))))
++    mem_0_0.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<2>("h0"))))
++    mem_0_1.CE2 <= R0_clk
++    mem_0_1.A2 <= R0_addr
++    node R0_data_0_1 = bits(mem_0_1.O2, 31, 0)
++    mem_0_1.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<2>("h0"))))
++    mem_0_1.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<2>("h0"))))
++    mem_0_1.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<2>("h0"))))
++    node R0_data_0 = cat(R0_data_0_1, R0_data_0_0)
++    inst mem_1_0 of my_sram_2rw_128x32
++    inst mem_1_1 of my_sram_2rw_128x32
++    mem_1_0.CE1 <= W0_clk
++    mem_1_0.A1 <= W0_addr
++    mem_1_0.I1 <= bits(W0_data, 31, 0)
++    mem_1_0.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<2>("h1"))))
++    mem_1_0.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<2>("h1"))))
++    mem_1_0.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<2>("h1"))))
++    mem_1_1.CE1 <= W0_clk
++    mem_1_1.A1 <= W0_addr
++    mem_1_1.I1 <= bits(W0_data, 63, 32)
++    mem_1_1.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<2>("h1"))))
++    mem_1_1.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<2>("h1"))))
++    mem_1_1.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<2>("h1"))))
++    mem_1_0.CE2 <= R0_clk
++    mem_1_0.A2 <= R0_addr
++    node R0_data_1_0 = bits(mem_1_0.O2, 31, 0)
++    mem_1_0.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<2>("h1"))))
++    mem_1_0.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<2>("h1"))))
++    mem_1_0.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<2>("h1"))))
++    mem_1_1.CE2 <= R0_clk
++    mem_1_1.A2 <= R0_addr
++    node R0_data_1_1 = bits(mem_1_1.O2, 31, 0)
++    mem_1_1.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<2>("h1"))))
++    mem_1_1.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<2>("h1"))))
++    mem_1_1.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<2>("h1"))))
++    node R0_data_1 = cat(R0_data_1_1, R0_data_1_0)
++    inst mem_2_0 of my_sram_2rw_128x32
++    inst mem_2_1 of my_sram_2rw_128x32
++    mem_2_0.CE1 <= W0_clk
++    mem_2_0.A1 <= W0_addr
++    mem_2_0.I1 <= bits(W0_data, 31, 0)
++    mem_2_0.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<2>("h2"))))
++    mem_2_0.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<2>("h2"))))
++    mem_2_0.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<2>("h2"))))
++    mem_2_1.CE1 <= W0_clk
++    mem_2_1.A1 <= W0_addr
++    mem_2_1.I1 <= bits(W0_data, 63, 32)
++    mem_2_1.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<2>("h2"))))
++    mem_2_1.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<2>("h2"))))
++    mem_2_1.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<2>("h2"))))
++    mem_2_0.CE2 <= R0_clk
++    mem_2_0.A2 <= R0_addr
++    node R0_data_2_0 = bits(mem_2_0.O2, 31, 0)
++    mem_2_0.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<2>("h2"))))
++    mem_2_0.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<2>("h2"))))
++    mem_2_0.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<2>("h2"))))
++    mem_2_1.CE2 <= R0_clk
++    mem_2_1.A2 <= R0_addr
++    node R0_data_2_1 = bits(mem_2_1.O2, 31, 0)
++    mem_2_1.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<2>("h2"))))
++    mem_2_1.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<2>("h2"))))
++    mem_2_1.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<2>("h2"))))
++    node R0_data_2 = cat(R0_data_2_1, R0_data_2_0)
++    inst mem_3_0 of my_sram_2rw_128x32
++    inst mem_3_1 of my_sram_2rw_128x32
++    mem_3_0.CE1 <= W0_clk
++    mem_3_0.A1 <= W0_addr
++    mem_3_0.I1 <= bits(W0_data, 31, 0)
++    mem_3_0.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<2>("h3"))))
++    mem_3_0.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<2>("h3"))))
++    mem_3_0.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<2>("h3"))))
++    mem_3_1.CE1 <= W0_clk
++    mem_3_1.A1 <= W0_addr
++    mem_3_1.I1 <= bits(W0_data, 63, 32)
++    mem_3_1.OEB1 <= not(and(not(UInt<1>("h1")), eq(W0_addr_sel, UInt<2>("h3"))))
++    mem_3_1.WEB1 <= not(and(and(UInt<1>("h1"), bits(W0_mask, 0, 0)), eq(W0_addr_sel, UInt<2>("h3"))))
++    mem_3_1.CSB1 <= not(and(W0_en, eq(W0_addr_sel, UInt<2>("h3"))))
++    mem_3_0.CE2 <= R0_clk
++    mem_3_0.A2 <= R0_addr
++    node R0_data_3_0 = bits(mem_3_0.O2, 31, 0)
++    mem_3_0.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<2>("h3"))))
++    mem_3_0.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<2>("h3"))))
++    mem_3_0.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<2>("h3"))))
++    mem_3_1.CE2 <= R0_clk
++    mem_3_1.A2 <= R0_addr
++    node R0_data_3_1 = bits(mem_3_1.O2, 31, 0)
++    mem_3_1.OEB2 <= not(and(not(UInt<1>("h0")), eq(R0_addr_sel, UInt<2>("h3"))))
++    mem_3_1.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), eq(R0_addr_sel, UInt<2>("h3"))))
++    mem_3_1.CSB2 <= not(and(R0_en, eq(R0_addr_sel, UInt<2>("h3"))))
++    node R0_data_3 = cat(R0_data_3_1, R0_data_3_0)
++    R0_data <= mux(eq(R0_addr_sel_reg, UInt<2>("h0")), R0_data_0, mux(eq(R0_addr_sel_reg, UInt<2>("h1")), R0_data_1, mux(eq(R0_addr_sel_reg, UInt<2>("h2")), R0_data_2, mux(eq(R0_addr_sel_reg, UInt<2>("h3")), R0_data_3, UInt<1>("h0")))))
++
++  extmodule my_sram_2rw_128x32 :
++    input CE1 : Clock
++    input A1 : UInt<7>
++    input I1 : UInt<32>
++    output O1 : UInt<32>
++    input CSB1 : UInt<1>
++    input OEB1 : UInt<1>
++    input WEB1 : UInt<1>
++    input CE2 : Clock
++    input A2 : UInt<7>
++    input I2 : UInt<32>
++    output O2 : UInt<32>
++    input CSB2 : UInt<1>
++    input OEB2 : UInt<1>
++    input WEB2 : UInt<1>
++
++    defname = my_sram_2rw_128x32
++
++
++  module tag_array_ext :
++    input RW0_clk : Clock
++    input RW0_addr : UInt<6>
++    input RW0_wdata : UInt<80>
++    output RW0_rdata : UInt<80>
++    input RW0_en : UInt<1>
++    input RW0_wmode : UInt<1>
++    input RW0_wmask : UInt<4>
++
++    inst mem_0_0 of my_sram_1rw_64x32
++    inst mem_0_1 of my_sram_1rw_64x32
++    inst mem_0_2 of my_sram_1rw_64x32
++    inst mem_0_3 of my_sram_1rw_64x32
++    mem_0_0.CE <= RW0_clk
++    mem_0_0.A <= RW0_addr
++    node RW0_rdata_0_0 = bits(mem_0_0.O, 19, 0)
++    mem_0_0.I <= bits(RW0_wdata, 19, 0)
++    mem_0_0.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_0.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 0, 0)), UInt<1>("h1")))
++    mem_0_0.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_1.CE <= RW0_clk
++    mem_0_1.A <= RW0_addr
++    node RW0_rdata_0_1 = bits(mem_0_1.O, 19, 0)
++    mem_0_1.I <= bits(RW0_wdata, 39, 20)
++    mem_0_1.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_1.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 1, 1)), UInt<1>("h1")))
++    mem_0_1.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_2.CE <= RW0_clk
++    mem_0_2.A <= RW0_addr
++    node RW0_rdata_0_2 = bits(mem_0_2.O, 19, 0)
++    mem_0_2.I <= bits(RW0_wdata, 59, 40)
++    mem_0_2.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_2.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 2, 2)), UInt<1>("h1")))
++    mem_0_2.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_3.CE <= RW0_clk
++    mem_0_3.A <= RW0_addr
++    node RW0_rdata_0_3 = bits(mem_0_3.O, 19, 0)
++    mem_0_3.I <= bits(RW0_wdata, 79, 60)
++    mem_0_3.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_3.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 3, 3)), UInt<1>("h1")))
++    mem_0_3.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    node RW0_rdata_0 = cat(RW0_rdata_0_3, cat(RW0_rdata_0_2, cat(RW0_rdata_0_1, RW0_rdata_0_0)))
++    RW0_rdata <= mux(UInt<1>("h1"), RW0_rdata_0, UInt<1>("h0"))
++
++  extmodule my_sram_1rw_64x32 :
++    input CE : Clock
++    input A : UInt<6>
++    input I : UInt<32>
++    output O : UInt<32>
++    input CSB : UInt<1>
++    input OEB : UInt<1>
++    input WEB : UInt<1>
++
++    defname = my_sram_1rw_64x32
++
++
++  module _T_886_ext :
++    input RW0_clk : Clock
++    input RW0_addr : UInt<9>
++    input RW0_wdata : UInt<64>
++    output RW0_rdata : UInt<64>
++    input RW0_en : UInt<1>
++    input RW0_wmode : UInt<1>
++
++    inst mem_0_0 of my_sram_1rw_512x32
++    inst mem_0_1 of my_sram_1rw_512x32
++    mem_0_0.CE <= RW0_clk
++    mem_0_0.A <= RW0_addr
++    node RW0_rdata_0_0 = bits(mem_0_0.O, 31, 0)
++    mem_0_0.I <= bits(RW0_wdata, 31, 0)
++    mem_0_0.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_0.WEB <= not(and(and(RW0_wmode, UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_0.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_1.CE <= RW0_clk
++    mem_0_1.A <= RW0_addr
++    node RW0_rdata_0_1 = bits(mem_0_1.O, 31, 0)
++    mem_0_1.I <= bits(RW0_wdata, 63, 32)
++    mem_0_1.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_1.WEB <= not(and(and(RW0_wmode, UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_1.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    node RW0_rdata_0 = cat(RW0_rdata_0_1, RW0_rdata_0_0)
++    RW0_rdata <= mux(UInt<1>("h1"), RW0_rdata_0, UInt<1>("h0"))
++
++  extmodule my_sram_1rw_512x32 :
++    input CE : Clock
++    input A : UInt<9>
++    input I : UInt<32>
++    output O : UInt<32>
++    input CSB : UInt<1>
++    input OEB : UInt<1>
++    input WEB : UInt<1>
++
++    defname = my_sram_1rw_512x32
++
++
++  module entries_info_ext :
++    input R0_clk : Clock
++    input R0_addr : UInt<5>
++    output R0_data : UInt<40>
++    input R0_en : UInt<1>
++    input W0_clk : Clock
++    input W0_addr : UInt<5>
++    input W0_data : UInt<40>
++    input W0_en : UInt<1>
++
++    inst mem_0_0 of my_sram_2rw_32x8
++    inst mem_0_1 of my_sram_2rw_32x8
++    inst mem_0_2 of my_sram_2rw_32x8
++    inst mem_0_3 of my_sram_2rw_32x8
++    inst mem_0_4 of my_sram_2rw_32x8
++    mem_0_0.CE1 <= W0_clk
++    mem_0_0.A1 <= W0_addr
++    mem_0_0.I1 <= bits(W0_data, 7, 0)
++    mem_0_0.OEB1 <= not(and(not(UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_0.WEB1 <= not(and(and(UInt<1>("h1"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_0.CSB1 <= not(and(W0_en, UInt<1>("h1")))
++    mem_0_1.CE1 <= W0_clk
++    mem_0_1.A1 <= W0_addr
++    mem_0_1.I1 <= bits(W0_data, 15, 8)
++    mem_0_1.OEB1 <= not(and(not(UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_1.WEB1 <= not(and(and(UInt<1>("h1"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_1.CSB1 <= not(and(W0_en, UInt<1>("h1")))
++    mem_0_2.CE1 <= W0_clk
++    mem_0_2.A1 <= W0_addr
++    mem_0_2.I1 <= bits(W0_data, 23, 16)
++    mem_0_2.OEB1 <= not(and(not(UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_2.WEB1 <= not(and(and(UInt<1>("h1"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_2.CSB1 <= not(and(W0_en, UInt<1>("h1")))
++    mem_0_3.CE1 <= W0_clk
++    mem_0_3.A1 <= W0_addr
++    mem_0_3.I1 <= bits(W0_data, 31, 24)
++    mem_0_3.OEB1 <= not(and(not(UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_3.WEB1 <= not(and(and(UInt<1>("h1"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_3.CSB1 <= not(and(W0_en, UInt<1>("h1")))
++    mem_0_4.CE1 <= W0_clk
++    mem_0_4.A1 <= W0_addr
++    mem_0_4.I1 <= bits(W0_data, 39, 32)
++    mem_0_4.OEB1 <= not(and(not(UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_4.WEB1 <= not(and(and(UInt<1>("h1"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_4.CSB1 <= not(and(W0_en, UInt<1>("h1")))
++    mem_0_0.CE2 <= R0_clk
++    mem_0_0.A2 <= R0_addr
++    node R0_data_0_0 = bits(mem_0_0.O2, 7, 0)
++    mem_0_0.OEB2 <= not(and(not(UInt<1>("h0")), UInt<1>("h1")))
++    mem_0_0.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_0.CSB2 <= not(and(R0_en, UInt<1>("h1")))
++    mem_0_1.CE2 <= R0_clk
++    mem_0_1.A2 <= R0_addr
++    node R0_data_0_1 = bits(mem_0_1.O2, 7, 0)
++    mem_0_1.OEB2 <= not(and(not(UInt<1>("h0")), UInt<1>("h1")))
++    mem_0_1.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_1.CSB2 <= not(and(R0_en, UInt<1>("h1")))
++    mem_0_2.CE2 <= R0_clk
++    mem_0_2.A2 <= R0_addr
++    node R0_data_0_2 = bits(mem_0_2.O2, 7, 0)
++    mem_0_2.OEB2 <= not(and(not(UInt<1>("h0")), UInt<1>("h1")))
++    mem_0_2.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_2.CSB2 <= not(and(R0_en, UInt<1>("h1")))
++    mem_0_3.CE2 <= R0_clk
++    mem_0_3.A2 <= R0_addr
++    node R0_data_0_3 = bits(mem_0_3.O2, 7, 0)
++    mem_0_3.OEB2 <= not(and(not(UInt<1>("h0")), UInt<1>("h1")))
++    mem_0_3.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_3.CSB2 <= not(and(R0_en, UInt<1>("h1")))
++    mem_0_4.CE2 <= R0_clk
++    mem_0_4.A2 <= R0_addr
++    node R0_data_0_4 = bits(mem_0_4.O2, 7, 0)
++    mem_0_4.OEB2 <= not(and(not(UInt<1>("h0")), UInt<1>("h1")))
++    mem_0_4.WEB2 <= not(and(and(UInt<1>("h0"), UInt<1>("h1")), UInt<1>("h1")))
++    mem_0_4.CSB2 <= not(and(R0_en, UInt<1>("h1")))
++    node R0_data_0 = cat(R0_data_0_4, cat(R0_data_0_3, cat(R0_data_0_2, cat(R0_data_0_1, R0_data_0_0))))
++    R0_data <= mux(UInt<1>("h1"), R0_data_0, UInt<1>("h0"))
++
++  extmodule my_sram_2rw_32x8 :
++    input CE1 : Clock
++    input A1 : UInt<5>
++    input I1 : UInt<8>
++    output O1 : UInt<8>
++    input CSB1 : UInt<1>
++    input OEB1 : UInt<1>
++    input WEB1 : UInt<1>
++    input CE2 : Clock
++    input A2 : UInt<5>
++    input I2 : UInt<8>
++    output O2 : UInt<8>
++    input CSB2 : UInt<1>
++    input OEB2 : UInt<1>
++    input WEB2 : UInt<1>
++
++    defname = my_sram_2rw_32x8
++
++
++  module smem_ext :
++    input RW0_clk : Clock
++    input RW0_addr : UInt<5>
++    input RW0_wdata : UInt<32>
++    output RW0_rdata : UInt<32>
++    input RW0_en : UInt<1>
++    input RW0_wmode : UInt<1>
++    input RW0_wmask : UInt<32>
++
++    inst mem_0_0 of my_sram_1rw_64x8
++    inst mem_0_1 of my_sram_1rw_64x8
++    inst mem_0_2 of my_sram_1rw_64x8
++    inst mem_0_3 of my_sram_1rw_64x8
++    inst mem_0_4 of my_sram_1rw_64x8
++    inst mem_0_5 of my_sram_1rw_64x8
++    inst mem_0_6 of my_sram_1rw_64x8
++    inst mem_0_7 of my_sram_1rw_64x8
++    inst mem_0_8 of my_sram_1rw_64x8
++    inst mem_0_9 of my_sram_1rw_64x8
++    inst mem_0_10 of my_sram_1rw_64x8
++    inst mem_0_11 of my_sram_1rw_64x8
++    inst mem_0_12 of my_sram_1rw_64x8
++    inst mem_0_13 of my_sram_1rw_64x8
++    inst mem_0_14 of my_sram_1rw_64x8
++    inst mem_0_15 of my_sram_1rw_64x8
++    inst mem_0_16 of my_sram_1rw_64x8
++    inst mem_0_17 of my_sram_1rw_64x8
++    inst mem_0_18 of my_sram_1rw_64x8
++    inst mem_0_19 of my_sram_1rw_64x8
++    inst mem_0_20 of my_sram_1rw_64x8
++    inst mem_0_21 of my_sram_1rw_64x8
++    inst mem_0_22 of my_sram_1rw_64x8
++    inst mem_0_23 of my_sram_1rw_64x8
++    inst mem_0_24 of my_sram_1rw_64x8
++    inst mem_0_25 of my_sram_1rw_64x8
++    inst mem_0_26 of my_sram_1rw_64x8
++    inst mem_0_27 of my_sram_1rw_64x8
++    inst mem_0_28 of my_sram_1rw_64x8
++    inst mem_0_29 of my_sram_1rw_64x8
++    inst mem_0_30 of my_sram_1rw_64x8
++    inst mem_0_31 of my_sram_1rw_64x8
++    mem_0_0.CE <= RW0_clk
++    mem_0_0.A <= RW0_addr
++    node RW0_rdata_0_0 = bits(mem_0_0.O, 0, 0)
++    mem_0_0.I <= bits(RW0_wdata, 0, 0)
++    mem_0_0.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_0.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 0, 0)), UInt<1>("h1")))
++    mem_0_0.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_1.CE <= RW0_clk
++    mem_0_1.A <= RW0_addr
++    node RW0_rdata_0_1 = bits(mem_0_1.O, 0, 0)
++    mem_0_1.I <= bits(RW0_wdata, 1, 1)
++    mem_0_1.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_1.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 1, 1)), UInt<1>("h1")))
++    mem_0_1.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_2.CE <= RW0_clk
++    mem_0_2.A <= RW0_addr
++    node RW0_rdata_0_2 = bits(mem_0_2.O, 0, 0)
++    mem_0_2.I <= bits(RW0_wdata, 2, 2)
++    mem_0_2.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_2.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 2, 2)), UInt<1>("h1")))
++    mem_0_2.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_3.CE <= RW0_clk
++    mem_0_3.A <= RW0_addr
++    node RW0_rdata_0_3 = bits(mem_0_3.O, 0, 0)
++    mem_0_3.I <= bits(RW0_wdata, 3, 3)
++    mem_0_3.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_3.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 3, 3)), UInt<1>("h1")))
++    mem_0_3.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_4.CE <= RW0_clk
++    mem_0_4.A <= RW0_addr
++    node RW0_rdata_0_4 = bits(mem_0_4.O, 0, 0)
++    mem_0_4.I <= bits(RW0_wdata, 4, 4)
++    mem_0_4.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_4.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 4, 4)), UInt<1>("h1")))
++    mem_0_4.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_5.CE <= RW0_clk
++    mem_0_5.A <= RW0_addr
++    node RW0_rdata_0_5 = bits(mem_0_5.O, 0, 0)
++    mem_0_5.I <= bits(RW0_wdata, 5, 5)
++    mem_0_5.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_5.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 5, 5)), UInt<1>("h1")))
++    mem_0_5.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_6.CE <= RW0_clk
++    mem_0_6.A <= RW0_addr
++    node RW0_rdata_0_6 = bits(mem_0_6.O, 0, 0)
++    mem_0_6.I <= bits(RW0_wdata, 6, 6)
++    mem_0_6.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_6.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 6, 6)), UInt<1>("h1")))
++    mem_0_6.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_7.CE <= RW0_clk
++    mem_0_7.A <= RW0_addr
++    node RW0_rdata_0_7 = bits(mem_0_7.O, 0, 0)
++    mem_0_7.I <= bits(RW0_wdata, 7, 7)
++    mem_0_7.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_7.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 7, 7)), UInt<1>("h1")))
++    mem_0_7.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_8.CE <= RW0_clk
++    mem_0_8.A <= RW0_addr
++    node RW0_rdata_0_8 = bits(mem_0_8.O, 0, 0)
++    mem_0_8.I <= bits(RW0_wdata, 8, 8)
++    mem_0_8.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_8.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 8, 8)), UInt<1>("h1")))
++    mem_0_8.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_9.CE <= RW0_clk
++    mem_0_9.A <= RW0_addr
++    node RW0_rdata_0_9 = bits(mem_0_9.O, 0, 0)
++    mem_0_9.I <= bits(RW0_wdata, 9, 9)
++    mem_0_9.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_9.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 9, 9)), UInt<1>("h1")))
++    mem_0_9.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_10.CE <= RW0_clk
++    mem_0_10.A <= RW0_addr
++    node RW0_rdata_0_10 = bits(mem_0_10.O, 0, 0)
++    mem_0_10.I <= bits(RW0_wdata, 10, 10)
++    mem_0_10.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_10.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 10, 10)), UInt<1>("h1")))
++    mem_0_10.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_11.CE <= RW0_clk
++    mem_0_11.A <= RW0_addr
++    node RW0_rdata_0_11 = bits(mem_0_11.O, 0, 0)
++    mem_0_11.I <= bits(RW0_wdata, 11, 11)
++    mem_0_11.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_11.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 11, 11)), UInt<1>("h1")))
++    mem_0_11.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_12.CE <= RW0_clk
++    mem_0_12.A <= RW0_addr
++    node RW0_rdata_0_12 = bits(mem_0_12.O, 0, 0)
++    mem_0_12.I <= bits(RW0_wdata, 12, 12)
++    mem_0_12.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_12.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 12, 12)), UInt<1>("h1")))
++    mem_0_12.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_13.CE <= RW0_clk
++    mem_0_13.A <= RW0_addr
++    node RW0_rdata_0_13 = bits(mem_0_13.O, 0, 0)
++    mem_0_13.I <= bits(RW0_wdata, 13, 13)
++    mem_0_13.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_13.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 13, 13)), UInt<1>("h1")))
++    mem_0_13.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_14.CE <= RW0_clk
++    mem_0_14.A <= RW0_addr
++    node RW0_rdata_0_14 = bits(mem_0_14.O, 0, 0)
++    mem_0_14.I <= bits(RW0_wdata, 14, 14)
++    mem_0_14.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_14.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 14, 14)), UInt<1>("h1")))
++    mem_0_14.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_15.CE <= RW0_clk
++    mem_0_15.A <= RW0_addr
++    node RW0_rdata_0_15 = bits(mem_0_15.O, 0, 0)
++    mem_0_15.I <= bits(RW0_wdata, 15, 15)
++    mem_0_15.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_15.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 15, 15)), UInt<1>("h1")))
++    mem_0_15.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_16.CE <= RW0_clk
++    mem_0_16.A <= RW0_addr
++    node RW0_rdata_0_16 = bits(mem_0_16.O, 0, 0)
++    mem_0_16.I <= bits(RW0_wdata, 16, 16)
++    mem_0_16.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_16.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 16, 16)), UInt<1>("h1")))
++    mem_0_16.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_17.CE <= RW0_clk
++    mem_0_17.A <= RW0_addr
++    node RW0_rdata_0_17 = bits(mem_0_17.O, 0, 0)
++    mem_0_17.I <= bits(RW0_wdata, 17, 17)
++    mem_0_17.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_17.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 17, 17)), UInt<1>("h1")))
++    mem_0_17.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_18.CE <= RW0_clk
++    mem_0_18.A <= RW0_addr
++    node RW0_rdata_0_18 = bits(mem_0_18.O, 0, 0)
++    mem_0_18.I <= bits(RW0_wdata, 18, 18)
++    mem_0_18.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_18.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 18, 18)), UInt<1>("h1")))
++    mem_0_18.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_19.CE <= RW0_clk
++    mem_0_19.A <= RW0_addr
++    node RW0_rdata_0_19 = bits(mem_0_19.O, 0, 0)
++    mem_0_19.I <= bits(RW0_wdata, 19, 19)
++    mem_0_19.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_19.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 19, 19)), UInt<1>("h1")))
++    mem_0_19.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_20.CE <= RW0_clk
++    mem_0_20.A <= RW0_addr
++    node RW0_rdata_0_20 = bits(mem_0_20.O, 0, 0)
++    mem_0_20.I <= bits(RW0_wdata, 20, 20)
++    mem_0_20.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_20.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 20, 20)), UInt<1>("h1")))
++    mem_0_20.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_21.CE <= RW0_clk
++    mem_0_21.A <= RW0_addr
++    node RW0_rdata_0_21 = bits(mem_0_21.O, 0, 0)
++    mem_0_21.I <= bits(RW0_wdata, 21, 21)
++    mem_0_21.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_21.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 21, 21)), UInt<1>("h1")))
++    mem_0_21.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_22.CE <= RW0_clk
++    mem_0_22.A <= RW0_addr
++    node RW0_rdata_0_22 = bits(mem_0_22.O, 0, 0)
++    mem_0_22.I <= bits(RW0_wdata, 22, 22)
++    mem_0_22.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_22.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 22, 22)), UInt<1>("h1")))
++    mem_0_22.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_23.CE <= RW0_clk
++    mem_0_23.A <= RW0_addr
++    node RW0_rdata_0_23 = bits(mem_0_23.O, 0, 0)
++    mem_0_23.I <= bits(RW0_wdata, 23, 23)
++    mem_0_23.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_23.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 23, 23)), UInt<1>("h1")))
++    mem_0_23.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_24.CE <= RW0_clk
++    mem_0_24.A <= RW0_addr
++    node RW0_rdata_0_24 = bits(mem_0_24.O, 0, 0)
++    mem_0_24.I <= bits(RW0_wdata, 24, 24)
++    mem_0_24.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_24.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 24, 24)), UInt<1>("h1")))
++    mem_0_24.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_25.CE <= RW0_clk
++    mem_0_25.A <= RW0_addr
++    node RW0_rdata_0_25 = bits(mem_0_25.O, 0, 0)
++    mem_0_25.I <= bits(RW0_wdata, 25, 25)
++    mem_0_25.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_25.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 25, 25)), UInt<1>("h1")))
++    mem_0_25.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_26.CE <= RW0_clk
++    mem_0_26.A <= RW0_addr
++    node RW0_rdata_0_26 = bits(mem_0_26.O, 0, 0)
++    mem_0_26.I <= bits(RW0_wdata, 26, 26)
++    mem_0_26.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_26.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 26, 26)), UInt<1>("h1")))
++    mem_0_26.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_27.CE <= RW0_clk
++    mem_0_27.A <= RW0_addr
++    node RW0_rdata_0_27 = bits(mem_0_27.O, 0, 0)
++    mem_0_27.I <= bits(RW0_wdata, 27, 27)
++    mem_0_27.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_27.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 27, 27)), UInt<1>("h1")))
++    mem_0_27.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_28.CE <= RW0_clk
++    mem_0_28.A <= RW0_addr
++    node RW0_rdata_0_28 = bits(mem_0_28.O, 0, 0)
++    mem_0_28.I <= bits(RW0_wdata, 28, 28)
++    mem_0_28.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_28.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 28, 28)), UInt<1>("h1")))
++    mem_0_28.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_29.CE <= RW0_clk
++    mem_0_29.A <= RW0_addr
++    node RW0_rdata_0_29 = bits(mem_0_29.O, 0, 0)
++    mem_0_29.I <= bits(RW0_wdata, 29, 29)
++    mem_0_29.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_29.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 29, 29)), UInt<1>("h1")))
++    mem_0_29.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_30.CE <= RW0_clk
++    mem_0_30.A <= RW0_addr
++    node RW0_rdata_0_30 = bits(mem_0_30.O, 0, 0)
++    mem_0_30.I <= bits(RW0_wdata, 30, 30)
++    mem_0_30.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_30.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 30, 30)), UInt<1>("h1")))
++    mem_0_30.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_31.CE <= RW0_clk
++    mem_0_31.A <= RW0_addr
++    node RW0_rdata_0_31 = bits(mem_0_31.O, 0, 0)
++    mem_0_31.I <= bits(RW0_wdata, 31, 31)
++    mem_0_31.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_31.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 31, 31)), UInt<1>("h1")))
++    mem_0_31.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    node RW0_rdata_0 = cat(RW0_rdata_0_31, cat(RW0_rdata_0_30, cat(RW0_rdata_0_29, cat(RW0_rdata_0_28, cat(RW0_rdata_0_27, cat(RW0_rdata_0_26, cat(RW0_rdata_0_25, cat(RW0_rdata_0_24, cat(RW0_rdata_0_23, cat(RW0_rdata_0_22, cat(RW0_rdata_0_21, cat(RW0_rdata_0_20, cat(RW0_rdata_0_19, cat(RW0_rdata_0_18, cat(RW0_rdata_0_17, cat(RW0_rdata_0_16, cat(RW0_rdata_0_15, cat(RW0_rdata_0_14, cat(RW0_rdata_0_13, cat(RW0_rdata_0_12, cat(RW0_rdata_0_11, cat(RW0_rdata_0_10, cat(RW0_rdata_0_9, cat(RW0_rdata_0_8, cat(RW0_rdata_0_7, cat(RW0_rdata_0_6, cat(RW0_rdata_0_5, cat(RW0_rdata_0_4, cat(RW0_rdata_0_3, cat(RW0_rdata_0_2, cat(RW0_rdata_0_1, RW0_rdata_0_0)))))))))))))))))))))))))))))))
++    RW0_rdata <= mux(UInt<1>("h1"), RW0_rdata_0, UInt<1>("h0"))
++
++  module smem_0_ext :
++    input RW0_clk : Clock
++    input RW0_addr : UInt<6>
++    input RW0_wdata : UInt<32>
++    output RW0_rdata : UInt<32>
++    input RW0_en : UInt<1>
++    input RW0_wmode : UInt<1>
++    input RW0_wmask : UInt<32>
++
++    inst mem_0_0 of my_sram_1rw_64x8
++    inst mem_0_1 of my_sram_1rw_64x8
++    inst mem_0_2 of my_sram_1rw_64x8
++    inst mem_0_3 of my_sram_1rw_64x8
++    inst mem_0_4 of my_sram_1rw_64x8
++    inst mem_0_5 of my_sram_1rw_64x8
++    inst mem_0_6 of my_sram_1rw_64x8
++    inst mem_0_7 of my_sram_1rw_64x8
++    inst mem_0_8 of my_sram_1rw_64x8
++    inst mem_0_9 of my_sram_1rw_64x8
++    inst mem_0_10 of my_sram_1rw_64x8
++    inst mem_0_11 of my_sram_1rw_64x8
++    inst mem_0_12 of my_sram_1rw_64x8
++    inst mem_0_13 of my_sram_1rw_64x8
++    inst mem_0_14 of my_sram_1rw_64x8
++    inst mem_0_15 of my_sram_1rw_64x8
++    inst mem_0_16 of my_sram_1rw_64x8
++    inst mem_0_17 of my_sram_1rw_64x8
++    inst mem_0_18 of my_sram_1rw_64x8
++    inst mem_0_19 of my_sram_1rw_64x8
++    inst mem_0_20 of my_sram_1rw_64x8
++    inst mem_0_21 of my_sram_1rw_64x8
++    inst mem_0_22 of my_sram_1rw_64x8
++    inst mem_0_23 of my_sram_1rw_64x8
++    inst mem_0_24 of my_sram_1rw_64x8
++    inst mem_0_25 of my_sram_1rw_64x8
++    inst mem_0_26 of my_sram_1rw_64x8
++    inst mem_0_27 of my_sram_1rw_64x8
++    inst mem_0_28 of my_sram_1rw_64x8
++    inst mem_0_29 of my_sram_1rw_64x8
++    inst mem_0_30 of my_sram_1rw_64x8
++    inst mem_0_31 of my_sram_1rw_64x8
++    mem_0_0.CE <= RW0_clk
++    mem_0_0.A <= RW0_addr
++    node RW0_rdata_0_0 = bits(mem_0_0.O, 0, 0)
++    mem_0_0.I <= bits(RW0_wdata, 0, 0)
++    mem_0_0.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_0.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 0, 0)), UInt<1>("h1")))
++    mem_0_0.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_1.CE <= RW0_clk
++    mem_0_1.A <= RW0_addr
++    node RW0_rdata_0_1 = bits(mem_0_1.O, 0, 0)
++    mem_0_1.I <= bits(RW0_wdata, 1, 1)
++    mem_0_1.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_1.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 1, 1)), UInt<1>("h1")))
++    mem_0_1.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_2.CE <= RW0_clk
++    mem_0_2.A <= RW0_addr
++    node RW0_rdata_0_2 = bits(mem_0_2.O, 0, 0)
++    mem_0_2.I <= bits(RW0_wdata, 2, 2)
++    mem_0_2.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_2.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 2, 2)), UInt<1>("h1")))
++    mem_0_2.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_3.CE <= RW0_clk
++    mem_0_3.A <= RW0_addr
++    node RW0_rdata_0_3 = bits(mem_0_3.O, 0, 0)
++    mem_0_3.I <= bits(RW0_wdata, 3, 3)
++    mem_0_3.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_3.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 3, 3)), UInt<1>("h1")))
++    mem_0_3.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_4.CE <= RW0_clk
++    mem_0_4.A <= RW0_addr
++    node RW0_rdata_0_4 = bits(mem_0_4.O, 0, 0)
++    mem_0_4.I <= bits(RW0_wdata, 4, 4)
++    mem_0_4.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_4.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 4, 4)), UInt<1>("h1")))
++    mem_0_4.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_5.CE <= RW0_clk
++    mem_0_5.A <= RW0_addr
++    node RW0_rdata_0_5 = bits(mem_0_5.O, 0, 0)
++    mem_0_5.I <= bits(RW0_wdata, 5, 5)
++    mem_0_5.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_5.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 5, 5)), UInt<1>("h1")))
++    mem_0_5.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_6.CE <= RW0_clk
++    mem_0_6.A <= RW0_addr
++    node RW0_rdata_0_6 = bits(mem_0_6.O, 0, 0)
++    mem_0_6.I <= bits(RW0_wdata, 6, 6)
++    mem_0_6.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_6.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 6, 6)), UInt<1>("h1")))
++    mem_0_6.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_7.CE <= RW0_clk
++    mem_0_7.A <= RW0_addr
++    node RW0_rdata_0_7 = bits(mem_0_7.O, 0, 0)
++    mem_0_7.I <= bits(RW0_wdata, 7, 7)
++    mem_0_7.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_7.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 7, 7)), UInt<1>("h1")))
++    mem_0_7.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_8.CE <= RW0_clk
++    mem_0_8.A <= RW0_addr
++    node RW0_rdata_0_8 = bits(mem_0_8.O, 0, 0)
++    mem_0_8.I <= bits(RW0_wdata, 8, 8)
++    mem_0_8.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_8.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 8, 8)), UInt<1>("h1")))
++    mem_0_8.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_9.CE <= RW0_clk
++    mem_0_9.A <= RW0_addr
++    node RW0_rdata_0_9 = bits(mem_0_9.O, 0, 0)
++    mem_0_9.I <= bits(RW0_wdata, 9, 9)
++    mem_0_9.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_9.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 9, 9)), UInt<1>("h1")))
++    mem_0_9.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_10.CE <= RW0_clk
++    mem_0_10.A <= RW0_addr
++    node RW0_rdata_0_10 = bits(mem_0_10.O, 0, 0)
++    mem_0_10.I <= bits(RW0_wdata, 10, 10)
++    mem_0_10.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_10.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 10, 10)), UInt<1>("h1")))
++    mem_0_10.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_11.CE <= RW0_clk
++    mem_0_11.A <= RW0_addr
++    node RW0_rdata_0_11 = bits(mem_0_11.O, 0, 0)
++    mem_0_11.I <= bits(RW0_wdata, 11, 11)
++    mem_0_11.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_11.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 11, 11)), UInt<1>("h1")))
++    mem_0_11.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_12.CE <= RW0_clk
++    mem_0_12.A <= RW0_addr
++    node RW0_rdata_0_12 = bits(mem_0_12.O, 0, 0)
++    mem_0_12.I <= bits(RW0_wdata, 12, 12)
++    mem_0_12.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_12.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 12, 12)), UInt<1>("h1")))
++    mem_0_12.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_13.CE <= RW0_clk
++    mem_0_13.A <= RW0_addr
++    node RW0_rdata_0_13 = bits(mem_0_13.O, 0, 0)
++    mem_0_13.I <= bits(RW0_wdata, 13, 13)
++    mem_0_13.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_13.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 13, 13)), UInt<1>("h1")))
++    mem_0_13.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_14.CE <= RW0_clk
++    mem_0_14.A <= RW0_addr
++    node RW0_rdata_0_14 = bits(mem_0_14.O, 0, 0)
++    mem_0_14.I <= bits(RW0_wdata, 14, 14)
++    mem_0_14.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_14.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 14, 14)), UInt<1>("h1")))
++    mem_0_14.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_15.CE <= RW0_clk
++    mem_0_15.A <= RW0_addr
++    node RW0_rdata_0_15 = bits(mem_0_15.O, 0, 0)
++    mem_0_15.I <= bits(RW0_wdata, 15, 15)
++    mem_0_15.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_15.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 15, 15)), UInt<1>("h1")))
++    mem_0_15.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_16.CE <= RW0_clk
++    mem_0_16.A <= RW0_addr
++    node RW0_rdata_0_16 = bits(mem_0_16.O, 0, 0)
++    mem_0_16.I <= bits(RW0_wdata, 16, 16)
++    mem_0_16.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_16.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 16, 16)), UInt<1>("h1")))
++    mem_0_16.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_17.CE <= RW0_clk
++    mem_0_17.A <= RW0_addr
++    node RW0_rdata_0_17 = bits(mem_0_17.O, 0, 0)
++    mem_0_17.I <= bits(RW0_wdata, 17, 17)
++    mem_0_17.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_17.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 17, 17)), UInt<1>("h1")))
++    mem_0_17.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_18.CE <= RW0_clk
++    mem_0_18.A <= RW0_addr
++    node RW0_rdata_0_18 = bits(mem_0_18.O, 0, 0)
++    mem_0_18.I <= bits(RW0_wdata, 18, 18)
++    mem_0_18.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_18.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 18, 18)), UInt<1>("h1")))
++    mem_0_18.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_19.CE <= RW0_clk
++    mem_0_19.A <= RW0_addr
++    node RW0_rdata_0_19 = bits(mem_0_19.O, 0, 0)
++    mem_0_19.I <= bits(RW0_wdata, 19, 19)
++    mem_0_19.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_19.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 19, 19)), UInt<1>("h1")))
++    mem_0_19.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_20.CE <= RW0_clk
++    mem_0_20.A <= RW0_addr
++    node RW0_rdata_0_20 = bits(mem_0_20.O, 0, 0)
++    mem_0_20.I <= bits(RW0_wdata, 20, 20)
++    mem_0_20.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_20.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 20, 20)), UInt<1>("h1")))
++    mem_0_20.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_21.CE <= RW0_clk
++    mem_0_21.A <= RW0_addr
++    node RW0_rdata_0_21 = bits(mem_0_21.O, 0, 0)
++    mem_0_21.I <= bits(RW0_wdata, 21, 21)
++    mem_0_21.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_21.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 21, 21)), UInt<1>("h1")))
++    mem_0_21.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_22.CE <= RW0_clk
++    mem_0_22.A <= RW0_addr
++    node RW0_rdata_0_22 = bits(mem_0_22.O, 0, 0)
++    mem_0_22.I <= bits(RW0_wdata, 22, 22)
++    mem_0_22.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_22.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 22, 22)), UInt<1>("h1")))
++    mem_0_22.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_23.CE <= RW0_clk
++    mem_0_23.A <= RW0_addr
++    node RW0_rdata_0_23 = bits(mem_0_23.O, 0, 0)
++    mem_0_23.I <= bits(RW0_wdata, 23, 23)
++    mem_0_23.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_23.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 23, 23)), UInt<1>("h1")))
++    mem_0_23.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_24.CE <= RW0_clk
++    mem_0_24.A <= RW0_addr
++    node RW0_rdata_0_24 = bits(mem_0_24.O, 0, 0)
++    mem_0_24.I <= bits(RW0_wdata, 24, 24)
++    mem_0_24.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_24.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 24, 24)), UInt<1>("h1")))
++    mem_0_24.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_25.CE <= RW0_clk
++    mem_0_25.A <= RW0_addr
++    node RW0_rdata_0_25 = bits(mem_0_25.O, 0, 0)
++    mem_0_25.I <= bits(RW0_wdata, 25, 25)
++    mem_0_25.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_25.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 25, 25)), UInt<1>("h1")))
++    mem_0_25.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_26.CE <= RW0_clk
++    mem_0_26.A <= RW0_addr
++    node RW0_rdata_0_26 = bits(mem_0_26.O, 0, 0)
++    mem_0_26.I <= bits(RW0_wdata, 26, 26)
++    mem_0_26.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_26.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 26, 26)), UInt<1>("h1")))
++    mem_0_26.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_27.CE <= RW0_clk
++    mem_0_27.A <= RW0_addr
++    node RW0_rdata_0_27 = bits(mem_0_27.O, 0, 0)
++    mem_0_27.I <= bits(RW0_wdata, 27, 27)
++    mem_0_27.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_27.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 27, 27)), UInt<1>("h1")))
++    mem_0_27.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_28.CE <= RW0_clk
++    mem_0_28.A <= RW0_addr
++    node RW0_rdata_0_28 = bits(mem_0_28.O, 0, 0)
++    mem_0_28.I <= bits(RW0_wdata, 28, 28)
++    mem_0_28.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_28.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 28, 28)), UInt<1>("h1")))
++    mem_0_28.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_29.CE <= RW0_clk
++    mem_0_29.A <= RW0_addr
++    node RW0_rdata_0_29 = bits(mem_0_29.O, 0, 0)
++    mem_0_29.I <= bits(RW0_wdata, 29, 29)
++    mem_0_29.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_29.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 29, 29)), UInt<1>("h1")))
++    mem_0_29.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_30.CE <= RW0_clk
++    mem_0_30.A <= RW0_addr
++    node RW0_rdata_0_30 = bits(mem_0_30.O, 0, 0)
++    mem_0_30.I <= bits(RW0_wdata, 30, 30)
++    mem_0_30.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_30.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 30, 30)), UInt<1>("h1")))
++    mem_0_30.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    mem_0_31.CE <= RW0_clk
++    mem_0_31.A <= RW0_addr
++    node RW0_rdata_0_31 = bits(mem_0_31.O, 0, 0)
++    mem_0_31.I <= bits(RW0_wdata, 31, 31)
++    mem_0_31.OEB <= not(and(not(RW0_wmode), UInt<1>("h1")))
++    mem_0_31.WEB <= not(and(and(RW0_wmode, bits(RW0_wmask, 31, 31)), UInt<1>("h1")))
++    mem_0_31.CSB <= not(and(RW0_en, UInt<1>("h1")))
++    node RW0_rdata_0 = cat(RW0_rdata_0_31, cat(RW0_rdata_0_30, cat(RW0_rdata_0_29, cat(RW0_rdata_0_28, cat(RW0_rdata_0_27, cat(RW0_rdata_0_26, cat(RW0_rdata_0_25, cat(RW0_rdata_0_24, cat(RW0_rdata_0_23, cat(RW0_rdata_0_22, cat(RW0_rdata_0_21, cat(RW0_rdata_0_20, cat(RW0_rdata_0_19, cat(RW0_rdata_0_18, cat(RW0_rdata_0_17, cat(RW0_rdata_0_16, cat(RW0_rdata_0_15, cat(RW0_rdata_0_14, cat(RW0_rdata_0_13, cat(RW0_rdata_0_12, cat(RW0_rdata_0_11, cat(RW0_rdata_0_10, cat(RW0_rdata_0_9, cat(RW0_rdata_0_8, cat(RW0_rdata_0_7, cat(RW0_rdata_0_6, cat(RW0_rdata_0_5, cat(RW0_rdata_0_4, cat(RW0_rdata_0_3, cat(RW0_rdata_0_2, cat(RW0_rdata_0_1, RW0_rdata_0_0)))))))))))))))))))))))))))))))
++    RW0_rdata <= mux(UInt<1>("h1"), RW0_rdata_0, UInt<1>("h0"))
++
++  extmodule my_sram_1rw_64x8 :
++    input CE : Clock
++    input A : UInt<6>
++    input I : UInt<8>
++    output O : UInt<8>
++    input CSB : UInt<1>
++    input OEB : UInt<1>
++    input WEB : UInt<1>
++
++    defname = my_sram_1rw_64x8
++"""
++
++  compileExecuteAndTest(mem, lib, v, output)
++}
++
+ class RocketChipTest extends MacroCompilerSpec with HasSRAMGenerator {
+   val mem = s"mem-RocketChipTest.json"
+   val lib = s"lib-RocketChipTest.json"

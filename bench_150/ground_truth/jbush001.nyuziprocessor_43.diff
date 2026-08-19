@@ -1,0 +1,84 @@
+diff --git a/hardware/core/core.sv b/hardware/core/core.sv
+index 454d211c..5415e5d3 100644
+--- a/hardware/core/core.sv
++++ b/hardware/core/core.sv
+@@ -295,6 +295,7 @@ module core
+     cache_line_data_t   sq_store_bypass_data;   // From l1_l2_interface of l1_l2_interface.v
+     logic [`CACHE_LINE_BYTES-1:0] sq_store_bypass_mask;// From l1_l2_interface of l1_l2_interface.v
+     logic               sq_store_sync_success;  // From l1_l2_interface of l1_l2_interface.v
++    thread_bitmap_t     sq_sync_store_pending;  // From l1_l2_interface of l1_l2_interface.v
+     thread_bitmap_t     ts_fetch_en;            // From thread_select_stage of thread_select_stage.v
+     decoded_instruction_t ts_instruction;       // From thread_select_stage of thread_select_stage.v
+     logic               ts_instruction_valid;   // From thread_select_stage of thread_select_stage.v
+diff --git a/hardware/core/instruction_decode_stage.sv b/hardware/core/instruction_decode_stage.sv
+index cbaa1374..d1ad5ad4 100644
+--- a/hardware/core/instruction_decode_stage.sv
++++ b/hardware/core/instruction_decode_stage.sv
+@@ -57,6 +57,9 @@ module instruction_decode_stage(
+     // From dcache_data_stage
+     input thread_bitmap_t         dd_sync_load_pending,
+ 
++    // From l1_l2_interface
++    input thread_bitmap_t         sq_sync_store_pending,
++
+     // To thread_select_stage
+     output decoded_instruction_t  id_instruction,
+     output logic                  id_instruction_valid,
+@@ -245,13 +248,13 @@ module instruction_decode_stage(
+     end
+ 
+     // Subtle: Certain instructions need to be issued twice, including I/O
+-    // requests and synchronized loads. The first queues the transaction and
+-    // the second collects the result. Because the first instruction updates
+-    // internal state, bad things would happen if an interrupt were dispatched
+-    // between them. To avoid this, don't dispatch an interrupt if the
+-    // first instruction has been issued.
++    // requests and synchronized memory accesses. The first queues the
++    // transaction and the second collects the result. Because the first
++    // instruction updates internal state, bad things would happen if an
++    // interrupt were dispatched between them. To avoid this, don't dispatch
++    // an interrupt if the first instruction has been issued.
+     assign masked_interrupt_flags = ic_interrupt_pending & cr_interrupt_en
+-        & ~ior_pending & ~dd_sync_load_pending;
++        & ~ior_pending & ~dd_sync_load_pending & ~sq_sync_store_pending;
+     assign raise_interrupt = masked_interrupt_flags[ifd_thread_idx];
+     assign decoded_instr_nxt.has_trap = has_trap;
+ 
+diff --git a/hardware/core/l1_l2_interface.sv b/hardware/core/l1_l2_interface.sv
+index 656a16d6..12132c8f 100644
+--- a/hardware/core/l1_l2_interface.sv
++++ b/hardware/core/l1_l2_interface.sv
+@@ -62,6 +62,10 @@ module l1_l2_interface
+     output l1i_tag_t                              l2i_itag_update_tag,
+     output logic                                  l2i_itag_update_valid,
+ 
++    // To instruction_decode_stage
++    output thread_bitmap_t                        sq_sync_store_pending,
++
++
+     // From ifetch_tag_stage
+     input l1i_way_idx_t                           ift_fill_lru,
+ 
+diff --git a/hardware/core/l1_store_queue.sv b/hardware/core/l1_store_queue.sv
+index f9579b70..7a861aed 100644
+--- a/hardware/core/l1_store_queue.sv
++++ b/hardware/core/l1_store_queue.sv
+@@ -29,6 +29,9 @@ module l1_store_queue(
+     input                                  clk,
+     input                                  reset,
+ 
++    // To instruction_decode_stage
++    output thread_bitmap_t                sq_sync_store_pending,
++
+     // From dache_data_stage
+     input                                  dd_store_en,
+     input                                  dd_flush_en,
+@@ -139,6 +142,8 @@ module l1_store_queue(
+             assign enqueue_cache_control = dd_store_thread_idx == thread_idx_t'(thread_idx)
+                 && (!pending_stores[thread_idx].valid || got_response_this_entry)
+                 && (dd_flush_en || dd_dinvalidate_en || dd_iinvalidate_en);
++            assign sq_sync_store_pending[thread_idx] = pending_stores[thread_idx].valid
++                && pending_stores[thread_idx].synchronized;
+ 
+             always_comb
+             begin

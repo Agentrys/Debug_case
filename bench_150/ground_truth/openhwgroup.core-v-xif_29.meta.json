@@ -1,0 +1,31 @@
+{
+  "case_id": "openhwgroup.core-v-xif#29",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "core-v-xif"
+  },
+  "fix_repo": {
+    "owner": "Silabs-ArjanB",
+    "name": "core-v-xif"
+  },
+  "fix_oid": "9c6daa9665b5ec29350fd9ccab9c647b6a67e5a5",
+  "buggy_commit_sha": "936c37f70947774d6030070c0dfac9bb8bad4c87",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/openhwgroup.core-v-xif_29.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "9c6daa9665b5ec29350fd9ccab9c647b6a67e5a5",
+    "488084005bf7f902273e7889f83a056c2090c0bc"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "docs/source/x_ext.rst"
+  ],
+  "raw_diff_path": "ground_truth/openhwgroup.core-v-xif_29.raw.diff"
+}

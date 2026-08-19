@@ -1,0 +1,55 @@
+{
+  "case_id": "spinalhdl.vexriscv#1",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_oid": "195318b66592e942ee414fa1a86a08a3f74deb33",
+  "buggy_commit_sha": "49f502aef47a9c4a08c5c950beccacba008d8b21",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.vexriscv_1.diff",
+  "diff_sha256": "c26c1b0fd9e8b712abb37b606e0d193120671c12e6030b91d941eb9b677fe300",
+  "fix_oids_sorted": [
+    "195318b66592e942ee414fa1a86a08a3f74deb33",
+    "bb2abee194603e04dfe177e1823de13a18cff9d7",
+    "45bcdf01e6642fbd4f474d7659c7c18f1ed6ce4b",
+    "53c404ffb31cc77b01f820b8b18273db6e7c969f",
+    "3c90508a1410eb484d5cf82882f3efb3e66701f4",
+    "6535b7fd703ffd1ff643f9ab95279350ee33789e"
+  ],
+  "n_fix_commits": 6,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/vexriscv/demo/Murax.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/vexriscv/demo/Murax.scala": [
+      [
+        368,
+        425
+      ],
+      [
+        368,
+        425
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "scripts/Murax/iCE40-hx8k_breakout_board_xip/Murax_iCE40_hx8k_breakout_board_xip.pcf",
+    "scripts/Murax/iCE40-hx8k_breakout_board_xip/README.md",
+    "src/main/c/murax/xipBootloader/crt.S",
+    "src/main/c/murax/xipBootloader/crt.bin",
+    "src/main/c/karnix/karnix_soc/src/linker.ld",
+    "src/main/c/karnix/karnix_soc/src/crt.S",
+    "src/main/c/karnix/example_ram/Makefile",
+    "src/main/c/karnix/example_ram/src/main.c"
+  ],
+  "raw_diff_path": "ground_truth/spinalhdl.vexriscv_1.raw.diff"
+}

@@ -1,0 +1,31 @@
+{
+  "case_id": "microsoft.cheriot-safe#3",
+  "issue_repo": {
+    "owner": "microsoft",
+    "name": "cheriot-safe"
+  },
+  "fix_repo": {
+    "owner": "sami2316",
+    "name": "cheriot-rtos"
+  },
+  "fix_oid": "c93b32427d62106d83cd6127e37d1d8decf999ae",
+  "buggy_commit_sha": "aa17978490faf676c60e4aaec77718a1ebb5ff69",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/microsoft.cheriot-safe_3.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "c93b32427d62106d83cd6127e37d1d8decf999ae",
+    "3d23ce8c11769b3bd6ab567381a87f6e0b9042fd"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "examples/01.hello_world/hello.cc"
+  ],
+  "raw_diff_path": "ground_truth/microsoft.cheriot-safe_3.raw.diff"
+}

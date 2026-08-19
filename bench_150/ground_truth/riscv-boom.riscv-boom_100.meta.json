@@ -1,0 +1,31 @@
+{
+  "case_id": "riscv-boom.riscv-boom#100",
+  "issue_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_oid": "57a471e21ef7830c60ce3a57d81a1e575c2f7b1b",
+  "buggy_commit_sha": "ef65be6c783d8b821d3735d4d09ca1e84bc8d94c",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/riscv-boom.riscv-boom_100.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "57a471e21ef7830c60ce3a57d81a1e575c2f7b1b"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "docs/Getting-Started/Initial-Repo-Setup.rst",
+    "docs/Getting-Started/index.rst"
+  ],
+  "raw_diff_path": "ground_truth/riscv-boom.riscv-boom_100.raw.diff"
+}

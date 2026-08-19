@@ -1,0 +1,2821 @@
+diff --git a/README.md b/README.md
+index 32449cb..3655903 100644
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,4 @@
+-# SNES for MiSTer.
+-
+-This is the port of [srg320's FpgaSnes](https://github.com/srg320/FpgaSnes) core.
++# SNES for MiSTer by [srg320](https://github.com/srg320)
+ 
+ ## Installing
+ copy *.rbf to root of SD card. Put some ROMs (*.SCF, *.SMC, *.BIN) into SNES folder
+@@ -8,7 +6,7 @@ copy *.rbf to root of SD card. Put some ROMs (*.SCF, *.SMC, *.BIN) into SNES fol
+ ## Features
+ * Cycle accurate SNES replica.
+ * Supports LoROM, HiROM, ExHiROM.
+-* Supports additional chips: DSP-1/2/3/4, ST010, CX4, SDD1, SuperFX(GSU-1/2), SA1.
++* Supports additional chips: DSP-1/2/3/4, ST010, CX4, SDD1, SuperFX(GSU-1/2), SA1, OBC1.
++* Cheat engine.
+ * Save/Load Backup RAM.
+ * Supports mouse.
+-
+diff --git a/SNES.qpf b/SNES.qpf
+index ffaab6f..e5a15d3 100644
+--- a/SNES.qpf
++++ b/SNES.qpf
+@@ -1,31 +1,2 @@
+-# -------------------------------------------------------------------------- #
+-#
+-# Copyright (C) 2017  Intel Corporation. All rights reserved.
+-# Your use of Intel Corporation's design tools, logic functions 
+-# and other software and tools, and its AMPP partner logic 
+-# functions, and any output files from any of the foregoing 
+-# (including device programming or simulation files), and any 
+-# associated documentation or information are expressly subject 
+-# to the terms and conditions of the Intel Program License 
+-# Subscription Agreement, the Intel Quartus Prime License Agreement,
+-# the Intel MegaCore Function License Agreement, or other 
+-# applicable license agreement, including, without limitation, 
+-# that your use is for the sole purpose of programming logic 
+-# devices manufactured by Intel and sold by Intel or its 
+-# authorized distributors.  Please refer to the applicable 
+-# agreement for further details.
+-#
+-# -------------------------------------------------------------------------- #
+-#
+-# Quartus Prime
+-# Version 17.0.0 Build 595 04/25/2017 SJ Standard Edition
+-# Date created = 01:35:00  November 17, 2018
+-#
+-# -------------------------------------------------------------------------- #
+-
+-QUARTUS_VERSION = "17.0"
+-DATE = "01:35:00  November 17, 2018"
+-
+-# Revisions
+-
+-PROJECT_REVISION = "SNES"
++QUARTUS_VERSION = "17.0"
++PROJECT_REVISION = "SNES"
+diff --git a/SNES.qsf b/SNES.qsf
+index ccc6504..e60b26e 100644
+--- a/SNES.qsf
++++ b/SNES.qsf
+@@ -1,48 +1,25 @@
+-# -------------------------------------------------------------------------- #
++# --------------------------------------------------------------------------
+ #
+-# Copyright (C) 2017  Intel Corporation. All rights reserved.
+-# Your use of Intel Corporation's design tools, logic functions 
+-# and other software and tools, and its AMPP partner logic 
+-# functions, and any output files from any of the foregoing 
+-# (including device programming or simulation files), and any 
+-# associated documentation or information are expressly subject 
+-# to the terms and conditions of the Intel Program License 
+-# Subscription Agreement, the Intel Quartus Prime License Agreement,
+-# the Intel MegaCore Function License Agreement, or other 
+-# applicable license agreement, including, without limitation, 
+-# that your use is for the sole purpose of programming logic 
+-# devices manufactured by Intel and sold by Intel or its 
+-# authorized distributors.  Please refer to the applicable 
+-# agreement for further details.
++# MiSTer project
+ #
+-# -------------------------------------------------------------------------- #
++# WARNING WARNING WARNING:
++# Do not add files to project in Quartus IDE! It will mess this file!
++# Add the files manually to files.qip file.
+ #
+-# Quartus Prime
+-# Version 16.1.2 Build 203 01/18/2017 SJ Standard Edition
+-# Date created = 01:53:32  April 20, 2017
+-#
+-# -------------------------------------------------------------------------- #
+-
+-set_global_assignment -name VERILOG_MACRO "LITE=1"
++# --------------------------------------------------------------------------
+ 
+-set_global_assignment -name FAMILY "Cyclone V"
+-set_global_assignment -name DEVICE 5CSEBA6U23I7
+ set_global_assignment -name TOP_LEVEL_ENTITY sys_top
+-set_global_assignment -name ORIGINAL_QUARTUS_VERSION 16.1.2
++set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
++set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
++set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
++
+ set_global_assignment -name LAST_QUARTUS_VERSION "17.0.2 Standard Edition"
+-set_global_assignment -name PROJECT_CREATION_TIME_DATE "01:53:30  APRIL 20, 2017"
+-set_global_assignment -name DEVICE_FILTER_PACKAGE UFBGA
+-set_global_assignment -name DEVICE_FILTER_PIN_COUNT 672
+-set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 7
+ 
+ set_global_assignment -name GENERATE_RBF_FILE ON
+ set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+ set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
+ set_global_assignment -name SAVE_DISK_SPACE OFF
+ set_global_assignment -name SMART_RECOMPILE ON
+-set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+-set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+-set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+ set_global_assignment -name MIN_CORE_JUNCTION_TEMP "-40"
+ set_global_assignment -name MAX_CORE_JUNCTION_TEMP 100
+ set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
+@@ -73,321 +50,6 @@ set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING ON
+ set_global_assignment -name ALM_REGISTER_PACKING_EFFORT LOW
+ set_global_assignment -name SEED 1
+ 
+-#============================================================
+-# ADC
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_CONVST
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SCK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDI
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDO
+-set_location_assignment PIN_U9 -to ADC_CONVST
+-set_location_assignment PIN_V10 -to ADC_SCK
+-set_location_assignment PIN_AC4 -to ADC_SDI
+-set_location_assignment PIN_AD4 -to ADC_SDO
+-
+-#============================================================
+-# ARDUINO
+-#============================================================
+-set_location_assignment PIN_AG9 -to ARDUINO_IO[3]
+-set_location_assignment PIN_U14 -to ARDUINO_IO[4]
+-set_location_assignment PIN_U13 -to ARDUINO_IO[5]
+-set_location_assignment PIN_AG8 -to ARDUINO_IO[6]
+-set_location_assignment PIN_AH8 -to ARDUINO_IO[7]
+-set_location_assignment PIN_AF17 -to ARDUINO_IO[8]
+-set_location_assignment PIN_AE15 -to ARDUINO_IO[9]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ARDUINO_IO[*]
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to ARDUINO_IO[*]
+-set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to ARDUINO_IO[*]
+-
+-#============================================================
+-# USER PORT
+-#============================================================
+-set_location_assignment PIN_AF15 -to USER_IO[5]
+-set_location_assignment PIN_AG16 -to USER_IO[4]
+-set_location_assignment PIN_AH11 -to USER_IO[3]
+-set_location_assignment PIN_AH12 -to USER_IO[2]
+-set_location_assignment PIN_AH9 -to USER_IO[1]
+-set_location_assignment PIN_AG11 -to USER_IO[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[*]
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to USER_IO[*]
+-set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to USER_IO[*]
+-
+-#============================================================
+-# SDIO
+-#============================================================
+-set_location_assignment PIN_AF25 -to SDIO_DAT[0]
+-set_location_assignment PIN_AF23 -to SDIO_DAT[1]
+-set_location_assignment PIN_AD26 -to SDIO_DAT[2]
+-set_location_assignment PIN_AF28 -to SDIO_DAT[3]
+-set_location_assignment PIN_AF27 -to SDIO_CMD
+-set_location_assignment PIN_AH26 -to SDIO_CLK
+-set_location_assignment PIN_AH7 -to SDIO_CD
+-
+-set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDIO_*
+-
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SDIO_*
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to SDIO_DAT[*]
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to SDIO_CMD
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to SDIO_CD
+-
+-#============================================================
+-# VGA
+-#============================================================
+-set_location_assignment PIN_AE17 -to VGA_R[0]
+-set_location_assignment PIN_AE20 -to VGA_R[1]
+-set_location_assignment PIN_AF20 -to VGA_R[2]
+-set_location_assignment PIN_AH18 -to VGA_R[3]
+-set_location_assignment PIN_AH19 -to VGA_R[4]
+-set_location_assignment PIN_AF21 -to VGA_R[5]
+-
+-set_location_assignment PIN_AE19 -to VGA_G[0]
+-set_location_assignment PIN_AG15 -to VGA_G[1]
+-set_location_assignment PIN_AF18 -to VGA_G[2]
+-set_location_assignment PIN_AG18 -to VGA_G[3]
+-set_location_assignment PIN_AG19 -to VGA_G[4]
+-set_location_assignment PIN_AG20 -to VGA_G[5]
+-
+-set_location_assignment PIN_AG21 -to VGA_B[0]
+-set_location_assignment PIN_AA20 -to VGA_B[1]
+-set_location_assignment PIN_AE22 -to VGA_B[2]
+-set_location_assignment PIN_AF22 -to VGA_B[3]
+-set_location_assignment PIN_AH23 -to VGA_B[4]
+-set_location_assignment PIN_AH21 -to VGA_B[5]
+-
+-set_location_assignment PIN_AH22 -to VGA_HS
+-set_location_assignment PIN_AG24 -to VGA_VS
+-
+-set_location_assignment PIN_AH27 -to VGA_EN
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to VGA_EN
+-
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_*
+-set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_*
+-
+-#============================================================
+-# AUDIO
+-#============================================================
+-set_location_assignment PIN_AC24 -to AUDIO_L
+-set_location_assignment PIN_AE25 -to AUDIO_R
+-set_location_assignment PIN_AG26 -to AUDIO_SPDIF
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUDIO_*
+-set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to AUDIO_*
+-
+-#============================================================
+-# SDRAM
+-#============================================================
+-set_location_assignment PIN_Y11 -to SDRAM_A[0]
+-set_location_assignment PIN_AA26 -to SDRAM_A[1]
+-set_location_assignment PIN_AA13 -to SDRAM_A[2]
+-set_location_assignment PIN_AA11 -to SDRAM_A[3]
+-set_location_assignment PIN_W11 -to SDRAM_A[4]
+-set_location_assignment PIN_Y19 -to SDRAM_A[5]
+-set_location_assignment PIN_AB23 -to SDRAM_A[6]
+-set_location_assignment PIN_AC23 -to SDRAM_A[7]
+-set_location_assignment PIN_AC22 -to SDRAM_A[8]
+-set_location_assignment PIN_C12 -to SDRAM_A[9]
+-set_location_assignment PIN_AB26 -to SDRAM_A[10]
+-set_location_assignment PIN_AD17 -to SDRAM_A[11]
+-set_location_assignment PIN_D12 -to SDRAM_A[12]
+-set_location_assignment PIN_Y17 -to SDRAM_BA[0]
+-set_location_assignment PIN_AB25 -to SDRAM_BA[1]
+-
+-set_location_assignment PIN_E8 -to SDRAM_DQ[0]
+-set_location_assignment PIN_V12 -to SDRAM_DQ[1]
+-set_location_assignment PIN_D11 -to SDRAM_DQ[2]
+-set_location_assignment PIN_W12 -to SDRAM_DQ[3]
+-set_location_assignment PIN_AH13 -to SDRAM_DQ[4]
+-set_location_assignment PIN_D8 -to SDRAM_DQ[5]
+-set_location_assignment PIN_AH14 -to SDRAM_DQ[6]
+-set_location_assignment PIN_AF7 -to SDRAM_DQ[7]
+-set_location_assignment PIN_AE24 -to SDRAM_DQ[8]
+-set_location_assignment PIN_AD23 -to SDRAM_DQ[9]
+-set_location_assignment PIN_AE6 -to SDRAM_DQ[10]
+-set_location_assignment PIN_AE23 -to SDRAM_DQ[11]
+-set_location_assignment PIN_AG14 -to SDRAM_DQ[12]
+-set_location_assignment PIN_AD5 -to SDRAM_DQ[13]
+-set_location_assignment PIN_AF4 -to SDRAM_DQ[14]
+-set_location_assignment PIN_AH3 -to SDRAM_DQ[15]
+-set_location_assignment PIN_AG13 -to SDRAM_DQML
+-set_location_assignment PIN_AF13 -to SDRAM_DQMH
+-
+-set_location_assignment PIN_AD20 -to SDRAM_CLK
+-set_location_assignment PIN_AG10 -to SDRAM_CKE
+-
+-set_location_assignment PIN_AA19 -to SDRAM_nWE
+-set_location_assignment PIN_AA18 -to SDRAM_nCAS
+-set_location_assignment PIN_Y18 -to SDRAM_nCS
+-set_location_assignment PIN_W14 -to SDRAM_nRAS
+-
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SDRAM_*
+-set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_*
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A*
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_BA*
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[*]
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQM*
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_n*
+-set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[*]
+-set_instance_assignment -name ALLOW_SYNCH_CTRL_USAGE OFF -to *|SDRAM_*
+-
+-#============================================================
+-# I/O
+-#============================================================
+-set_location_assignment PIN_Y15 -to LED_USER
+-set_location_assignment PIN_AA15 -to LED_HDD
+-set_location_assignment PIN_AG28 -to LED_POWER
+-
+-set_location_assignment PIN_AH24 -to BTN_USER
+-set_location_assignment PIN_AG25 -to BTN_OSD
+-set_location_assignment PIN_AG23 -to BTN_RESET
+-
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_*
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BTN_*
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to BTN_*
+-
+-#============================================================
+-# CLOCK
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_CLK1_50
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_CLK2_50
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_CLK3_50
+-set_location_assignment PIN_V11 -to FPGA_CLK1_50
+-set_location_assignment PIN_Y13 -to FPGA_CLK2_50
+-set_location_assignment PIN_E11 -to FPGA_CLK3_50
+-
+-#============================================================
+-# HDMI
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_I2C_SCL
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_I2C_SDA
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_I2S
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_LRCLK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_MCLK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_SCLK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_CLK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_DE
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[1]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[2]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[3]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[4]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[5]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[6]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[7]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[8]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[9]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[10]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[11]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[12]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[13]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[14]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[15]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[16]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[17]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[18]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[19]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[20]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[21]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[22]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[23]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_HS
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_INT
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_VS
+-set_location_assignment PIN_U10 -to HDMI_I2C_SCL
+-set_location_assignment PIN_AA4 -to HDMI_I2C_SDA
+-set_location_assignment PIN_T13 -to HDMI_I2S
+-set_location_assignment PIN_T11 -to HDMI_LRCLK
+-set_location_assignment PIN_U11 -to HDMI_MCLK
+-set_location_assignment PIN_T12 -to HDMI_SCLK
+-set_location_assignment PIN_AG5 -to HDMI_TX_CLK
+-set_location_assignment PIN_AD19 -to HDMI_TX_DE
+-set_location_assignment PIN_AD12 -to HDMI_TX_D[0]
+-set_location_assignment PIN_AE12 -to HDMI_TX_D[1]
+-set_location_assignment PIN_W8 -to HDMI_TX_D[2]
+-set_location_assignment PIN_Y8 -to HDMI_TX_D[3]
+-set_location_assignment PIN_AD11 -to HDMI_TX_D[4]
+-set_location_assignment PIN_AD10 -to HDMI_TX_D[5]
+-set_location_assignment PIN_AE11 -to HDMI_TX_D[6]
+-set_location_assignment PIN_Y5 -to HDMI_TX_D[7]
+-set_location_assignment PIN_AF10 -to HDMI_TX_D[8]
+-set_location_assignment PIN_Y4 -to HDMI_TX_D[9]
+-set_location_assignment PIN_AE9 -to HDMI_TX_D[10]
+-set_location_assignment PIN_AB4 -to HDMI_TX_D[11]
+-set_location_assignment PIN_AE7 -to HDMI_TX_D[12]
+-set_location_assignment PIN_AF6 -to HDMI_TX_D[13]
+-set_location_assignment PIN_AF8 -to HDMI_TX_D[14]
+-set_location_assignment PIN_AF5 -to HDMI_TX_D[15]
+-set_location_assignment PIN_AE4 -to HDMI_TX_D[16]
+-set_location_assignment PIN_AH2 -to HDMI_TX_D[17]
+-set_location_assignment PIN_AH4 -to HDMI_TX_D[18]
+-set_location_assignment PIN_AH5 -to HDMI_TX_D[19]
+-set_location_assignment PIN_AH6 -to HDMI_TX_D[20]
+-set_location_assignment PIN_AG6 -to HDMI_TX_D[21]
+-set_location_assignment PIN_AF9 -to HDMI_TX_D[22]
+-set_location_assignment PIN_AE8 -to HDMI_TX_D[23]
+-set_location_assignment PIN_T8 -to HDMI_TX_HS
+-set_location_assignment PIN_AF11 -to HDMI_TX_INT
+-set_location_assignment PIN_V13 -to HDMI_TX_VS
+-
+-#============================================================
+-# KEY
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[1]
+-set_location_assignment PIN_AH17 -to KEY[0]
+-set_location_assignment PIN_AH16 -to KEY[1]
+-
+-#============================================================
+-# LED
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[1]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[2]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[3]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[4]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[5]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[6]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[7]
+-set_location_assignment PIN_W15 -to LED[0]
+-set_location_assignment PIN_AA24 -to LED[1]
+-set_location_assignment PIN_V16 -to LED[2]
+-set_location_assignment PIN_V15 -to LED[3]
+-set_location_assignment PIN_AF26 -to LED[4]
+-set_location_assignment PIN_AE26 -to LED[5]
+-set_location_assignment PIN_Y16 -to LED[6]
+-set_location_assignment PIN_AA23 -to LED[7]
+-
+-#============================================================
+-# SW
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[1]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[2]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[3]
+-set_location_assignment PIN_Y24 -to SW[0]
+-set_location_assignment PIN_W24 -to SW[1]
+-set_location_assignment PIN_W21 -to SW[2]
+-set_location_assignment PIN_W20 -to SW[3]
+-
+-set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
+-
+-set_global_assignment -name CDF_FILE jtag.cdf
+-set_global_assignment -name QIP_FILE sys/sys.qip
+-set_global_assignment -name QIP_FILE src/65C816/65C816.qip
+-set_global_assignment -name QIP_FILE src/SPC700/SPC700.qip
+-set_global_assignment -name QIP_FILE src/chip/chip.qip
+-set_global_assignment -name VHDL_FILE src/CEGen.vhd
+-set_global_assignment -name VHDL_FILE src/SWRAM.vhd
+-set_global_assignment -name VHDL_FILE src/SMP.vhd
+-set_global_assignment -name VHDL_FILE src/PPU_PKG.vhd
+-set_global_assignment -name VHDL_FILE src/PPU.vhd
+-set_global_assignment -name VHDL_FILE src/CPU.vhd
+-set_global_assignment -name VHDL_FILE src/DSP_PKG.vhd
+-set_global_assignment -name VHDL_FILE src/DSP.vhd
+-set_global_assignment -name VHDL_FILE src/SNES.vhd
+-set_global_assignment -name VERILOG_FILE src/main.v
+-set_global_assignment -name SYSTEMVERILOG_FILE cheatcodes.sv
+-set_global_assignment -name VHDL_FILE bram.vhd
+-set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
+-set_global_assignment -name SYSTEMVERILOG_FILE ioport.sv
+-set_global_assignment -name SDC_FILE SNES.sdc
+-set_global_assignment -name SYSTEMVERILOG_FILE SNES.sv
++source sys/sys.tcl
++source files.qip
+ set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+\ No newline at end of file
+diff --git a/SNES.sv b/SNES.sv
+index 7651140..b68fcca 100644
+--- a/SNES.sv
++++ b/SNES.sv
+@@ -62,7 +62,9 @@ module emu
+ 	output [15:0] AUDIO_R,
+ 	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
+ 	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
+-	input         TAPE_IN,
++
++	//ADC
++	inout   [3:0] ADC_BUS,
+ 
+ 	// SD-SPI
+ 	output        SD_SCK,
+@@ -115,6 +117,7 @@ module emu
+ 	input         OSD_STATUS
+ );
+ 
++assign ADC_BUS  = 'Z;
+ assign USER_OUT = '1;
+ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
+ 
+@@ -154,35 +157,20 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
+ ////////////////////////////  HPS I/O  //////////////////////////////////
+ 
+ `include "build_id.v"
+-parameter CONF_STR1 = {
++parameter CONF_STR = {
+ 	"SNES;;",
+ 	"FS,SFCSMCBIN;",
+ 	"-;",
+ 	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
+ 	"-;",
+ 	"C,Cheats;",
+-};
+-
+-parameter CONF_STR2 = {
+-	"O,Cheats Enabled,Yes,No;",
++	"H2OO,Cheats Enabled,Yes,No;",
+ 	"-;",
+-};
+-
+-parameter CONF_STR3 = {
+-	"C,Load Backup RAM;"
+-};
+-
+-parameter CONF_STR4 = {
+-	"D,Save Backup RAM;",
+-	"ON,Autosave,OFF,ON;",
+-};
+-
+-parameter CONF_STR5 = {
+-	";",
+-};
+-
+-parameter CONF_STR6 = {
+-	"I,SuperFX speed,Original,Turbo;",
++	"D0RC,Load Backup RAM;",
++	"D0RD,Save Backup RAM;",
++	"D0ON,Autosave,OFF,ON;",
++	"D0-;",
++	"D1OI,SuperFX speed,Original,Turbo;",
+ 	"OEF,Video Region,Auto,NTSC,PAL;",
+ 	"O8,Aspect ratio,4:3,16:9;",
+ 	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+@@ -193,13 +181,19 @@ parameter CONF_STR6 = {
+ 	"O7,Swap Joysticks,No,Yes;",
+ 	"OH,Multitap,Disabled,Port2;",
+ 	"-;",
++	"OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
++	"OR,Super Scope Btn,Joy,Mouse;",
++	"OST,Cross,Small,Big,None;",
++	"-;",
+ 	"R0,Reset;",
+-	"J1,A,B,X,Y,LT,RT,Select,Start;",
++	"J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
+ 	"V,v",`BUILD_DATE
+ };
++// free bits: 4,L,M,U,V
+ 
+ wire  [1:0] buttons;
+ wire [31:0] status;
++wire [15:0] status_menumask = {~gg_available, ~GSU_ACTIVE, ~bk_ena};
+ wire        forced_scandoubler;
+ reg  [31:0] sd_lba;
+ reg         sd_rd = 0;
+@@ -221,16 +215,20 @@ wire  [7:0] ioctl_index;
+ wire [11:0] joy0,joy1,joy2,joy3,joy4;
+ wire [24:0] ps2_mouse;
+ 
+-hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF_STR4)+$size(CONF_STR5)+$size(CONF_STR6))>>3) + 5), .WIDE(1)) hps_io
++wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
++
++hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
+ (
+ 	.clk_sys(clk_sys),
+ 	.HPS_BUS(HPS_BUS),
+-	.conf_str({CONF_STR1,gg_available ? "O" : "+",CONF_STR2,bk_ena ? "R" : "+",CONF_STR3,bk_ena ? "R" : "+",CONF_STR4,bk_ena ? "-" : "+",CONF_STR5,GSU_ACTIVE ? "O" : "+",CONF_STR6}),
++	.conf_str(CONF_STR),
+ 
+ 	.buttons(buttons),
+ 	.forced_scandoubler(forced_scandoubler),
+ 	.new_vmode(new_vmode),
+ 
++	.joystick_analog_0({joy0_y, joy0_x}),
++	.joystick_analog_1({joy1_y, joy1_x}),
+ 	.joystick_0(joy0),
+ 	.joystick_1(joy1),
+ 	.joystick_2(joy2),
+@@ -239,6 +237,7 @@ hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF
+ 	.ps2_mouse(ps2_mouse),
+ 
+ 	.status(status),
++	.status_menumask(status_menumask),
+ 
+ 	.ioctl_addr(ioctl_addr),
+ 	.ioctl_dout(ioctl_dout),
+@@ -260,6 +259,8 @@ hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF
+ 	.img_size(img_size)
+ );
+ 
++wire       GUN_BTN = status[27];
++wire [1:0] GUN_MODE = status[26:25];
+ wire       GSU_TURBO = status[18];
+ wire       BLEND = ~status[16];
+ wire       PAL = (!status[15:14]) ? rom_region : status[15];
+@@ -404,12 +405,13 @@ main main
+ 	.VSYNC(VSYNC),
+ 
+ 	.JOY1_DI(JOY1_DO),
+-	.JOY2_DI(JOY2_DO),
++	.JOY2_DI(GUN_MODE ? LG_DO : JOY2_DO),
+ 	.JOY_STRB(JOY_STRB),
+ 	.JOY1_CLK(JOY1_CLK),
+ 	.JOY2_CLK(JOY2_CLK),
+ 	.JOY1_P6(JOY1_P6),
+ 	.JOY2_P6(JOY2_P6),
++	.JOY2_P6_in(LG_P6_out | !GUN_MODE),
+ 
+ 	.GG_EN(status[24]),
+ 	.GG_CODE(gg_code),
+@@ -575,6 +577,7 @@ wire VBlank_n;
+ wire HIGH_RES;
+ wire DOTCLK;
+ 
++reg interlace;
+ reg ce_pix;
+ always @(posedge CLK_VIDEO) begin
+ 	reg [2:0] pcnt;
+@@ -588,6 +591,7 @@ always @(posedge CLK_VIDEO) begin
+ 	if(~old_vsync & VSync) begin
+ 		frame_hres <= tmp_hres | ~scandoubler;
+ 		tmp_hres <= HIGH_RES;
++		interlace <= INTERLACE;
+ 	end
+ 
+ 	pcnt <= pcnt + 1'd1;
+@@ -599,12 +603,12 @@ always @(posedge CLK_VIDEO) begin
+ 	if(pcnt==3) {HSync, VSync} <= {HSYNC, VSYNC};
+ end
+ 
+-assign VGA_F1 = INTERLACE & FIELD;
+-assign VGA_SL = {~INTERLACE,~INTERLACE}&sl[1:0];
++assign VGA_F1 = interlace & FIELD;
++assign VGA_SL = {~interlace,~interlace}&sl[1:0];
+ 
+ wire [2:0] scale = status[11:9];
+ wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
+-wire       scandoubler = ~INTERLACE && (scale || forced_scandoubler);
++wire       scandoubler = ~interlace && (scale || forced_scandoubler);
+ 
+ video_mixer #(.LINE_LENGTH(520)) video_mixer
+ (
+@@ -619,9 +623,9 @@ video_mixer #(.LINE_LENGTH(520)) video_mixer
+ 
+ 	.HBlank(~HBlank_n),
+ 	.VBlank(~VBlank_n),
+-	.R(R),
+-	.G(G),
+-	.B(B)
++	.R((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[0]}} : R),
++	.G((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[1]}} : G),
++	.B((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[2]}} : B)
+ );
+ 
+ ////////////////////////////  I/O PORTS  ////////////////////////////////
+@@ -669,6 +673,39 @@ ioport port2
+ 	.MOUSE_EN(mouse_mode[1])
+ );
+ 
++wire       LG_P6_out;
++wire [1:0] LG_DO;
++wire [2:0] LG_TARGET;
++wire       LG_T = ((GUN_MODE[0]&joy0[6]) | (GUN_MODE[1]&joy1[6])); // always from joysticks
++
++lightgun lightgun
++(
++	.CLK(clk_sys),
++	.RESET(reset),
++
++	.MOUSE(ps2_mouse),
++	.MOUSE_XY(&GUN_MODE),
++
++	.JOY_X(GUN_MODE[0] ? joy0_x : joy1_x),
++	.JOY_Y(GUN_MODE[0] ? joy0_y : joy1_y),
++
++	.F(GUN_BTN ? ps2_mouse[0] : ((GUN_MODE[0]&(joy0[4]|joy0[9]) | (GUN_MODE[1]&(joy1[4]|joy1[9]))))),
++	.C(GUN_BTN ? ps2_mouse[1] : ((GUN_MODE[0]&(joy0[5]|joy0[8]) | (GUN_MODE[1]&(joy1[5]|joy0[8]))))),
++	.T(LG_T), // always from joysticks
++	.P(ps2_mouse[2] | ((GUN_MODE[0]&joy0[7]) | (GUN_MODE[1]&joy1[7]))), // always from joysticks and mouse
++
++	.HDE(HBlank_n),
++	.VDE(VBlank_n),
++	.CLKPIX(DOTCLK),
++	
++	.TARGET(LG_TARGET),
++	.SIZE(status[28]),
++
++	.PORT_LATCH(JOY_STRB),
++	.PORT_CLK(JOY2_CLK),
++	.PORT_P6(LG_P6_out),
++	.PORT_DO(LG_DO)
++);
+ 
+ /////////////////////////  STATE SAVE/LOAD  /////////////////////////////
+ 
+diff --git a/SNES_Q13.qpf b/SNES_Q13.qpf
+index 3bced2f..be06a04 100644
+--- a/SNES_Q13.qpf
++++ b/SNES_Q13.qpf
+@@ -1,12 +1,2 @@
+-#
+-# please keep this file read-only!
+-# Quartus changes this file everytime revision is switched, 
+-# and it will be marked as changed with every commit.
+-#
+-
+ QUARTUS_VERSION = "13.1"
+-DATE = "23:13:02  April 27, 2017"
+-
+-# Revisions
+-
+ PROJECT_REVISION = "SNES_Q13"
+diff --git a/SNES_Q13.qsf b/SNES_Q13.qsf
+index 0397a70..d40f2d7 100644
+--- a/SNES_Q13.qsf
++++ b/SNES_Q13.qsf
+@@ -1,48 +1,25 @@
+-# -------------------------------------------------------------------------- #
++# --------------------------------------------------------------------------
+ #
+-# Copyright (C) 2017  Intel Corporation. All rights reserved.
+-# Your use of Intel Corporation's design tools, logic functions 
+-# and other software and tools, and its AMPP partner logic 
+-# functions, and any output files from any of the foregoing 
+-# (including device programming or simulation files), and any 
+-# associated documentation or information are expressly subject 
+-# to the terms and conditions of the Intel Program License 
+-# Subscription Agreement, the Intel Quartus Prime License Agreement,
+-# the Intel MegaCore Function License Agreement, or other 
+-# applicable license agreement, including, without limitation, 
+-# that your use is for the sole purpose of programming logic 
+-# devices manufactured by Intel and sold by Intel or its 
+-# authorized distributors.  Please refer to the applicable 
+-# agreement for further details.
++# MiSTer project
+ #
+-# -------------------------------------------------------------------------- #
++# WARNING WARNING WARNING:
++# Do not add files to project in Quartus IDE! It will mess this file!
++# Add the files manually to files.qip file.
+ #
+-# Quartus Prime
+-# Version 16.1.2 Build 203 01/18/2017 SJ Standard Edition
+-# Date created = 01:53:32  April 20, 2017
+-#
+-# -------------------------------------------------------------------------- #
+-
+-set_global_assignment -name VERILOG_MACRO "LITE=1"
++# --------------------------------------------------------------------------
+ 
+-set_global_assignment -name FAMILY "Cyclone V"
+-set_global_assignment -name DEVICE 5CSEBA6U23I7
+ set_global_assignment -name TOP_LEVEL_ENTITY sys_top
+-set_global_assignment -name ORIGINAL_QUARTUS_VERSION 16.1.2
++set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
++set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
++set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
++
+ set_global_assignment -name LAST_QUARTUS_VERSION 13.1
+-set_global_assignment -name PROJECT_CREATION_TIME_DATE "01:53:30  APRIL 20, 2017"
+-set_global_assignment -name DEVICE_FILTER_PACKAGE UFBGA
+-set_global_assignment -name DEVICE_FILTER_PIN_COUNT 672
+-set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 7
+ 
+ set_global_assignment -name GENERATE_RBF_FILE ON
+ set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+ set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
+ set_global_assignment -name SAVE_DISK_SPACE OFF
+ set_global_assignment -name SMART_RECOMPILE ON
+-set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+-set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+-set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+ set_global_assignment -name MIN_CORE_JUNCTION_TEMP "-40"
+ set_global_assignment -name MAX_CORE_JUNCTION_TEMP 100
+ set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
+@@ -50,334 +27,19 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+ set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS OFF
+ set_global_assignment -name OPTIMIZE_POWER_DURING_FITTING OFF
+ set_global_assignment -name FINAL_PLACEMENT_OPTIMIZATION ALWAYS
++set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+ set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS ON
+-set_global_assignment -name ALM_REGISTER_PACKING_EFFORT LOW
+ set_global_assignment -name OPTIMIZATION_TECHNIQUE SPEED
+ set_global_assignment -name PLACEMENT_EFFORT_MULTIPLIER 2.0
++set_global_assignment -name SYNTH_GATED_CLOCK_CONVERSION ON
+ set_global_assignment -name ROUTER_CLOCKING_TOPOLOGY_ANALYSIS ON
+ set_global_assignment -name ALLOW_SYNCH_CTRL_USAGE OFF
+ set_global_assignment -name OPTIMIZE_POWER_DURING_SYNTHESIS OFF
+-set_global_assignment -name SYNTH_GATED_CLOCK_CONVERSION ON
+ set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
+ set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
+-set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
++set_global_assignment -name ALM_REGISTER_PACKING_EFFORT LOW
+ set_global_assignment -name SEED 1
+ 
+-#============================================================
+-# ADC
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_CONVST
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SCK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDI
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDO
+-set_location_assignment PIN_U9 -to ADC_CONVST
+-set_location_assignment PIN_V10 -to ADC_SCK
+-set_location_assignment PIN_AC4 -to ADC_SDI
+-set_location_assignment PIN_AD4 -to ADC_SDO
+-
+-#============================================================
+-# ARDUINO
+-#============================================================
+-set_location_assignment PIN_AG9 -to ARDUINO_IO[3]
+-set_location_assignment PIN_U14 -to ARDUINO_IO[4]
+-set_location_assignment PIN_U13 -to ARDUINO_IO[5]
+-set_location_assignment PIN_AG8 -to ARDUINO_IO[6]
+-set_location_assignment PIN_AH8 -to ARDUINO_IO[7]
+-set_location_assignment PIN_AF17 -to ARDUINO_IO[8]
+-set_location_assignment PIN_AE15 -to ARDUINO_IO[9]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ARDUINO_IO[*]
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to ARDUINO_IO[*]
+-set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to ARDUINO_IO[*]
+-
+-#============================================================
+-# USER PORT
+-#============================================================
+-set_location_assignment PIN_AF15 -to USER_IO[5]
+-set_location_assignment PIN_AG16 -to USER_IO[4]
+-set_location_assignment PIN_AH11 -to USER_IO[3]
+-set_location_assignment PIN_AH12 -to USER_IO[2]
+-set_location_assignment PIN_AH9  -to USER_IO[1]
+-set_location_assignment PIN_AG11 -to USER_IO[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[*]
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to USER_IO[*]
+-set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to USER_IO[*]
+-
+-#============================================================
+-# SDIO
+-#============================================================
+-set_location_assignment PIN_AF25 -to SDIO_DAT[0]
+-set_location_assignment PIN_AF23 -to SDIO_DAT[1]
+-set_location_assignment PIN_AD26 -to SDIO_DAT[2]
+-set_location_assignment PIN_AF28 -to SDIO_DAT[3]
+-set_location_assignment PIN_AF27 -to SDIO_CMD
+-set_location_assignment PIN_AH26 -to SDIO_CLK
+-set_location_assignment PIN_AH7 -to SDIO_CD
+-
+-set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDIO_*
+-
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SDIO_*
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to SDIO_DAT[*]
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to SDIO_CMD
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to SDIO_CD
+-
+-#============================================================
+-# VGA
+-#============================================================
+-set_location_assignment PIN_AE17 -to VGA_R[0]
+-set_location_assignment PIN_AE20 -to VGA_R[1]
+-set_location_assignment PIN_AF20 -to VGA_R[2]
+-set_location_assignment PIN_AH18 -to VGA_R[3]
+-set_location_assignment PIN_AH19 -to VGA_R[4]
+-set_location_assignment PIN_AF21 -to VGA_R[5]
+-
+-set_location_assignment PIN_AE19 -to VGA_G[0]
+-set_location_assignment PIN_AG15 -to VGA_G[1]
+-set_location_assignment PIN_AF18 -to VGA_G[2]
+-set_location_assignment PIN_AG18 -to VGA_G[3]
+-set_location_assignment PIN_AG19 -to VGA_G[4]
+-set_location_assignment PIN_AG20 -to VGA_G[5]
+-
+-set_location_assignment PIN_AG21 -to VGA_B[0]
+-set_location_assignment PIN_AA20 -to VGA_B[1]
+-set_location_assignment PIN_AE22 -to VGA_B[2]
+-set_location_assignment PIN_AF22 -to VGA_B[3]
+-set_location_assignment PIN_AH23 -to VGA_B[4]
+-set_location_assignment PIN_AH21 -to VGA_B[5]
+-
+-set_location_assignment PIN_AH22 -to VGA_HS
+-set_location_assignment PIN_AG24 -to VGA_VS
+-
+-set_location_assignment PIN_AH27 -to VGA_EN
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to VGA_EN
+-
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_*
+-set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_*
+-
+-#============================================================
+-# AUDIO
+-#============================================================
+-set_location_assignment PIN_AC24 -to AUDIO_L
+-set_location_assignment PIN_AE25 -to AUDIO_R
+-set_location_assignment PIN_AG26 -to AUDIO_SPDIF
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUDIO_*
+-set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to AUDIO_*
+-
+-#============================================================
+-# SDRAM
+-#============================================================
+-set_location_assignment PIN_Y11 -to SDRAM_A[0]
+-set_location_assignment PIN_AA26 -to SDRAM_A[1]
+-set_location_assignment PIN_AA13 -to SDRAM_A[2]
+-set_location_assignment PIN_AA11 -to SDRAM_A[3]
+-set_location_assignment PIN_W11 -to SDRAM_A[4]
+-set_location_assignment PIN_Y19 -to SDRAM_A[5]
+-set_location_assignment PIN_AB23 -to SDRAM_A[6]
+-set_location_assignment PIN_AC23 -to SDRAM_A[7]
+-set_location_assignment PIN_AC22 -to SDRAM_A[8]
+-set_location_assignment PIN_C12 -to SDRAM_A[9]
+-set_location_assignment PIN_AB26 -to SDRAM_A[10]
+-set_location_assignment PIN_AD17 -to SDRAM_A[11]
+-set_location_assignment PIN_D12 -to SDRAM_A[12]
+-set_location_assignment PIN_Y17 -to SDRAM_BA[0]
+-set_location_assignment PIN_AB25 -to SDRAM_BA[1]
+-
+-set_location_assignment PIN_E8 -to SDRAM_DQ[0]
+-set_location_assignment PIN_V12 -to SDRAM_DQ[1]
+-set_location_assignment PIN_D11 -to SDRAM_DQ[2]
+-set_location_assignment PIN_W12 -to SDRAM_DQ[3]
+-set_location_assignment PIN_AH13 -to SDRAM_DQ[4]
+-set_location_assignment PIN_D8 -to SDRAM_DQ[5]
+-set_location_assignment PIN_AH14 -to SDRAM_DQ[6]
+-set_location_assignment PIN_AF7 -to SDRAM_DQ[7]
+-set_location_assignment PIN_AE24 -to SDRAM_DQ[8]
+-set_location_assignment PIN_AD23 -to SDRAM_DQ[9]
+-set_location_assignment PIN_AE6 -to SDRAM_DQ[10]
+-set_location_assignment PIN_AE23 -to SDRAM_DQ[11]
+-set_location_assignment PIN_AG14 -to SDRAM_DQ[12]
+-set_location_assignment PIN_AD5 -to SDRAM_DQ[13]
+-set_location_assignment PIN_AF4 -to SDRAM_DQ[14]
+-set_location_assignment PIN_AH3 -to SDRAM_DQ[15]
+-set_location_assignment PIN_AG13 -to SDRAM_DQML
+-set_location_assignment PIN_AF13 -to SDRAM_DQMH
+-
+-set_location_assignment PIN_AD20 -to SDRAM_CLK
+-set_location_assignment PIN_AG10 -to SDRAM_CKE
+-
+-set_location_assignment PIN_AA19 -to SDRAM_nWE
+-set_location_assignment PIN_AA18 -to SDRAM_nCAS
+-set_location_assignment PIN_Y18 -to SDRAM_nCS
+-set_location_assignment PIN_W14 -to SDRAM_nRAS
+-
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SDRAM_*
+-set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_*
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A*
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_BA*
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[*]
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQM*
+-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_n*
+-set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[*]
+-set_instance_assignment -name ALLOW_SYNCH_CTRL_USAGE OFF -to *|SDRAM_*
+-
+-#============================================================
+-# I/O
+-#============================================================
+-set_location_assignment PIN_Y15 -to LED_USER
+-set_location_assignment PIN_AA15 -to LED_HDD
+-set_location_assignment PIN_AG28 -to LED_POWER
+-
+-set_location_assignment PIN_AH24 -to BTN_USER
+-set_location_assignment PIN_AG25 -to BTN_OSD
+-set_location_assignment PIN_AG23 -to BTN_RESET
+-
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_*
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BTN_*
+-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to BTN_*
+-
+-#============================================================
+-# CLOCK
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_CLK1_50
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_CLK2_50
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_CLK3_50
+-set_location_assignment PIN_V11 -to FPGA_CLK1_50
+-set_location_assignment PIN_Y13 -to FPGA_CLK2_50
+-set_location_assignment PIN_E11 -to FPGA_CLK3_50
+-
+-#============================================================
+-# HDMI
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_I2C_SCL
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_I2C_SDA
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_I2S
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_LRCLK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_MCLK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_SCLK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_CLK
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_DE
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[1]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[2]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[3]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[4]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[5]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[6]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[7]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[8]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[9]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[10]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[11]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[12]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[13]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[14]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[15]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[16]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[17]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[18]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[19]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[20]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[21]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[22]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[23]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_HS
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_INT
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_VS
+-set_location_assignment PIN_U10 -to HDMI_I2C_SCL
+-set_location_assignment PIN_AA4 -to HDMI_I2C_SDA
+-set_location_assignment PIN_T13 -to HDMI_I2S
+-set_location_assignment PIN_T11 -to HDMI_LRCLK
+-set_location_assignment PIN_U11 -to HDMI_MCLK
+-set_location_assignment PIN_T12 -to HDMI_SCLK
+-set_location_assignment PIN_AG5 -to HDMI_TX_CLK
+-set_location_assignment PIN_AD19 -to HDMI_TX_DE
+-set_location_assignment PIN_AD12 -to HDMI_TX_D[0]
+-set_location_assignment PIN_AE12 -to HDMI_TX_D[1]
+-set_location_assignment PIN_W8 -to HDMI_TX_D[2]
+-set_location_assignment PIN_Y8 -to HDMI_TX_D[3]
+-set_location_assignment PIN_AD11 -to HDMI_TX_D[4]
+-set_location_assignment PIN_AD10 -to HDMI_TX_D[5]
+-set_location_assignment PIN_AE11 -to HDMI_TX_D[6]
+-set_location_assignment PIN_Y5 -to HDMI_TX_D[7]
+-set_location_assignment PIN_AF10 -to HDMI_TX_D[8]
+-set_location_assignment PIN_Y4 -to HDMI_TX_D[9]
+-set_location_assignment PIN_AE9 -to HDMI_TX_D[10]
+-set_location_assignment PIN_AB4 -to HDMI_TX_D[11]
+-set_location_assignment PIN_AE7 -to HDMI_TX_D[12]
+-set_location_assignment PIN_AF6 -to HDMI_TX_D[13]
+-set_location_assignment PIN_AF8 -to HDMI_TX_D[14]
+-set_location_assignment PIN_AF5 -to HDMI_TX_D[15]
+-set_location_assignment PIN_AE4 -to HDMI_TX_D[16]
+-set_location_assignment PIN_AH2 -to HDMI_TX_D[17]
+-set_location_assignment PIN_AH4 -to HDMI_TX_D[18]
+-set_location_assignment PIN_AH5 -to HDMI_TX_D[19]
+-set_location_assignment PIN_AH6 -to HDMI_TX_D[20]
+-set_location_assignment PIN_AG6 -to HDMI_TX_D[21]
+-set_location_assignment PIN_AF9 -to HDMI_TX_D[22]
+-set_location_assignment PIN_AE8 -to HDMI_TX_D[23]
+-set_location_assignment PIN_T8 -to HDMI_TX_HS
+-set_location_assignment PIN_AF11 -to HDMI_TX_INT
+-set_location_assignment PIN_V13 -to HDMI_TX_VS
+-
+-#============================================================
+-# KEY
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[1]
+-set_location_assignment PIN_AH17 -to KEY[0]
+-set_location_assignment PIN_AH16 -to KEY[1]
+-
+-#============================================================
+-# LED
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[1]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[2]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[3]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[4]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[5]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[6]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[7]
+-set_location_assignment PIN_W15 -to LED[0]
+-set_location_assignment PIN_AA24 -to LED[1]
+-set_location_assignment PIN_V16 -to LED[2]
+-set_location_assignment PIN_V15 -to LED[3]
+-set_location_assignment PIN_AF26 -to LED[4]
+-set_location_assignment PIN_AE26 -to LED[5]
+-set_location_assignment PIN_Y16 -to LED[6]
+-set_location_assignment PIN_AA23 -to LED[7]
+-
+-#============================================================
+-# SW
+-#============================================================
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[0]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[1]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[2]
+-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[3]
+-set_location_assignment PIN_Y24 -to SW[0]
+-set_location_assignment PIN_W24 -to SW[1]
+-set_location_assignment PIN_W21 -to SW[2]
+-set_location_assignment PIN_W20 -to SW[3]
+-
+-set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
+-
+-set_global_assignment -name CDF_FILE jtag.cdf
+-set_global_assignment -name QIP_FILE sys/sys_q13.qip
+-set_global_assignment -name QIP_FILE src/65C816/65C816.qip
+-set_global_assignment -name QIP_FILE src/SPC700/SPC700.qip
+-set_global_assignment -name QIP_FILE src/chip/chip.qip
+-set_global_assignment -name VHDL_FILE src/CEGen.vhd
+-set_global_assignment -name VHDL_FILE src/SWRAM.vhd
+-set_global_assignment -name VHDL_FILE src/SMP.vhd
+-set_global_assignment -name VHDL_FILE src/PPU_PKG.vhd
+-set_global_assignment -name VHDL_FILE src/PPU.vhd
+-set_global_assignment -name VHDL_FILE src/CPU.vhd
+-set_global_assignment -name VHDL_FILE src/DSP_PKG.vhd
+-set_global_assignment -name VHDL_FILE src/DSP.vhd
+-set_global_assignment -name VHDL_FILE src/SNES.vhd
+-set_global_assignment -name VERILOG_FILE src/main.v
+-set_global_assignment -name SYSTEMVERILOG_FILE cheatcodes.sv
+-set_global_assignment -name VHDL_FILE bram.vhd
+-set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
+-set_global_assignment -name SYSTEMVERILOG_FILE ioport.sv
+-set_global_assignment -name SDC_FILE SNES.sdc
+-set_global_assignment -name SYSTEMVERILOG_FILE SNES.sv
++source sys/sys.tcl
++set_global_assignment -name QIP_FILE files.qip
+ set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+\ No newline at end of file
+diff --git a/files.qip b/files.qip
+new file mode 100644
+index 0000000..67a85b0
+--- /dev/null
++++ b/files.qip
+@@ -0,0 +1,20 @@
++set_global_assignment -name QIP_FILE src/65C816/65C816.qip
++set_global_assignment -name QIP_FILE src/SPC700/SPC700.qip
++set_global_assignment -name QIP_FILE src/chip/chip.qip
++set_global_assignment -name VHDL_FILE src/CEGen.vhd
++set_global_assignment -name VHDL_FILE src/SWRAM.vhd
++set_global_assignment -name VHDL_FILE src/SMP.vhd
++set_global_assignment -name VHDL_FILE src/PPU_PKG.vhd
++set_global_assignment -name VHDL_FILE src/PPU.vhd
++set_global_assignment -name VHDL_FILE src/CPU.vhd
++set_global_assignment -name VHDL_FILE src/DSP_PKG.vhd
++set_global_assignment -name VHDL_FILE src/DSP.vhd
++set_global_assignment -name VHDL_FILE src/SNES.vhd
++set_global_assignment -name VERILOG_FILE src/main.v
++set_global_assignment -name SYSTEMVERILOG_FILE cheatcodes.sv
++set_global_assignment -name VHDL_FILE bram.vhd
++set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
++set_global_assignment -name SYSTEMVERILOG_FILE ioport.sv
++set_global_assignment -name SYSTEMVERILOG_FILE lightgun.sv
++set_global_assignment -name SDC_FILE SNES.sdc
++set_global_assignment -name SYSTEMVERILOG_FILE SNES.sv
+diff --git a/lightgun.sv b/lightgun.sv
+new file mode 100644
+index 0000000..db13f7c
+--- /dev/null
++++ b/lightgun.sv
+@@ -0,0 +1,125 @@
++
++module lightgun
++(
++	input        CLK,
++	input        RESET,
++
++	input [24:0] MOUSE,
++	input        MOUSE_XY,
++
++	input  [7:0] JOY_X,JOY_Y,
++	input        F,C,T,P,
++
++	input        HDE,VDE,
++	input        CLKPIX,
++	
++	output [2:0] TARGET,
++	input        SIZE,
++
++	input        PORT_LATCH,
++	input        PORT_CLK,
++	output       PORT_P6,
++	output [1:0] PORT_DO
++);
++
++parameter CROSS_SZ = 8'd3;
++
++assign PORT_DO = {1'b1, JOY_LATCH0[15]};
++assign TARGET  = {{2{~Ttr & ~offscreen & draw}}, Ttr & ~offscreen & draw};
++
++reg Ttr; // 0 - one-shot fire. 1 - continous fire.
++reg Fb = 0, Pb = 0;
++
++reg [15:0] JOY_LATCH0;
++always @(posedge CLK) begin
++	reg old_clk, old_f, old_p, old_t, old_latch;
++	old_clk <= PORT_CLK;
++
++	old_latch <= PORT_LATCH;
++	if(old_latch & ~PORT_LATCH) begin
++		Pb <= 0;
++		if(~Ttr) Fb <= 0;
++	end
++
++	old_t <= T;
++	if(~old_t & T) Ttr <=~Ttr;
++	if(RESET) Ttr <= 1;
++
++	old_f <= F;
++	if(~old_f & F) Fb <= 1;
++	if(old_f & ~F) Fb <= 0;
++	
++	old_p <= P;
++	if(~old_p & P) Pb <= 1;
++	
++	if(PORT_LATCH) JOY_LATCH0 <= ~{Fb,C,Ttr,Pb,2'b00,offscreen,1'b0,4'b1111,4'b1111};
++	else if (~old_clk & PORT_CLK) JOY_LATCH0 <= JOY_LATCH0 << 1;
++end
++
++reg  [8:0] lg_x, lg_y, x, y;
++
++wire [9:0] new_x = {lg_x[8],lg_x} + {{2{MOUSE[4]}},MOUSE[15:8]};
++wire [9:0] new_y = {lg_y[8],lg_y} - {{2{MOUSE[5]}},MOUSE[23:16]};
++
++wire [8:0] j_x = {~JOY_X[7], JOY_X[6:0]};
++wire [8:0] j_y = {~JOY_Y[7], JOY_Y[6:0]};
++
++reg offscreen = 0, draw = 0;
++always @(posedge CLK) begin
++	reg old_pix, old_hde, old_vde, old_ms;
++	reg [8:0] hcnt, vcnt;
++	reg [8:0] vtotal;
++	reg [15:0] hde_d;
++	reg [8:0] xm,xp,ym,yp;
++	
++	old_ms <= MOUSE[24];
++	if(MOUSE_XY) begin
++		if(old_ms ^ MOUSE[24]) begin
++			if(new_x[9]) lg_x <= 0;
++			else if(new_x[8]) lg_x <= 255;
++			else lg_x <= new_x[8:0];
++
++			if(new_y[9]) lg_y <= 0;
++			else if(new_y > vtotal) lg_y <= vtotal;
++			else lg_y <= new_y[8:0];
++		end
++	end
++	else begin
++		lg_x <= j_x;
++		if(j_y < 8) lg_y <= 0;
++		else if((j_y - 9'd8) > vtotal) lg_y <= vtotal;
++		else lg_y <= j_y - 9'd8;
++	end
++
++	old_pix <= CLKPIX;
++	if(~old_pix & CLKPIX) begin
++		hde_d <= {hde_d[14:0],HDE};
++		old_hde <= hde_d[15];
++		if(~&hcnt) hcnt <= hcnt + 1'd1;
++		if(~old_hde & ~HDE) hcnt <= 0;
++		if(old_hde & ~hde_d[15]) begin
++			if(~VDE) begin
++				vcnt <= 0;
++				if(vcnt) vtotal <= vcnt - 1'd1;
++			end
++			else if(~&vcnt) vcnt <= vcnt + 1'd1;
++		end
++		
++		old_vde <= VDE;
++		if(~old_vde & VDE) begin
++			x  <= lg_x;
++			y  <= lg_y;
++			xm <= lg_x - CROSS_SZ;
++			xp <= lg_x + CROSS_SZ;
++			ym <= lg_y - CROSS_SZ;
++			yp <= lg_y + CROSS_SZ;
++			offscreen <= !lg_y[7:1] || lg_y >= (vtotal-1'd1) || !lg_x[7:1] || &lg_x[7:1];
++		end
++	end
++
++	PORT_P6 <= ~(HDE && VDE && x == hcnt && y == vcnt);
++	draw <= (((SIZE || ($signed(hcnt) >= $signed(xm) && hcnt <= xp)) && y == vcnt) || 
++	         ((SIZE || ($signed(vcnt) >= $signed(ym) && vcnt <= yp)) && x == hcnt));
++end
++
++endmodule
+diff --git a/releases/SNES_20190510.rbf b/releases/SNES_20190510.rbf
+new file mode 100644
+index 0000000..b8d28b5
+Binary files /dev/null and b/releases/SNES_20190510.rbf differ
+diff --git a/releases/SNES_20190513.rbf b/releases/SNES_20190513.rbf
+new file mode 100644
+index 0000000..012234a
+Binary files /dev/null and b/releases/SNES_20190513.rbf differ
+diff --git a/releases/SNES_20190515.rbf b/releases/SNES_20190515.rbf
+new file mode 100644
+index 0000000..393d2bd
+Binary files /dev/null and b/releases/SNES_20190515.rbf differ
+diff --git a/src/PPU.vhd b/src/PPU.vhd
+index 36504ad..f4d4251 100644
+--- a/src/PPU.vhd
++++ b/src/PPU.vhd
+@@ -887,7 +887,7 @@ begin
+ 			if H_CNT = 19-1  then HDE <= '1'; end if;
+ 			if H_CNT = 275-1 then HDE <= '0'; end if;
+ 
+-			if H_CNT = 296-1 then HSYNC <= '1'; end if;
++			if H_CNT = 297-1 then HSYNC <= '1'; end if;
+ 			if H_CNT = 320-1 then HSYNC <= '0'; end if;
+ 
+ 			if V_CNT = 1               then VDE <= '1'; end if;
+diff --git a/src/SNES.vhd b/src/SNES.vhd
+index 78e8bd1..298b82d 100644
+--- a/src/SNES.vhd
++++ b/src/SNES.vhd
+@@ -78,7 +78,8 @@ entity SNES is
+ 		JOY2_CLK		: out std_logic;
+ 		JOY1_P6		: out std_logic;
+ 		JOY2_P6		: out std_logic;
+-		
++		JOY2_P6_in	: in std_logic;
++
+ 		LRCK			: out std_logic;
+ 		BCK			: out std_logic;
+ 		SDAT			: out std_logic;
+@@ -320,7 +321,7 @@ begin
+ 		VRAM_WRA_N	=> VRAM_WRA_N,
+ 		VRAM_WRB_N	=> VRAM_WRB_N,
+ 		
+-		EXTLATCH		=> JPIO67(7),
++		EXTLATCH		=> JPIO67(7) and JOY2_P6_in,
+ 		
+ 		BLEND			=> BLEND,
+ 		PAL			=> PAL,
+diff --git a/src/chip/DSP/DSP_LHRomMap.vhd b/src/chip/DSP/DSP_LHRomMap.vhd
+index 5a5d464..6e646e8 100644
+--- a/src/chip/DSP/DSP_LHRomMap.vhd
++++ b/src/chip/DSP/DSP_LHRomMap.vhd
+@@ -59,22 +59,28 @@ end DSP_LHRomMap;
+ 
+ architecture rtl of DSP_LHRomMap is
+ 
+-	signal CART_ADDR : std_logic_vector(23 downto 0);
+-	signal BRAM_ADDR : std_logic_vector(19 downto 0);
+-	signal BSRAM_SEL : std_logic;
+-	signal DP_SEL    : std_logic;
+-
+-	signal DSP_SEL	  : std_logic;
+-	signal DSP_DO    : std_logic_vector(7 downto 0);
+-	signal DSP_A0	  : std_logic;
+-	signal DSP_CS_N  : std_logic;
+-	signal DSP_CE	  : std_logic;
++	signal CART_ADDR 		: std_logic_vector(23 downto 0);
++	signal BRAM_ADDR 		: std_logic_vector(19 downto 0);
++	signal BSRAM_SEL 		: std_logic;
++	signal DP_SEL    		: std_logic;
+ 	
+-	signal OPENBUS   : std_logic_vector(7 downto 0);
++	signal DSP_SEL	  		: std_logic;
++	signal DSP_DO    		: std_logic_vector(7 downto 0);
++	signal DSP_A0	  		: std_logic;
++	signal DSP_CS_N  		: std_logic;
++	signal DSP_CE	  		: std_logic;
++	
++	signal OBC1_SEL		: std_logic;
++	signal OBC1_SRAM_A 	: std_logic_vector(12 downto 0);
++	signal OBC1_SRAM_DO 	: std_logic_vector(7 downto 0);
++	
++	signal OPENBUS   		: std_logic_vector(7 downto 0);
+ 
+-	signal MAP_SEL	  : std_logic;
+-	signal DSP_CLK	  : integer;
+-	signal ROM_RD	  : std_logic;
++	signal MAP_DSP_SEL 	: std_logic;
++	signal MAP_OBC1_SEL 	: std_logic;
++	signal DSP_CLK	  		: integer;
++	signal ROM_RD	  		: std_logic;
++	
+ begin
+ 	
+ 	CEGen : entity work.CEGen
+@@ -91,6 +97,9 @@ begin
+ 	process( CA, MAP_CTRL, ROMSEL_N, RAMSEL_N, BSRAM_MASK, ROM_MASK )
+ 	begin
+ 		DP_SEL <= '0';
++		DSP_SEL <= '0';
++		OBC1_SEL <= '0';
++		BSRAM_SEL <= '0';
+ 		if ROM_MASK(23) = '0' then
+ 			case MAP_CTRL(2 downto 0) is
+ 				when "000" =>							-- LoROM
+@@ -99,26 +108,23 @@ begin
+ 					if MAP_CTRL(3) = '0' then
+ 						if CA(22 downto 20) = "111" and CA(15) = '0' and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
+ 							BSRAM_SEL <= '1';
+-						else
+-							BSRAM_SEL <= '0';
+ 						end if;
+ 						if (CA(22 downto 21) = "01" and CA(15) = '1' and ROM_MASK(20) = '0') or		--20-3F/A0-BF:8000-FFFF
+ 							(CA(22 downto 20) = "110" and CA(15) = '0' and ROM_MASK(20) = '1') then	--60-6F/E0-EF:0000-7FFF
+-							DSP_SEL <= MAP_CTRL(7);
+-						else
+-							DSP_SEL <= '0';
++							DSP_SEL <= MAP_CTRL(7) and not MAP_CTRL(6);
+ 						end if;
+ 						DSP_A0 <= CA(14);
++						if CA(22) = '0' and CA(15 downto 13) = "011" then									--00-3F/80-BF:6000-7FFF
++							OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6);
++						end if;
+ 					else
+ 						BSRAM_SEL <= '0';
+-						if CA(22 downto 19) = "1101" and ROMSEL_N = '0' then --68-6F/E8-EF:0000-0FFF
++						if CA(22 downto 19) = "1101" and ROMSEL_N = '0' then 								--68-6F/E8-EF:0000-0FFF
+ 							DP_SEL <= '1';
+ 						end if;
+ 						
+-						if CA(22 downto 19) = "1100" then	--60-67/E0-E7:0000-0001
+-							DSP_SEL <= MAP_CTRL(7);
+-						else
+-							DSP_SEL <= '0';
++						if CA(22 downto 19) = "1100" then														--60-67/E0-E7:0000-0001
++							DSP_SEL <= MAP_CTRL(7) and not MAP_CTRL(6);
+ 						end if;
+ 						DSP_A0 <= CA(0);
+ 					end if;
+@@ -127,13 +133,9 @@ begin
+ 					BRAM_ADDR <= "00" & CA(20 downto 16) & CA(12 downto 0);
+ 					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
+ 						BSRAM_SEL <= '1';
+-					else
+-						BSRAM_SEL <= '0';
+ 					end if;
+-					if CA(22 downto 21) = "00" and CA(15 downto 13) = "011" then	--00-1F/80-9f:6000-7FFF
+-						DSP_SEL <= MAP_CTRL(7);
+-					else
+-						DSP_SEL <= '0';
++					if CA(22 downto 21) = "00" and CA(15 downto 13) = "011" then						--00-1F/80-9f:6000-7FFF
++						DSP_SEL <= MAP_CTRL(7) and not MAP_CTRL(6);
+ 					end if;
+ 					DSP_A0 <= CA(12);
+ 				when "101"|"010" =>					-- ExHiROM
+@@ -141,8 +143,6 @@ begin
+ 					BRAM_ADDR <= CA(19 downto 0);
+ 					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
+ 						BSRAM_SEL <= '1';
+-					else
+-						BSRAM_SEL <= '0';
+ 					end if;
+ 					DSP_SEL <= '0';
+ 					DSP_A0 <= '1';
+@@ -162,16 +162,15 @@ begin
+ 			BRAM_ADDR <= "00" & CA(20 downto 16) & CA(12 downto 0);
+ 			if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
+ 				BSRAM_SEL <= '1';
+-			else
+-				BSRAM_SEL <= '0';
+ 			end if;
+ 			DSP_SEL <= '0';
+ 			DSP_A0 <= '1';
+ 		end if;
+ 	end process;
+ 	
+-	MAP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));
+-	MAP_ACTIVE <= MAP_SEL;
++	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
++	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
++	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
+ 
+ 
+ 	DSP_CS_N <= not DSP_SEL;
+@@ -180,7 +179,7 @@ begin
+ 	port map(
+ 		CLK			=> MCLK,
+ 		CE				=> DSP_CE,
+-		RST_N			=> RST_N and MAP_SEL,
++		RST_N			=> RST_N and MAP_DSP_SEL,
+ 		ENABLE		=> ENABLE,
+ 		A0				=> DSP_A0,
+ 		DI				=> DI,
+@@ -201,6 +200,26 @@ begin
+ 		DBG_DAT_WR	=> DBG_DAT_WR
+ 	);
+ 	
++	OBC1 : entity work.OBC1
++	port map(
++		CLK			=> MCLK,
++		RST_N			=> RST_N and MAP_OBC1_SEL,
++		ENABLE		=> ENABLE,
++		
++		CA				=> CA,
++		DI				=> DI,
++		CPURD_N		=> CPURD_N,
++		CPUWR_N		=> CPUWR_N,
++		
++		SYSCLKF_CE	=> SYSCLKF_CE,
++		
++		CS				=> OBC1_SEL,
++				
++		SRAM_A		=> OBC1_SRAM_A,
++		SRAM_DI  	=> BSRAM_Q,
++		SRAM_DO		=> OBC1_SRAM_DO
++	);
++	
+ 	ROM_RD <= (SYSCLKF_CE or SYSCLKR_CE) when rising_edge(MCLK);
+ 
+ 	ROM_ADDR <= CART_ADDR and ROM_MASK;
+@@ -208,11 +227,11 @@ begin
+ 	ROM_OE_N <= not ROM_RD;
+ 	ROM_WORD	<= '0';
+ 
+-	BSRAM_ADDR <= BRAM_ADDR and BSRAM_MASK(19 downto 0);
+-	BSRAM_CE_N <= not BSRAM_SEL;
++	BSRAM_ADDR <= "0000000" & OBC1_SRAM_A when OBC1_SEL = '1' else BRAM_ADDR and BSRAM_MASK(19 downto 0);
++	BSRAM_CE_N <= not (BSRAM_SEL or OBC1_SEL);
+ 	BSRAM_OE_N <= CPURD_N;
+ 	BSRAM_WE_N <= CPUWR_N;
+-	BSRAM_D    <= DI;
++	BSRAM_D    <= OBC1_SRAM_DO when OBC1_SEL = '1' else DI;
+ 	
+ 	process(MCLK, RST_N)
+ 	begin
+@@ -226,7 +245,7 @@ begin
+ 	end process;
+ 	
+ 	DO <= DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
+-			BSRAM_Q when BSRAM_SEL = '1' else
++			BSRAM_Q when BSRAM_SEL = '1' or OBC1_SEL = '1' else
+ 			ROM_Q(7 downto 0) when ROMSEL_N = '0' else
+ 			OPENBUS;
+ 
+diff --git a/src/chip/DSP/OBC1.vhd b/src/chip/DSP/OBC1.vhd
+new file mode 100644
+index 0000000..6470663
+--- /dev/null
++++ b/src/chip/DSP/OBC1.vhd
+@@ -0,0 +1,92 @@
++library IEEE;
++use IEEE.STD_LOGIC_1164.ALL;
++library STD;
++use IEEE.NUMERIC_STD.ALL;
++
++
++entity OBC1 is
++	port(
++		CLK			: in std_logic;
++		RST_N			: in std_logic;
++		ENABLE		: in std_logic;
++		
++		CA   			: in std_logic_vector(23 downto 0);
++		DI				: in std_logic_vector(7 downto 0);
++		CPURD_N		: in std_logic;
++		CPUWR_N		: in std_logic;
++		
++		SYSCLKF_CE	: in std_logic;
++		
++		CS				: in std_logic;
++						
++		SRAM_A      : out std_logic_vector(12 downto 0);
++		SRAM_DI		: in std_logic_vector(7 downto 0);
++		SRAM_DO		: out std_logic_vector(7 downto 0)
++	);
++end OBC1;
++
++architecture rtl of OBC1 is
++
++	signal BASE			: std_logic;
++	signal INDEX 		: std_logic_vector(6 downto 0);
++	
++	signal SRAM_ADDR 	: std_logic_vector(12 downto 0);
++	
++begin
++		
++	process( RST_N, CLK)
++	begin
++		if RST_N = '0' then
++			INDEX <= (others => '0');
++			BASE <= '0';
++		elsif rising_edge(CLK) then
++			if ENABLE = '1' and SYSCLKF_CE = '1' then
++				if CPUWR_N = '0' and CS = '1' and CA(15 downto 4) = x"7FF" then 
++					case CA(3 downto 0) is
++						when x"5" =>
++							BASE<= DI(0);
++						when x"6" =>
++							INDEX <= DI(6 downto 0);
++						when others => null;
++					end case; 
++				end if;
++			end if;
++		end if;
++	end process; 
++	
++	process( CA, BASE, INDEX )
++	begin
++		if CA(12 downto 3) = "1111111110" then	--7FF0-7FF7
++			case CA(3 downto 0) is
++				when x"0" | x"1" | x"2" | x"3" =>
++					SRAM_ADDR <= "11" & not BASE & "0" & INDEX & CA(1 downto 0);
++				when x"4" =>
++					SRAM_ADDR <= "11" & not BASE & "1" & "0000" & INDEX(6 downto 2);
++				when others =>
++					SRAM_ADDR <= CA(12 downto 0);
++			end case;
++		else
++			SRAM_ADDR <= CA(12 downto 0);
++		end if;
++	end process; 
++	SRAM_A <= SRAM_ADDR;
++	
++	process( CA, DI, INDEX, SRAM_DI)
++	begin
++		if CA(12 downto 0) = "1111111110100" then	--7FF4
++			case INDEX(1 downto 0) is
++				when "00" =>
++					SRAM_DO <= SRAM_DI(7 downto 2) & DI(1 downto 0);
++				when "01" =>
++					SRAM_DO <= SRAM_DI(7 downto 4) & DI(1 downto 0) & SRAM_DI(1 downto 0);
++				when "10" =>
++					SRAM_DO <= SRAM_DI(7 downto 6) & DI(1 downto 0) & SRAM_DI(3 downto 0);
++				when others =>
++					SRAM_DO <=                       DI(1 downto 0) & SRAM_DI(5 downto 0);
++			end case;
++		else
++			SRAM_DO <= DI;
++		end if;
++	end process; 
++
++end rtl;
+diff --git a/src/chip/chip.qip b/src/chip/chip.qip
+index d9a453c..cb2bf25 100644
+--- a/src/chip/chip.qip
++++ b/src/chip/chip.qip
+@@ -3,6 +3,7 @@ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) CX4/cx4cac
+ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) CX4/CX4Map.vhd ]
+ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) DSP/DSPn.vhd ]
+ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) DSP/DSP_LHRomMap.vhd ]
++set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) DSP/OBC1.vhd ]
+ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SDD1/InputMgr.vhd ]
+ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SDD1/Decoder.vhd ]
+ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SDD1/SDD1.vhd ]
+diff --git a/src/main.v b/src/main.v
+index fc30495..3eeb20f 100644
+--- a/src/main.v
++++ b/src/main.v
+@@ -77,6 +77,7 @@ module main
+    output            JOY2_CLK,
+    output            JOY1_P6,
+    output            JOY2_P6,
++   input             JOY2_P6_in,
+ 
+    input             GG_EN,
+    input     [128:0] GG_CODE,
+@@ -163,6 +164,7 @@ SNES SNES
+ 	.joy2_clk(JOY2_CLK),
+ 	.joy1_p6(JOY1_P6),
+ 	.joy2_p6(JOY2_P6),
++	.joy2_p6_in(JOY2_P6_in),
+ 
+ 	.blend(BLEND),
+ 	.pal(PAL),
+diff --git a/sys/hdmi_config.sv b/sys/hdmi_config.sv
+index 476d72d..5b89d2c 100644
+--- a/sys/hdmi_config.sv
++++ b/sys/hdmi_config.sv
+@@ -1,202 +1,232 @@
+-
+-module hdmi_config
+-(
+-	//	Host Side
+-	input			iCLK,
+-	input			iRST_N,
+-	
+-	input       dvi_mode,
+-	input       audio_96k,
+-
+-	//	I2C Side
+-	output		I2C_SCL,
+-	inout 		I2C_SDA
+-);
+-
+-//	Internal Registers/Wires
+-reg        mI2C_GO = 0;
+-wire       mI2C_END;
+-wire       mI2C_ACK;
+-reg [15:0] LUT_DATA;
+-reg  [7:0] LUT_INDEX = 0;
+-
+-i2c #(50_000_000, 20_000) i2c_av
+-(
+-	.CLK(iCLK),
+-
+-	.I2C_SCL(I2C_SCL),		//	I2C CLOCK
+-	.I2C_SDA(I2C_SDA),		//	I2C DATA
+-
+-	.I2C_DATA({8'h72,init_data[LUT_INDEX]}),	//	DATA:[SLAVE_ADDR,SUB_ADDR,DATA]. 0x72 is the Slave Address of the ADV7513 chip!
+-	.START(mI2C_GO),    		//	START transfer
+-	.END(mI2C_END),			//	END transfer 
+-	.ACK(mI2C_ACK) 			//	ACK
+-);
+-
+-//////////////////////	Config Control	////////////////////////////
+-always@(posedge iCLK or negedge iRST_N) begin
+-	reg  [1:0] mSetup_ST = 0;
+-
+-	if(!iRST_N) begin
+-		LUT_INDEX	<=	0;
+-		mSetup_ST	<=	0;
+-		mI2C_GO		<=	0;
+-	end else begin
+-		if(init_data[LUT_INDEX] != 16'hFFFF) begin
+-			case(mSetup_ST)
+-			0:	begin
+-					mI2C_GO		<=	1;
+-					mSetup_ST	<=	1;
+-				end
+-			1: if(~mI2C_END) mSetup_ST	<=	2;
+-			2:	begin
+-					mI2C_GO <= 0;
+-					if(mI2C_END) begin
+-						mSetup_ST <= 0;
+-						if(!mI2C_ACK) LUT_INDEX <= LUT_INDEX + 8'd1;
+-					end
+-				end
+-			endcase
+-		end
+-	end
+-end
+-
+-////////////////////////////////////////////////////////////////////
+-/////////////////////	Config Data LUT   //////////////////////////
+-
+-wire [15:0] init_data[58] = 
+-'{
+-	16'h9803,					// ADI required Write.
+-
+-	{8'hD6, 8'b1100_0000},	// [7:6] HPD Control...
+-									// 00 = HPD is from both HPD pin or CDC HPD
+-									// 01 = HPD is from CDC HPD
+-									// 10 = HPD is from HPD pin
+-									// 11 = HPD is always high
+-
+-	16'h4110,					// Power Down control
+-	16'h9A70,					// ADI required Write.
+-	16'h9C30,					// ADI required Write.
+-	{8'h9D, 8'b0110_0001},	// [7:4] must be b0110!.
+-									// [3:2] b00 = Input clock not divided. b01 = Clk divided by 2. b10 = Clk divided by 4. b11 = invalid!
+-									//	[1:0] must be b01!
+-	16'hA2A4,					// ADI required Write.
+-	16'hA3A4,					// ADI required Write.
+-	16'hE0D0,					// ADI required Write.
+-
+-
+-	16'h35_40,
+-	16'h36_D9,
+-	16'h37_0A,
+-	16'h38_00,
+-	16'h39_2D,
+-	16'h3A_00,
+-
+-	{8'h16, 8'b0011_1000},	// Output Format 444 [7]=0.
+-									// [6] must be 0!
+-									// Colour Depth for Input Video data [5:4] b11 = 8-bit.
+-									// Input Style [3:2] b10 = Style 1 (ignored when using 444 input).
+-									// DDR Input Edge falling [1]=0 (not using DDR atm).
+-									// Output Colour Space RGB [0]=0.
+-
+-	{8'h17, 8'b01100010},   // Aspect ratio 16:9 [1]=1, 4:3 [1]=0
+-
+-	{8'h18, 8'b0100_0110},	// CSC disabled [7]=0.
+-									// CSC Scaling Factor [6:5] b10 = +/- 4.0, -16384 - 16380.
+-									// CSC Equation 3 [4:0] b00110.
+-
+-
+-	{8'h3B, 8'b0000_0000},	// Pixel repetition [6:5] b00 AUTO. [4:3] b00 x1 mult of input clock. [2:1] b00 x1 pixel rep to send to HDMI Rx.
+-
+-	16'h4000,					// General Control Packet Enable
+-
+-	{8'h48, 8'b0000_1000},	// [6]=0 Normal bus order!
+-									// [5] DDR Alignment.
+-									// [4:3] b01 Data right justified (for YCbCr 422 input modes).
+-
+-	16'h49A8,					// ADI required Write.
+-	16'h4C00,					// ADI required Write.
+-
+-	{8'h55, 8'b0001_0000},	// [7] must be 0!. Set RGB444 in AVinfo Frame [6:5], Set active format [4].
+-									// AVI InfoFrame Valid [4].
+-									// Bar Info [3:2] b00 Bars invalid. b01 Bars vertical. b10 Bars horizontal. b11 Bars both.
+-									// Scan Info [1:0] b00 (No data). b01 TV. b10 PC. b11 None.
+-
+-	16'h7301,
+-
+-	{8'h94, 8'b1000_0000},	// [7]=1 HPD Interrupt ENabled.
+-
+-	16'h9902,					// ADI required Write.
+-	16'h9B18,					// ADI required Write.
+-
+-	16'h9F00,					// ADI required Write.
+-
+-	{8'hA1, 8'b0000_0000},	// [6]=1 Monitor Sense Power Down DISabled.
+-	
+-	16'hA408,					// ADI required Write.
+-	16'hA504,					// ADI required Write.
+-	16'hA600,					// ADI required Write.
+-	16'hA700,					// ADI required Write.
+-	16'hA800,					// ADI required Write.
+-	16'hA900,					// ADI required Write.
+-	16'hAA00,					// ADI required Write.
+-	16'hAB40,					// ADI required Write.
+-	
+-	{8'hAF, 6'b0000_01,~dvi_mode,1'b0},	// [7]=0 HDCP Disabled.
+-									// [6:5] must be b00!
+-									// [4]=0 Current frame is unencrypted
+-									// [3:2] must be b01!
+-									//	[1]=1 HDMI Mode.
+-									// [0] must be b0!
+-
+-	16'hB900,					// ADI required Write.
+-
+-	{8'hBA, 8'b0110_0000},	// [7:5] Input Clock delay...
+-									// b000 = -1.2ns.
+-									// b001 = -0.8ns.
+-									// b010 = -0.4ns.
+-									// b011 = No delay.
+-									// b100 = 0.4ns.
+-									// b101 = 0.8ns.
+-									// b110 = 1.2ns.
+-									// b111 = 1.6ns.
+-					
+-	16'hBB00,					// ADI required Write.
+-	
+-	16'hDE9C,					// ADI required Write.
+-	16'hE460,					// ADI required Write.
+-	16'hFA7D,					// Nbr of times to search for good phase
+-
+-	
+-									// (Audio stuff on Programming Guide, Page 66)...
+-	
+-	{8'h0A, 8'b0000_0000},	// [6:4] Audio Select. b000 = I2S.
+-									// [3:2] Audio Mode. (HBR stuff, leave at 00!).
+-
+-	{8'h0B, 8'b0000_1110},	//
+-									
+-	{8'h0C, 8'b0000_0100},	// [7] 0 = Use sampling rate from I2S stream.   1 = Use samp rate from I2C Register.
+-									// [6] 0 = Use Channel Status bits from stream. 1 = Use Channel Status bits from I2C register.
+-									// [2] 1 = I2S0 Enable.
+-									// [1:0] I2S Format: 00 = Standard. 01 = Right Justified. 10 = Left Justified. 11 = AES.
+-									
+-	{8'h0D, 8'b0001_0000},	// [4:0] I2S Bit (Word) Width for Right-Justified.
+-	{8'h14, 8'b0000_0010},	// [3:0] Audio Word Length. b0010 = 16 bits.
+-	{8'h15, audio_96k, 7'b010_0000},	// I2S Sampling Rate [7:4]. b0000 = (44.1KHz). b0010 = 48KHz.
+-									// Input ID [3:1] b000 (0) = 24-bit RGB 444 or YCrCb 444 with Separate Syncs.
+-
+-	// Audio Clock Config
+-	16'h0100,					//  
+-	audio_96k ? 16'h0230 : 16'h0218,	// Set N Value 12288/6144
+-	16'h0300,					//
+-
+-	16'h0701,					//
+-	16'h0822,					// Set CTS Value 74250
+-	16'h090A,					//
+-
+-	16'hFFFF 				   // END
+-};
+-
+-////////////////////////////////////////////////////////////////////
+-
++
++module hdmi_config
++(
++	//	Host Side
++	input			iCLK,
++	input			iRST_N,
++	
++	input       dvi_mode,
++	input       audio_96k,
++	input       hdmi_limited,
++
++	//	I2C Side
++	output		I2C_SCL,
++	inout 		I2C_SDA
++);
++
++//	Internal Registers/Wires
++reg        mI2C_GO = 0;
++wire       mI2C_END;
++wire       mI2C_ACK;
++reg [15:0] LUT_DATA;
++reg  [7:0] LUT_INDEX = 0;
++
++i2c #(50_000_000, 20_000) i2c_av
++(
++	.CLK(iCLK),
++
++	.I2C_SCL(I2C_SCL),		//	I2C CLOCK
++	.I2C_SDA(I2C_SDA),		//	I2C DATA
++
++	.I2C_DATA({8'h72,init_data[LUT_INDEX]}),	//	DATA:[SLAVE_ADDR,SUB_ADDR,DATA]. 0x72 is the Slave Address of the ADV7513 chip!
++	.START(mI2C_GO),    		//	START transfer
++	.END(mI2C_END),			//	END transfer 
++	.ACK(mI2C_ACK) 			//	ACK
++);
++
++//////////////////////	Config Control	////////////////////////////
++always@(posedge iCLK or negedge iRST_N) begin
++	reg  [1:0] mSetup_ST = 0;
++
++	if(!iRST_N) begin
++		LUT_INDEX	<=	0;
++		mSetup_ST	<=	0;
++		mI2C_GO		<=	0;
++	end else begin
++		if(init_data[LUT_INDEX] != 16'hFFFF) begin
++			case(mSetup_ST)
++			0:	begin
++					mI2C_GO		<=	1;
++					mSetup_ST	<=	1;
++				end
++			1: if(~mI2C_END) mSetup_ST	<=	2;
++			2:	begin
++					mI2C_GO <= 0;
++					if(mI2C_END) begin
++						mSetup_ST <= 0;
++						if(!mI2C_ACK) LUT_INDEX <= LUT_INDEX + 8'd1;
++					end
++				end
++			endcase
++		end
++	end
++end
++
++////////////////////////////////////////////////////////////////////
++/////////////////////	Config Data LUT   //////////////////////////
++
++wire [15:0] init_data[82] = 
++'{
++	16'h9803,					// ADI required Write.
++
++	{8'hD6, 8'b1100_0000},	// [7:6] HPD Control...
++									// 00 = HPD is from both HPD pin or CDC HPD
++									// 01 = HPD is from CDC HPD
++									// 10 = HPD is from HPD pin
++									// 11 = HPD is always high
++
++	16'h4110,					// Power Down control
++	16'h9A70,					// ADI required Write.
++	16'h9C30,					// ADI required Write.
++	{8'h9D, 8'b0110_0001},	// [7:4] must be b0110!.
++									// [3:2] b00 = Input clock not divided. b01 = Clk divided by 2. b10 = Clk divided by 4. b11 = invalid!
++									//	[1:0] must be b01!
++	16'hA2A4,					// ADI required Write.
++	16'hA3A4,					// ADI required Write.
++	16'hE0D0,					// ADI required Write.
++
++
++	16'h35_40,
++	16'h36_D9,
++	16'h37_0A,
++	16'h38_00,
++	16'h39_2D,
++	16'h3A_00,
++
++	{8'h16, 8'b0011_1000},	// Output Format 444 [7]=0.
++									// [6] must be 0!
++									// Colour Depth for Input Video data [5:4] b11 = 8-bit.
++									// Input Style [3:2] b10 = Style 1 (ignored when using 444 input).
++									// DDR Input Edge falling [1]=0 (not using DDR atm).
++									// Output Colour Space RGB [0]=0.
++
++	{8'h17, 8'b01100010},   // Aspect ratio 16:9 [1]=1, 4:3 [1]=0
++
++	{8'h18, hdmi_limited,   // CSC enable [7]. 0 - Off. 1 - On.
++	        7'h0D},         // CSC Scaling Factors and Coefficients for RGB Full->Limited.
++	{8'h19, 8'hBC},         // Taken from table in ADV7513 Programming Guide.
++	{8'h1A, 8'h00},         // CSC Channel A.
++	{8'h1B, 8'h00},
++	{8'h1C, 8'h00},
++	{8'h1D, 8'h00},
++	{8'h1E, 8'h01},
++	{8'h1F, 8'h00},
++	
++	{8'h20, 8'h00},         // CSC Channel B.
++	{8'h21, 8'h00},
++	{8'h22, 8'h0D},
++	{8'h23, 8'hBC},
++	{8'h24, 8'h00},
++	{8'h25, 8'h00},
++	{8'h26, 8'h01},
++	{8'h27, 8'h00},
++	
++	{8'h28, 8'h00},         // CSC Channel C.
++	{8'h29, 8'h00},
++	{8'h2A, 8'h00},
++	{8'h2B, 8'h00},
++	{8'h2C, 8'h0D},
++	{8'h2D, 8'hBC},
++	{8'h2E, 8'h01},
++	{8'h2F, 8'h00},
++	
++
++	{8'h3B, 8'b0000_0000},	// Pixel repetition [6:5] b00 AUTO. [4:3] b00 x1 mult of input clock. [2:1] b00 x1 pixel rep to send to HDMI Rx.
++
++	16'h4000,					// General Control Packet Enable
++
++	{8'h48, 8'b0000_1000},	// [6]=0 Normal bus order!
++									// [5] DDR Alignment.
++									// [4:3] b01 Data right justified (for YCbCr 422 input modes).
++
++	16'h49A8,					// ADI required Write.
++	16'h4C00,					// ADI required Write.
++
++	{8'h55, 8'b0001_0000},	// [7] must be 0!. Set RGB444 in AVinfo Frame [6:5], Set active format [4].
++									// AVI InfoFrame Valid [4].
++									// Bar Info [3:2] b00 Bars invalid. b01 Bars vertical. b10 Bars horizontal. b11 Bars both.
++									// Scan Info [1:0] b00 (No data). b01 TV. b10 PC. b11 None.
++
++	{8'h57, 1'b0,           // [7] IT Content. 0 - No. 1 - Yes (type set in register h59).
++	3'b000,                 // [6:4] Color space (ignored for RGB)
++	hdmi_limited ? 2'b01 : 2'b10, // [3:2] RGB Quantization range
++	2'b00},                 // [1:0] Non-Uniform Scaled: 00 - None. 01 - Horiz. 10 - Vert. 11 - Both.
++
++	16'h7301,
++
++	{8'h94, 8'b1000_0000},	// [7]=1 HPD Interrupt ENabled.
++
++	16'h9902,					// ADI required Write.
++	16'h9B18,					// ADI required Write.
++
++	16'h9F00,					// ADI required Write.
++
++	{8'hA1, 8'b0000_0000},	// [6]=1 Monitor Sense Power Down DISabled.
++	
++	16'hA408,					// ADI required Write.
++	16'hA504,					// ADI required Write.
++	16'hA600,					// ADI required Write.
++	16'hA700,					// ADI required Write.
++	16'hA800,					// ADI required Write.
++	16'hA900,					// ADI required Write.
++	16'hAA00,					// ADI required Write.
++	16'hAB40,					// ADI required Write.
++	
++	{8'hAF, 6'b0000_01,~dvi_mode,1'b0},	// [7]=0 HDCP Disabled.
++									// [6:5] must be b00!
++									// [4]=0 Current frame is unencrypted
++									// [3:2] must be b01!
++									//	[1]=1 HDMI Mode.
++									// [0] must be b0!
++
++	16'hB900,					// ADI required Write.
++
++	{8'hBA, 8'b0110_0000},	// [7:5] Input Clock delay...
++									// b000 = -1.2ns.
++									// b001 = -0.8ns.
++									// b010 = -0.4ns.
++									// b011 = No delay.
++									// b100 = 0.4ns.
++									// b101 = 0.8ns.
++									// b110 = 1.2ns.
++									// b111 = 1.6ns.
++					
++	16'hBB00,					// ADI required Write.
++	
++	16'hDE9C,					// ADI required Write.
++	16'hE460,					// ADI required Write.
++	16'hFA7D,					// Nbr of times to search for good phase
++
++	
++									// (Audio stuff on Programming Guide, Page 66)...
++	
++	{8'h0A, 8'b0000_0000},	// [6:4] Audio Select. b000 = I2S.
++									// [3:2] Audio Mode. (HBR stuff, leave at 00!).
++
++	{8'h0B, 8'b0000_1110},	//
++									
++	{8'h0C, 8'b0000_0100},	// [7] 0 = Use sampling rate from I2S stream.   1 = Use samp rate from I2C Register.
++									// [6] 0 = Use Channel Status bits from stream. 1 = Use Channel Status bits from I2C register.
++									// [2] 1 = I2S0 Enable.
++									// [1:0] I2S Format: 00 = Standard. 01 = Right Justified. 10 = Left Justified. 11 = AES.
++									
++	{8'h0D, 8'b0001_0000},	// [4:0] I2S Bit (Word) Width for Right-Justified.
++	{8'h14, 8'b0000_0010},	// [3:0] Audio Word Length. b0010 = 16 bits.
++	{8'h15, audio_96k, 7'b010_0000},	// I2S Sampling Rate [7:4]. b0000 = (44.1KHz). b0010 = 48KHz.
++									// Input ID [3:1] b000 (0) = 24-bit RGB 444 or YCrCb 444 with Separate Syncs.
++
++	// Audio Clock Config
++	16'h0100,					//  
++	audio_96k ? 16'h0230 : 16'h0218,	// Set N Value 12288/6144
++	16'h0300,					//
++
++	16'h0701,					//
++	16'h0822,					// Set CTS Value 74250
++	16'h090A,					//
++
++	16'hFFFF 				   // END
++};
++
++////////////////////////////////////////////////////////////////////
++
+ endmodule
+\ No newline at end of file
+diff --git a/sys/hps_io.v b/sys/hps_io.v
+index 06283fb..9941fc9 100644
+--- a/sys/hps_io.v
++++ b/sys/hps_io.v
+@@ -57,6 +57,7 @@ module hps_io #(parameter STRLEN=0, PS2DIV=2000, WIDE=0, VDNUM=1, PS2WE=0)
+ 	output reg [31:0] status,
+ 	input      [31:0] status_in,
+ 	input             status_set,
++	input      [15:0] status_menumask,
+ 
+ 	//toggle to force notify of video mode change
+ 	input             new_vmode,
+@@ -458,6 +459,9 @@ always@(posedge clk_sys) begin
+ 								1: io_dout <= status_req[15:0];
+ 								2: io_dout <= status_req[31:16];
+ 							endcase
++					
++					//menu mask
++					'h2E: if(byte_cnt == 1) io_dout <= status_menumask;
+ 				endcase
+ 			end
+ 		end
+diff --git a/sys/ltc2308.sv b/sys/ltc2308.sv
+new file mode 100644
+index 0000000..33134fd
+--- /dev/null
++++ b/sys/ltc2308.sv
+@@ -0,0 +1,162 @@
++//============================================================================
++//
++//  LTC2308 controller
++//  Copyright (C) 2019 Sorgelig
++//
++//
++//  This program is free software; you can redistribute it and/or modify it
++//  under the terms of the GNU General Public License as published by the Free
++//  Software Foundation; either version 2 of the License, or (at your option)
++//  any later version.
++//
++//  This program is distributed in the hope that it will be useful, but WITHOUT
++//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++//  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++//  more details.
++//
++//  You should have received a copy of the GNU General Public License along
++//  with this program; if not, write to the Free Software Foundation, Inc.,
++//  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++//
++//============================================================================
++
++
++// NUM_CH 1..8
++// Sampling rate = ADC_RATE/NUM_CH
++// ADC_RATE max is ~500KHz
++// CLK_RATE max is ~80MHz
++module ltc2308 #(parameter NUM_CH = 2, ADC_RATE = 96000, CLK_RATE = 50000000)
++(
++	input        reset,
++	input        clk,
++
++	inout  [3:0] ADC_BUS,
++
++	output reg   dout_sync,             // toggle with every ADC round
++	output reg   [(NUM_CH*12)-1:0] dout // 12 bits per channel (unsigned)
++);
++
++localparam TCONV = CLK_RATE/625000;
++
++reg  sck;
++wire sdo = cfg[5];
++
++assign ADC_BUS[3] = sck;
++wire   sdi = ADC_BUS[2];
++assign ADC_BUS[1] = sdo;
++assign ADC_BUS[0] = convst;
++
++reg         convst;
++reg   [5:0] cfg;
++
++reg  [31:0] sum;
++wire [31:0] next_sum = sum + ADC_RATE;
++
++reg   [2:0] pin;
++wire  [2:0] next_pin = (pin == (NUM_CH-1)) ? 3'd0 : (pin + 1'd1);
++
++always @(posedge clk) begin
++	reg  [7:0] tconv;
++	reg  [3:0] bitcnt;
++	reg [10:0] adcin;
++
++	convst <= 0;
++
++	if(reset) begin
++		sum    <= 0;
++		tconv  <= 0;
++		bitcnt <= 0;
++		sck    <= 0;
++		cfg    <= 0;
++		dout   <= 0;
++		pin    <= NUM_CH[2:0]-1'd1;
++	end
++	else begin
++		sum <= next_sum;
++		if(next_sum >= CLK_RATE) begin
++			sum    <= next_sum - CLK_RATE;
++			tconv  <= TCONV[7:0];
++			convst <= 1;
++			bitcnt <= 12;
++			cfg    <= {1'b1, next_pin[0], next_pin[2:1], 1'b1, 1'b0};
++			if(!next_pin) dout_sync <= ~dout_sync;
++		end
++
++		if(tconv) tconv <= tconv - 1'd1;
++		else if(bitcnt) begin
++			sck <= ~sck;
++
++			if(sck) cfg <= cfg<<1;
++			else begin
++				adcin <= {adcin[9:0],sdi};
++				bitcnt <= bitcnt - 1'd1;
++				if(bitcnt == 1) begin
++					dout[pin*12 +:12] <= {adcin,sdi};
++					pin <= next_pin;
++				end
++			end
++		end
++		else sck <= 0;
++	end
++end
++
++endmodule
++
++module ltc2308_tape #(parameter HIST_LOW = 16, HIST_HIGH = 64, ADC_RATE = 48000, CLK_RATE = 50000000)
++(
++	input        reset,
++	input        clk,
++
++	inout  [3:0] ADC_BUS,
++	output reg   dout,
++	output       active
++);
++
++wire [11:0] adc_data;
++wire        adc_sync;
++ltc2308 #(1, ADC_RATE, CLK_RATE) adc
++(
++	.reset(reset),
++	.clk(clk),
++
++	.ADC_BUS(ADC_BUS),
++	.dout(adc_data),
++	.dout_sync(adc_sync)
++);
++
++always @(posedge clk) begin
++	reg [13:0] data1,data2,data3,data4, sum;
++	reg adc_sync_d;
++
++	adc_sync_d<=adc_sync;
++	if(adc_sync_d ^ adc_sync) begin
++		data1 <= data2;
++		data2 <= data3;
++		data3 <= data4;
++		data4 <= adc_data;
++		
++		sum <= data1+data2+data3+data4;
++
++		if(sum[13:2]<HIST_LOW)  dout <= 0;
++		if(sum[13:2]>HIST_HIGH) dout <= 1;
++	end
++end
++
++assign active = |act;
++
++reg [1:0] act;
++always @(posedge clk) begin
++	reg [31:0] onesec;
++	reg old_dout;
++	
++	onesec <= onesec + 1;
++	if(onesec>CLK_RATE) begin
++		onesec <= 0;
++		if(act) act <= act - 1'd1;
++	end
++
++	old_dout <= dout;
++	if(old_dout ^ dout) act <= 2;
++end
++
++endmodule
+diff --git a/sys/osd.v b/sys/osd.v
+index 81939c6..6ebac99 100644
+--- a/sys/osd.v
++++ b/sys/osd.v
+@@ -84,7 +84,7 @@ always@(posedge clk_sys) begin
+ 	end
+ end
+ 
+-reg ce_pix;
++(* direct_enable *) reg ce_pix;
+ always @(negedge clk_video) begin
+ 	integer cnt = 0;
+ 	integer pixsz, pixcnt;
+@@ -105,8 +105,24 @@ always @(negedge clk_video) begin
+ 	end
+ end
+ 
+-reg [2:0] osd_de;
+-reg       osd_pixel;
++reg [ 2:0] osd_de;
++reg        osd_pixel;
++reg [21:0] v_cnt;
++
++reg v_cnt_below320, v_cnt_below640, v_cnt_below960;
++
++reg [21:0] v_osd_start_320, v_osd_start_640, v_osd_start_960, v_osd_start_other;
++
++// pipeline the comparisons a bit
++always @(posedge clk_video) if(ce_pix) begin
++	v_cnt_below320    <= v_cnt < 320;
++	v_cnt_below640    <= v_cnt < 640;
++	v_cnt_below960    <= v_cnt < 960;
++	v_osd_start_320   <= ((v_cnt-hrheight)>>1) + OSD_Y_OFFSET;
++	v_osd_start_640   <= ((v_cnt-(hrheight<<1))>>1) + OSD_Y_OFFSET;
++	v_osd_start_960   <= ((v_cnt-(hrheight + (hrheight<<1)))>>1) + OSD_Y_OFFSET;
++	v_osd_start_other <= ((v_cnt-(hrheight<<2))>>1) + OSD_Y_OFFSET;
++end
+ 
+ always @(posedge clk_video) begin
+ 	reg        deD;
+@@ -114,7 +130,6 @@ always @(posedge clk_video) begin
+ 	reg  [1:0] multiscan;
+ 	reg  [7:0] osd_byte; 
+ 	reg [23:0] h_cnt;
+-	reg [21:0] v_cnt;
+ 	reg [21:0] dsp_width;
+ 	reg [21:0] osd_vcnt;
+ 	reg [21:0] h_osd_start;
+@@ -141,30 +156,30 @@ always @(posedge clk_video) begin
+ 		// rising edge of de
+ 		if(de_in && !deD) begin
+ 			h_cnt <= 0;
+-			v_cnt <= v_cnt + 1'd1;
++			v_cnt <= v_cnt + 1'd1; 
+ 			h_osd_start <= info ? infox : (((dsp_width - OSD_WIDTH)>>1) + OSD_X_OFFSET - 2'd2);
+ 
+ 			if(h_cnt > {dsp_width, 2'b00}) begin
+-				v_cnt <= 0;
++				v_cnt <= 1;
+ 
+ 				osd_en <= (osd_en << 1) | osd_enable;
+ 				if(~osd_enable) osd_en <= 0;
+ 
+-				if(v_cnt<320) begin
++				if(v_cnt_below320) begin
+ 					multiscan <= 0;
+-					v_osd_start <= info ? infoy : (((v_cnt-hrheight)>>1) + OSD_Y_OFFSET);
++					v_osd_start <= info ? infoy : v_osd_start_320;
+ 				end
+-				else if(v_cnt<640) begin
++				else if(v_cnt_below640) begin
+ 					multiscan <= 1;
+-					v_osd_start <= info ? (infoy<<1) : (((v_cnt-(hrheight<<1))>>1) + OSD_Y_OFFSET);
++					v_osd_start <= info ? (infoy<<1) : v_osd_start_640;
+ 				end
+-				else if(v_cnt<960) begin
++				else if(v_cnt_below960) begin
+ 					multiscan <= 2;
+-					v_osd_start <= info ? (infoy + (infoy << 1)) : (((v_cnt-(hrheight + (hrheight<<1)))>>1) + OSD_Y_OFFSET);
++					v_osd_start <= info ? (infoy + (infoy << 1)) : v_osd_start_960;
+ 				end
+ 				else begin
+ 					multiscan <= 3;
+-					v_osd_start <= info ? (infoy<<2) : (((v_cnt-(hrheight<<2))>>1) + OSD_Y_OFFSET);
++					v_osd_start <= info ? (infoy<<2) : v_osd_start_other;
+ 				end
+ 			end
+ 
+@@ -173,7 +188,7 @@ always @(posedge clk_video) begin
+ 				osd_div <= 0;
+ 				if(~&osd_vcnt) osd_vcnt <= osd_vcnt + 1'd1;
+ 			end
+-			if(v_osd_start == (v_cnt+1'b1)) {osd_div, osd_vcnt} <= 0;
++			if(v_osd_start == v_cnt) {osd_div, osd_vcnt} <= 0;
+ 		end
+ 
+ 		osd_byte  <= osd_buffer[{osd_vcnt[6:3], osd_hcnt[7:0]}];
+@@ -185,11 +200,19 @@ end
+ reg [23:0] rdout;
+ assign dout = rdout;
+ 
++reg [23:0] osd_rdout, normal_rdout;
++reg osd_mux;
++reg de_dly;
++
+ always @(posedge clk_video) begin
+-	rdout <= ~osd_de[2] ? din : {{osd_pixel, osd_pixel, OSD_COLOR[2], din[23:19]},
+-	                             {osd_pixel, osd_pixel, OSD_COLOR[1], din[15:11]},
+-	                             {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}};
+-	de_out <= de_in;
++	normal_rdout <= din;
++	osd_rdout <= {{osd_pixel, osd_pixel, OSD_COLOR[2], din[23:19]},// 23:16
++	              {osd_pixel, osd_pixel, OSD_COLOR[1], din[15:11]},// 15:8
++	              {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0
++	osd_mux <= ~osd_de[2];
++	rdout  <= osd_mux ? normal_rdout : osd_rdout;
++	de_dly <= de_in;
++	de_out <= de_dly;
+ end
+ 
+ endmodule
+diff --git a/sys/pll_q13.qip b/sys/pll_q13.qip
+new file mode 100644
+index 0000000..5495d67
+--- /dev/null
++++ b/sys/pll_q13.qip
+@@ -0,0 +1,7 @@
++set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll.v ]
++set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll/pll_0002.v ]
++set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll/pll_0002.qip ]
++set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll_hdmi_q13.qip ]
++set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll_hdmi_cfg.v ]
++set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll_hdmi_cfg/altera_pll_reconfig_core.v ]
++set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll_hdmi_cfg/altera_pll_reconfig_top.v ]
+diff --git a/sys/pll_q17.qip b/sys/pll_q17.qip
+new file mode 100644
+index 0000000..f211962
+--- /dev/null
++++ b/sys/pll_q17.qip
+@@ -0,0 +1,3 @@
++set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll.qip ]
++set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll_hdmi.qip ]
++set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll_hdmi_cfg.qip ]
+diff --git a/sys/sys.qip b/sys/sys.qip
+index 986b6d2..18e1926 100644
+--- a/sys/sys.qip
++++ b/sys/sys.qip
+@@ -1,8 +1,6 @@
++set_global_assignment -name QIP_FILE           [join [list $::quartus(qip_path) pll_q [regexp -inline {[0-9]+} $quartus(version)] .qip] {}]
+ set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) sys_top.v ]
+ set_global_assignment -name SDC_FILE           [file join $::quartus(qip_path) sys_top.sdc ]
+-set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll.qip ]
+-set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll_hdmi.qip ]
+-set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll_hdmi_cfg.qip ]
+ set_global_assignment -name VHDL_FILE          [file join $::quartus(qip_path) ascal.vhd ]
+ set_global_assignment -name VHDL_FILE          [file join $::quartus(qip_path) pll_hdmi_adj.vhd ]
+ set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) hq2x.sv ]
+@@ -17,10 +15,9 @@ set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) a
+ set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) i2s.v ]
+ set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) spdif.v ]
+ set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) audio_out.v ]
++set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ltc2308.sv ]
+ set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) sigma_delta_dac.v ]
+ set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) hdmi_config.sv ]
+ set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sysmem.sv ]
+ set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) sd_card.v ]
+ set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) hps_io.v ]
+-set_instance_assignment -name HPS_LOCATION HPSINTERFACEPERIPHERALSPIMASTER_X52_Y72_N111 -entity sys_top -to spi
+-set_instance_assignment -name HPS_LOCATION HPSINTERFACEPERIPHERALUART_X52_Y67_N111 -entity sys_top -to uart
+diff --git a/sys/sys.tcl b/sys/sys.tcl
+new file mode 100644
+index 0000000..b3d2eab
+--- /dev/null
++++ b/sys/sys.tcl
+@@ -0,0 +1,308 @@
++set_global_assignment -name FAMILY "Cyclone V"
++set_global_assignment -name DEVICE 5CSEBA6U23I7
++set_global_assignment -name DEVICE_FILTER_PACKAGE UFBGA
++set_global_assignment -name DEVICE_FILTER_PIN_COUNT 672
++set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 7
++
++#============================================================
++# ADC
++#============================================================
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_CONVST
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SCK
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDI
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDO
++set_location_assignment PIN_U9 -to ADC_CONVST
++set_location_assignment PIN_V10 -to ADC_SCK
++set_location_assignment PIN_AC4 -to ADC_SDI
++set_location_assignment PIN_AD4 -to ADC_SDO
++
++#============================================================
++# ARDUINO
++#============================================================
++set_location_assignment PIN_AG9 -to ARDUINO_IO[3]
++set_location_assignment PIN_U14 -to ARDUINO_IO[4]
++set_location_assignment PIN_U13 -to ARDUINO_IO[5]
++set_location_assignment PIN_AG8 -to ARDUINO_IO[6]
++set_location_assignment PIN_AH8 -to ARDUINO_IO[7]
++set_location_assignment PIN_AF17 -to ARDUINO_IO[8]
++set_location_assignment PIN_AE15 -to ARDUINO_IO[9]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ARDUINO_IO[*]
++set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to ARDUINO_IO[*]
++set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to ARDUINO_IO[*]
++
++#============================================================
++# USER PORT
++#============================================================
++set_location_assignment PIN_AF15 -to USER_IO[5]
++set_location_assignment PIN_AG16 -to USER_IO[4]
++set_location_assignment PIN_AH11 -to USER_IO[3]
++set_location_assignment PIN_AH12 -to USER_IO[2]
++set_location_assignment PIN_AH9 -to USER_IO[1]
++set_location_assignment PIN_AG11 -to USER_IO[0]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[*]
++set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to USER_IO[*]
++set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to USER_IO[*]
++
++#============================================================
++# SDIO
++#============================================================
++set_location_assignment PIN_AF25 -to SDIO_DAT[0]
++set_location_assignment PIN_AF23 -to SDIO_DAT[1]
++set_location_assignment PIN_AD26 -to SDIO_DAT[2]
++set_location_assignment PIN_AF28 -to SDIO_DAT[3]
++set_location_assignment PIN_AF27 -to SDIO_CMD
++set_location_assignment PIN_AH26 -to SDIO_CLK
++set_location_assignment PIN_AH7 -to SDIO_CD
++
++set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDIO_*
++
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SDIO_*
++set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to SDIO_DAT[*]
++set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to SDIO_CMD
++set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to SDIO_CD
++
++#============================================================
++# VGA
++#============================================================
++set_location_assignment PIN_AE17 -to VGA_R[0]
++set_location_assignment PIN_AE20 -to VGA_R[1]
++set_location_assignment PIN_AF20 -to VGA_R[2]
++set_location_assignment PIN_AH18 -to VGA_R[3]
++set_location_assignment PIN_AH19 -to VGA_R[4]
++set_location_assignment PIN_AF21 -to VGA_R[5]
++
++set_location_assignment PIN_AE19 -to VGA_G[0]
++set_location_assignment PIN_AG15 -to VGA_G[1]
++set_location_assignment PIN_AF18 -to VGA_G[2]
++set_location_assignment PIN_AG18 -to VGA_G[3]
++set_location_assignment PIN_AG19 -to VGA_G[4]
++set_location_assignment PIN_AG20 -to VGA_G[5]
++
++set_location_assignment PIN_AG21 -to VGA_B[0]
++set_location_assignment PIN_AA20 -to VGA_B[1]
++set_location_assignment PIN_AE22 -to VGA_B[2]
++set_location_assignment PIN_AF22 -to VGA_B[3]
++set_location_assignment PIN_AH23 -to VGA_B[4]
++set_location_assignment PIN_AH21 -to VGA_B[5]
++
++set_location_assignment PIN_AH22 -to VGA_HS
++set_location_assignment PIN_AG24 -to VGA_VS
++
++set_location_assignment PIN_AH27 -to VGA_EN
++set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to VGA_EN
++
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_*
++set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_*
++
++#============================================================
++# AUDIO
++#============================================================
++set_location_assignment PIN_AC24 -to AUDIO_L
++set_location_assignment PIN_AE25 -to AUDIO_R
++set_location_assignment PIN_AG26 -to AUDIO_SPDIF
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUDIO_*
++set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to AUDIO_*
++
++#============================================================
++# SDRAM
++#============================================================
++set_location_assignment PIN_Y11 -to SDRAM_A[0]
++set_location_assignment PIN_AA26 -to SDRAM_A[1]
++set_location_assignment PIN_AA13 -to SDRAM_A[2]
++set_location_assignment PIN_AA11 -to SDRAM_A[3]
++set_location_assignment PIN_W11 -to SDRAM_A[4]
++set_location_assignment PIN_Y19 -to SDRAM_A[5]
++set_location_assignment PIN_AB23 -to SDRAM_A[6]
++set_location_assignment PIN_AC23 -to SDRAM_A[7]
++set_location_assignment PIN_AC22 -to SDRAM_A[8]
++set_location_assignment PIN_C12 -to SDRAM_A[9]
++set_location_assignment PIN_AB26 -to SDRAM_A[10]
++set_location_assignment PIN_AD17 -to SDRAM_A[11]
++set_location_assignment PIN_D12 -to SDRAM_A[12]
++set_location_assignment PIN_Y17 -to SDRAM_BA[0]
++set_location_assignment PIN_AB25 -to SDRAM_BA[1]
++
++set_location_assignment PIN_E8 -to SDRAM_DQ[0]
++set_location_assignment PIN_V12 -to SDRAM_DQ[1]
++set_location_assignment PIN_D11 -to SDRAM_DQ[2]
++set_location_assignment PIN_W12 -to SDRAM_DQ[3]
++set_location_assignment PIN_AH13 -to SDRAM_DQ[4]
++set_location_assignment PIN_D8 -to SDRAM_DQ[5]
++set_location_assignment PIN_AH14 -to SDRAM_DQ[6]
++set_location_assignment PIN_AF7 -to SDRAM_DQ[7]
++set_location_assignment PIN_AE24 -to SDRAM_DQ[8]
++set_location_assignment PIN_AD23 -to SDRAM_DQ[9]
++set_location_assignment PIN_AE6 -to SDRAM_DQ[10]
++set_location_assignment PIN_AE23 -to SDRAM_DQ[11]
++set_location_assignment PIN_AG14 -to SDRAM_DQ[12]
++set_location_assignment PIN_AD5 -to SDRAM_DQ[13]
++set_location_assignment PIN_AF4 -to SDRAM_DQ[14]
++set_location_assignment PIN_AH3 -to SDRAM_DQ[15]
++set_location_assignment PIN_AG13 -to SDRAM_DQML
++set_location_assignment PIN_AF13 -to SDRAM_DQMH
++
++set_location_assignment PIN_AD20 -to SDRAM_CLK
++set_location_assignment PIN_AG10 -to SDRAM_CKE
++
++set_location_assignment PIN_AA19 -to SDRAM_nWE
++set_location_assignment PIN_AA18 -to SDRAM_nCAS
++set_location_assignment PIN_Y18 -to SDRAM_nCS
++set_location_assignment PIN_W14 -to SDRAM_nRAS
++
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SDRAM_*
++set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_*
++set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A*
++set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_BA*
++set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[*]
++set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQM*
++set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_n*
++set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[*]
++set_instance_assignment -name ALLOW_SYNCH_CTRL_USAGE OFF -to *|SDRAM_*
++
++#============================================================
++# I/O
++#============================================================
++set_location_assignment PIN_Y15 -to LED_USER
++set_location_assignment PIN_AA15 -to LED_HDD
++set_location_assignment PIN_AG28 -to LED_POWER
++
++set_location_assignment PIN_AH24 -to BTN_USER
++set_location_assignment PIN_AG25 -to BTN_OSD
++set_location_assignment PIN_AG23 -to BTN_RESET
++
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_*
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BTN_*
++set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to BTN_*
++
++#============================================================
++# CLOCK
++#============================================================
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_CLK1_50
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_CLK2_50
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_CLK3_50
++set_location_assignment PIN_V11 -to FPGA_CLK1_50
++set_location_assignment PIN_Y13 -to FPGA_CLK2_50
++set_location_assignment PIN_E11 -to FPGA_CLK3_50
++
++#============================================================
++# HDMI
++#============================================================
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_I2C_SCL
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_I2C_SDA
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_I2S
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_LRCLK
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_MCLK
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_SCLK
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_CLK
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_DE
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[0]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[1]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[2]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[3]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[4]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[5]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[6]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[7]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[8]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[9]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[10]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[11]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[12]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[13]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[14]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[15]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[16]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[17]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[18]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[19]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[20]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[21]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[22]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_D[23]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_HS
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_INT
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HDMI_TX_VS
++set_location_assignment PIN_U10 -to HDMI_I2C_SCL
++set_location_assignment PIN_AA4 -to HDMI_I2C_SDA
++set_location_assignment PIN_T13 -to HDMI_I2S
++set_location_assignment PIN_T11 -to HDMI_LRCLK
++set_location_assignment PIN_U11 -to HDMI_MCLK
++set_location_assignment PIN_T12 -to HDMI_SCLK
++set_location_assignment PIN_AG5 -to HDMI_TX_CLK
++set_location_assignment PIN_AD19 -to HDMI_TX_DE
++set_location_assignment PIN_AD12 -to HDMI_TX_D[0]
++set_location_assignment PIN_AE12 -to HDMI_TX_D[1]
++set_location_assignment PIN_W8 -to HDMI_TX_D[2]
++set_location_assignment PIN_Y8 -to HDMI_TX_D[3]
++set_location_assignment PIN_AD11 -to HDMI_TX_D[4]
++set_location_assignment PIN_AD10 -to HDMI_TX_D[5]
++set_location_assignment PIN_AE11 -to HDMI_TX_D[6]
++set_location_assignment PIN_Y5 -to HDMI_TX_D[7]
++set_location_assignment PIN_AF10 -to HDMI_TX_D[8]
++set_location_assignment PIN_Y4 -to HDMI_TX_D[9]
++set_location_assignment PIN_AE9 -to HDMI_TX_D[10]
++set_location_assignment PIN_AB4 -to HDMI_TX_D[11]
++set_location_assignment PIN_AE7 -to HDMI_TX_D[12]
++set_location_assignment PIN_AF6 -to HDMI_TX_D[13]
++set_location_assignment PIN_AF8 -to HDMI_TX_D[14]
++set_location_assignment PIN_AF5 -to HDMI_TX_D[15]
++set_location_assignment PIN_AE4 -to HDMI_TX_D[16]
++set_location_assignment PIN_AH2 -to HDMI_TX_D[17]
++set_location_assignment PIN_AH4 -to HDMI_TX_D[18]
++set_location_assignment PIN_AH5 -to HDMI_TX_D[19]
++set_location_assignment PIN_AH6 -to HDMI_TX_D[20]
++set_location_assignment PIN_AG6 -to HDMI_TX_D[21]
++set_location_assignment PIN_AF9 -to HDMI_TX_D[22]
++set_location_assignment PIN_AE8 -to HDMI_TX_D[23]
++set_location_assignment PIN_T8 -to HDMI_TX_HS
++set_location_assignment PIN_AF11 -to HDMI_TX_INT
++set_location_assignment PIN_V13 -to HDMI_TX_VS
++
++#============================================================
++# KEY
++#============================================================
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[0]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[1]
++set_location_assignment PIN_AH17 -to KEY[0]
++set_location_assignment PIN_AH16 -to KEY[1]
++
++#============================================================
++# LED
++#============================================================
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[0]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[1]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[2]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[3]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[4]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[5]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[6]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[7]
++set_location_assignment PIN_W15 -to LED[0]
++set_location_assignment PIN_AA24 -to LED[1]
++set_location_assignment PIN_V16 -to LED[2]
++set_location_assignment PIN_V15 -to LED[3]
++set_location_assignment PIN_AF26 -to LED[4]
++set_location_assignment PIN_AE26 -to LED[5]
++set_location_assignment PIN_Y16 -to LED[6]
++set_location_assignment PIN_AA23 -to LED[7]
++
++#============================================================
++# SW
++#============================================================
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[0]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[1]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[2]
++set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[3]
++set_location_assignment PIN_Y24 -to SW[0]
++set_location_assignment PIN_W24 -to SW[1]
++set_location_assignment PIN_W21 -to SW[2]
++set_location_assignment PIN_W20 -to SW[3]
++
++set_instance_assignment -name HPS_LOCATION HPSINTERFACEPERIPHERALSPIMASTER_X52_Y72_N111 -entity sys_top -to spi
++set_instance_assignment -name HPS_LOCATION HPSINTERFACEPERIPHERALUART_X52_Y67_N111 -entity sys_top -to uart
++
++set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
++
++set_global_assignment -name CDF_FILE jtag.cdf
++set_global_assignment -name QIP_FILE sys/sys.qip
++
+diff --git a/sys/sys_q13.qip b/sys/sys_q13.qip
+deleted file mode 100644
+index 760991a..0000000
+--- a/sys/sys_q13.qip
++++ /dev/null
+@@ -1,30 +0,0 @@
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) sys_top.v ]
+-set_global_assignment -name SDC_FILE           [file join $::quartus(qip_path) sys_top.sdc ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll.v ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll/pll_0002.v ]
+-set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll/pll_0002.qip ]
+-set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) pll_hdmi_q13.qip ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll_hdmi_cfg.v ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll_hdmi_cfg/altera_pll_reconfig_core.v ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) pll_hdmi_cfg/altera_pll_reconfig_top.v ]
+-set_global_assignment -name VHDL_FILE          [file join $::quartus(qip_path) ascal.vhd ]
+-set_global_assignment -name VHDL_FILE          [file join $::quartus(qip_path) pll_hdmi_adj.vhd ]
+-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) hq2x.sv ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) scandoubler.v ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) scanlines.v ]
+-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) video_cleaner.sv ]
+-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) video_mixer.sv ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) osd.v ]
+-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) vga_out.sv ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) i2c.v ]
+-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) alsa.sv ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) i2s.v ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) spdif.v ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) audio_out.v ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) sigma_delta_dac.v ]
+-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) hdmi_config.sv ]
+-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sysmem.sv ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) sd_card.v ]
+-set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) hps_io.v ]
+-set_instance_assignment -name HPS_LOCATION HPSINTERFACEPERIPHERALSPIMASTER_X52_Y72_N111 -entity sys_top -to spi
+-set_instance_assignment -name HPS_LOCATION HPSINTERFACEPERIPHERALUART_X52_Y67_N111 -entity sys_top -to uart
+diff --git a/sys/sys_top.v b/sys/sys_top.v
+index 517189f..90cc44e 100644
+--- a/sys/sys_top.v
++++ b/sys/sys_top.v
+@@ -83,6 +83,12 @@ module sys_top
+ 	output        SDIO_CLK,
+ 	input         SDIO_CD,
+ 
++	////////// ADC //////////////
++	output        ADC_SCK,
++	input         ADC_SDO,
++	output        ADC_SDI,
++	output        ADC_CONVST,
++
+ 	////////// MB KEY ///////////
+ 	input   [1:0] KEY,
+ 
+@@ -195,7 +201,7 @@ reg [15:0] cfg;
+ 
+ reg  cfg_got   = 0;
+ reg  cfg_set   = 0;
+-//wire [2:0] hdmi_res  = cfg[10:8];
++wire hdmi_limited = cfg[8];
+ wire dvi_mode  = cfg[7];
+ wire audio_96k = cfg[6];
+ wire ypbpr_en  = cfg[5];
+@@ -604,7 +610,8 @@ hdmi_config hdmi_config
+ 	.I2C_SDA(HDMI_I2C_SDA),
+ 
+ 	.dvi_mode(dvi_mode),
+-	.audio_96k(audio_96k)
++	.audio_96k(audio_96k),
++	.hdmi_limited(hdmi_limited)
+ );
+ 
+ wire [23:0] hdmi_data;
+@@ -860,7 +867,8 @@ emu emu
+ 	.AUDIO_R(audio_rs),
+ 	.AUDIO_S(audio_s),
+ 	.AUDIO_MIX(audio_mix),
+-	.TAPE_IN(0),
++
++	.ADC_BUS({ADC_SCK,ADC_SDO,ADC_SDI,ADC_CONVST}),
+ 
+ 	.SD_SCK(SDIO_CLK),
+ 	.SD_MOSI(SDIO_CMD),

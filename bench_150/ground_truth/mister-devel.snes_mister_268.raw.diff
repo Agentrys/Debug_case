@@ -1,0 +1,57 @@
+diff --git a/rtl/SPC700/SPC700.vhd b/rtl/SPC700/SPC700.vhd
+index 11423a1..ee82192 100644
+--- a/rtl/SPC700/SPC700.vhd
++++ b/rtl/SPC700/SPC700.vhd
+@@ -329,7 +329,7 @@ begin
+ 						PSW <= PSW;
+ 					when "001" => 
+ 						PSW(1 downto 0) <= ZO & CO; PSW(3) <= HO; PSW(7 downto 6) <= SO & VO; -- ALU
+-					when "010" => PSW(2) <= '0'; PSW(4) <= '1';    -- BRK
++					when "010" => PSW(2) <= '0'; PSW(4) <= not IsResetInterrupt ;    -- BRK
+ 					when "011" => PSW <= D_IN; -- RETI/POP PSW
+ 					when "100" => 
+ 						case IR(7 downto 5) is
+diff --git a/rtl/SPC700/MCode.vhd b/rtl/SPC700/MCode.vhd
+index b72c348..15c4de1 100644
+--- a/rtl/SPC700/MCode.vhd
++++ b/rtl/SPC700/MCode.vhd
+@@ -736,7 +736,7 @@ architecture rtl of SPC700_MCode is
+ 	-- 2A OR1 C, !m.b
+ 	("00","00","000000","00001","00","000000","000000","000"),-- ['PC++']
+ 	("00","00","100000","00001","00","000000","000000","000"),-- ['[PC]->AL', 'PC++']
+-	("00","00","001000","00001","00","000000","000000","000"),-- ['[PC]->AH', 'PC++']
++	("00","00","001000","00001","00","000000","000000","000"),-- ['[PC]&1F->AH', 'PC++']
+ 	("00","01","000000","01010","00","101011","011010","000"),-- ['ALU(C|~[AX].b)', 'ALU()->C']
+ 	("10","00","000000","00000","00","000000","000000","000"),-- []
+ 	("XX","XX","XXXXXX","XXXXX","XX","XXXXXX","XXXXXX","XXX"),
+@@ -1824,7 +1824,7 @@ architecture rtl of SPC700_MCode is
+ 	-- 6A AND1 C, !m.b
+ 	("00","00","000000","00001","00","000000","000000","000"),-- ['PC++']
+ 	("00","00","100000","00001","00","000000","000000","000"),-- ['[PC]->AL', 'PC++']
+-	("00","00","001000","00001","00","000000","000000","000"),-- ['[PC]->AH', '[PC]->DR', 'PC++']
++	("00","00","001000","00001","00","000000","000000","000"),-- ['[PC]&1F->AH', '[PC]->DR', 'PC++']
+ 	("10","01","000000","01010","00","101011","010101","000"),-- ['ALU([AX])->C']
+ 	("XX","XX","XXXXXX","XXXXX","XX","XXXXXX","XXXXXX","XXX"),
+ 	("XX","XX","XXXXXX","XXXXX","XX","XXXXXX","XXXXXX","XXX"),
+diff --git a/rtl/SPC700/SPC700.vhd b/rtl/SPC700/SPC700.vhd
+index 11423a1..9c189d9 100644
+--- a/rtl/SPC700/SPC700.vhd
++++ b/rtl/SPC700/SPC700.vhd
+@@ -329,7 +329,7 @@ begin
+ 						PSW <= PSW;
+ 					when "001" => 
+ 						PSW(1 downto 0) <= ZO & CO; PSW(3) <= HO; PSW(7 downto 6) <= SO & VO; -- ALU
+-					when "010" => PSW(2) <= '0'; PSW(4) <= '1';    -- BRK
++					when "010" => PSW(2) <= '0'; PSW(4) <= not IsResetInterrupt ;    -- BRK
+ 					when "011" => PSW <= D_IN; -- RETI/POP PSW
+ 					when "100" => 
+ 						case IR(7 downto 5) is
+@@ -374,7 +374,7 @@ begin
+ 			when "00" => 
+ 				A_OUT <= PC; 
+ 			when "01"=> 
+-				if IR = x"0A" or IR = x"4A" or IR = x"8A" or IR = x"AA" or IR = x"CA" or IR = x"EA" then
++				if IR = x"0A" or IR = x"2A" or IR = x"4A" or IR = x"6A" or IR = x"8A" or IR = x"AA" or IR = x"CA" or IR = x"EA" then
+ 					A_OUT <= AX and x"1FFF";
+ 				else
+ 					A_OUT <= AX;

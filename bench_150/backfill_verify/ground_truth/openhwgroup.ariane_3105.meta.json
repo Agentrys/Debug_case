@@ -1,0 +1,47 @@
+{
+  "case_id": "openhwgroup.ariane#3105",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "certainly-param",
+    "name": "cva6-param"
+  },
+  "fix_oid": "27edab76a7c98cb17a1bb1994901eb7420f32972",
+  "buggy_commit_sha": "4d823b83b165d41d8c834f204f84620850197978",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_3105.diff",
+  "diff_sha256": "fdea383a0550aa1e51c02796040e6a7f55202e2ff4d806c676ee4528b3f5e5bd",
+  "fix_oids_sorted": [
+    "27edab76a7c98cb17a1bb1994901eb7420f32972",
+    "74b40c59eeb4fc4e391b0781e3217df225e24d76",
+    "d33a4fb97d453c244c84c61b6af0db55dc13a362"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/cva6_iti/iti.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/cva6_iti/iti.sv": [
+      [
+        139,
+        144
+      ],
+      [
+        139,
+        144
+      ],
+      [
+        139,
+        144
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_3105.raw.diff"
+}

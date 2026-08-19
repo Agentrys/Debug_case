@@ -1,0 +1,39 @@
+{
+  "case_id": "jbush001.nyuziprocessor#143",
+  "issue_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_oid": "f55488517133ad88b2cbce61ba50bc8c838d960a",
+  "buggy_commit_sha": "449b369ac0388e022a987b91027768f6387fbdde",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/jbush001.nyuziprocessor_143.diff",
+  "diff_sha256": "e45a67f0630d8d41928e7924d46c9107f79e4e2fd3dce3ab2635f4c43f11d774",
+  "fix_oids_sorted": [
+    "f55488517133ad88b2cbce61ba50bc8c838d960a"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "hardware/core/tlb.sv"
+  ],
+  "ground_truth_hunks": {
+    "hardware/core/tlb.sv": [
+      [
+        149,
+        155
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "tests/unit/test_tlb.sv"
+  ],
+  "raw_diff_path": "ground_truth/jbush001.nyuziprocessor_143.raw.diff"
+}

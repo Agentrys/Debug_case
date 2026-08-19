@@ -1,0 +1,61 @@
+diff --git a/src/main/scala/huancun/BaseDirectory.scala b/src/main/scala/huancun/BaseDirectory.scala
+index 652f3e6f..b8b731a0 100644
+--- a/src/main/scala/huancun/BaseDirectory.scala
++++ b/src/main/scala/huancun/BaseDirectory.scala
+@@ -106,7 +106,7 @@ class SubDirectory[T <: Data](
+   val metaArray = Module(new SRAMTemplate(chiselTypeOf(dir_init), sets, ways, singlePort = true, input_clk_div_by_2 = clk_div_by_2))
+ 
+   val clkGate = Module(new STD_CLKGT_func)
+-  val clk_en = RegInit(true.B)
++  val clk_en = RegInit(false.B)
+   clk_en := ~clk_en
+   clkGate.io.TE := false.B
+   clkGate.io.E := clk_en
+@@ -225,7 +225,7 @@ class SubDirectory[T <: Data](
+   )
+ 
+   val cycleCnt = Counter(true.B, 2)
+-  val resetMask = if (clk_div_by_2) !cycleCnt._1(0) else true.B
++  val resetMask = if (clk_div_by_2) cycleCnt._1(0) else true.B
+   when(resetIdx === 0.U && resetMask) {
+     resetFinish := true.B
+   }
+diff --git a/src/main/scala/huancun/DataStorage.scala b/src/main/scala/huancun/DataStorage.scala
+index d8519764..aa15650b 100644
+--- a/src/main/scala/huancun/DataStorage.scala
++++ b/src/main/scala/huancun/DataStorage.scala
+@@ -165,7 +165,7 @@ class DataStorage(implicit p: Parameters) extends HuanCunModule {
+       .map(banks => Cat(banks).orR())
+       .zip(stackRdy)
+       .foreach {
+-        case (accessed, rdy) => rdy := !accessed && !cycleCnt._1(0)
++        case (accessed, rdy) => rdy := !accessed && cycleCnt._1(0)
+       }
+   }
+ 
+diff --git a/src/main/scala/huancun/noninclusive/Directory.scala b/src/main/scala/huancun/noninclusive/Directory.scala
+index 6780b18a..501510f7 100644
+--- a/src/main/scala/huancun/noninclusive/Directory.scala
++++ b/src/main/scala/huancun/noninclusive/Directory.scala
+@@ -251,7 +251,7 @@ class Directory(implicit p: Parameters)
+ 
+   val clk_div_by_2 = p(HCCacheParamsKey).sramClkDivBy2
+   val cycleCnt = Counter(true.B, 2)
+-  val readyMask = if (clk_div_by_2) !cycleCnt._1(0) else true.B
++  val readyMask = if (clk_div_by_2) cycleCnt._1(0) else true.B
+   req.ready := Cat(rports.map(_.ready)).andR() && readyMask
+   val reqValidReg = RegNext(req.fire(), false.B)
+   val reqIdOHReg = RegEnable(req.bits.idOH, req.fire()) // generate idOH in advance to index MSHRs
+diff --git a/src/main/scala/huancun/utils/SRAMWrapper.scala b/src/main/scala/huancun/utils/SRAMWrapper.scala
+index 2d094d55..2332d39d 100644
+--- a/src/main/scala/huancun/utils/SRAMWrapper.scala
++++ b/src/main/scala/huancun/utils/SRAMWrapper.scala
+@@ -42,7 +42,7 @@ class SRAMWrapper[T <: Data]
+     ))
+ 
+     val clkGate = Module(new STD_CLKGT_func)
+-    val clk_en = RegInit(true.B)
++    val clk_en = RegInit(false.B)
+     clk_en := ~clk_en
+     clkGate.io.TE := false.B
+     clkGate.io.E := clk_en

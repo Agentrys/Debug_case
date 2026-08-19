@@ -1,0 +1,39 @@
+{
+  "case_id": "sld-columbia.esp#93",
+  "issue_repo": {
+    "owner": "sld-columbia",
+    "name": "esp"
+  },
+  "fix_repo": {
+    "owner": "sld-columbia",
+    "name": "esp"
+  },
+  "fix_oid": "9107477a751b28cb1d2ff95d984971adefee6ee4",
+  "buggy_commit_sha": "3155e94d1a4bc46df439b32eb83d421329c6f545",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/sld-columbia.esp_93.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "9107477a751b28cb1d2ff95d984971adefee6ee4",
+    "fb392dba6f1e687fea23bf490b1b0185b6b1ca8c",
+    "b1432616d38ceab882e902bc0dc94f558128c276",
+    "b9f28072cc36524f46c5526959f50c836e080925",
+    "046ae60542879be58826d90f324ed6f25835cab1",
+    "e50540c55e6b8968198c94be5f349e0dd39483b0",
+    "d30f8eea5717d0e5b11608aedca573972e959fe0",
+    "ffacffdfb4fa777c9642cc72672150971c3758d1"
+  ],
+  "n_fix_commits": 8,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "utils/make/modelsim.mk",
+    "utils/make/ncsim.mk",
+    "utils/make/xmsim.mk"
+  ],
+  "raw_diff_path": "ground_truth/sld-columbia.esp_93.raw.diff"
+}

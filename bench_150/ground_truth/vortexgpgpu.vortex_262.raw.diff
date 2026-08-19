@@ -1,0 +1,256 @@
+diff --git a/hw/rtl/libs/VX_axi_adapter.sv b/hw/rtl/libs/VX_axi_adapter.sv
+index 421512854..930208f2d 100644
+--- a/hw/rtl/libs/VX_axi_adapter.sv
++++ b/hw/rtl/libs/VX_axi_adapter.sv
+@@ -27,6 +27,10 @@ module VX_axi_adapter #(
+     parameter ARBITER        = "R",
+     parameter REQ_OUT_BUF    = 0,
+     parameter RSP_OUT_BUF    = 0,
++    // Per-bank store-before-load AXI ordering. AW and AR with different IDs
++    // are not ordered by AXI4 (A5); set to 0 in verif environments whose
++    // memory model commits writes synchronously.
++    parameter WRITE_BEFORE_READ = 1,
+     parameter DATA_SIZE      = DATA_WIDTH/8
+  ) (
+     input  wire                     clk,
+@@ -246,17 +250,36 @@ module VX_axi_adapter #(
+             `UNUSED_PIN (tx_ack)
+         );
+ 
+-        assign req_xbar_ready_out[i] = xbar_rw_out ? axi_write_ready : m_axi_arready[i];
++        // Outstanding-write tracker: gate AR while AW is unmatched by B.
++        wire writes_pending;
++        if (WRITE_BEFORE_READ) begin : g_write_tracker
++            reg [7:0] pending_writes_r;
++            wire aw_fire = m_axi_awvalid[i] && m_axi_awready[i];
++            wire b_fire  = m_axi_bvalid[i]  && m_axi_bready[i];
++            always @(posedge clk) begin
++                if (reset) begin
++                    pending_writes_r <= '0;
++                end else if (aw_fire && ~b_fire) begin
++                    pending_writes_r <= pending_writes_r + 8'd1;
++                end else if (~aw_fire && b_fire) begin
++                    pending_writes_r <= pending_writes_r - 8'd1;
++                end
++            end
++            assign writes_pending = (pending_writes_r != '0);
++        end else begin : g_no_write_tracker
++            assign writes_pending = 1'b0;
++        end
++
++        assign req_xbar_ready_out[i] = xbar_rw_out ? axi_write_ready
++                                                   : (m_axi_arready[i] && ~writes_pending);
+ 
+         // AXI write address channel
+ 
+         assign m_axi_awvalid[i] = req_xbar_valid_out[i] && xbar_rw_out && ~m_axi_aw_ack;
+ 
+-    if (INTERLEAVE) begin : g_m_axi_awaddr_i
+-        assign m_axi_awaddr[i]  = (ADDR_WIDTH_OUT'(xbar_addr_out) << (BANK_SEL_BITS + LOG2_DATA_SIZE)) | (ADDR_WIDTH_OUT'(i) << LOG2_DATA_SIZE);
+-    end else begin : g_m_axi_awaddr_ni
+-        assign m_axi_awaddr[i]  = (ADDR_WIDTH_OUT'(xbar_addr_out) << LOG2_DATA_SIZE) | (ADDR_WIDTH_OUT'(i) << (BANK_ADDR_WIDTH + LOG2_DATA_SIZE));
+-    end
++    // Each m_axi_mem_<i> drives its own DDR controller, so the byte address
++    // is the compact per-bank cache-line index (bank_sel routed via i).
++    assign m_axi_awaddr[i]  = ADDR_WIDTH_OUT'(xbar_addr_out) << LOG2_DATA_SIZE;
+ 
+         assign m_axi_awid[i]    = TAG_WIDTH_OUT'(xbar_tag_out);
+         assign m_axi_awlen[i]   = 8'b00000000;
+@@ -285,14 +308,9 @@ module VX_axi_adapter #(
+             assign xbar_tag_r_out = READ_TAG_WIDTH'(xbar_tag_out);
+         end
+ 
+-        assign m_axi_arvalid[i] = req_xbar_valid_out[i] && ~xbar_rw_out;
++        assign m_axi_arvalid[i] = req_xbar_valid_out[i] && ~xbar_rw_out && ~writes_pending;
+ 
+-        // convert address to byte-addressable space
+-    if (INTERLEAVE) begin : g_m_axi_araddr_i
+-        assign m_axi_araddr[i]  = (ADDR_WIDTH_OUT'(xbar_addr_out) << (BANK_SEL_BITS + LOG2_DATA_SIZE)) | (ADDR_WIDTH_OUT'(i) << LOG2_DATA_SIZE);
+-    end else begin : g_m_axi_araddr_ni
+-        assign m_axi_araddr[i]  = (ADDR_WIDTH_OUT'(xbar_addr_out) << LOG2_DATA_SIZE) | (ADDR_WIDTH_OUT'(i) << (BANK_ADDR_WIDTH + LOG2_DATA_SIZE));
+-    end
++        assign m_axi_araddr[i]  = ADDR_WIDTH_OUT'(xbar_addr_out) << LOG2_DATA_SIZE;
+         assign m_axi_arid[i]    = TAG_WIDTH_OUT'(xbar_tag_r_out);
+         assign m_axi_arlen[i]   = 8'b00000000;
+         assign m_axi_arsize[i]  = 3'(LOG2_DATA_SIZE);
+diff --git a/hw/rtl/afu/xrt/VX_afu_wrap.sv b/hw/rtl/afu/xrt/VX_afu_wrap.sv
+index 39cc26492..0928fb9c2 100644
+--- a/hw/rtl/afu/xrt/VX_afu_wrap.sv
++++ b/hw/rtl/afu/xrt/VX_afu_wrap.sv
+@@ -287,9 +287,21 @@ module VX_afu_wrap import VX_gpu_pkg::*; #(
+ 	wire [M_AXI_MEM_ADDR_WIDTH-1:0] m_axi_mem_awaddr_u [C_M_AXI_MEM_NUM_BANKS];
+ 	wire [M_AXI_MEM_ADDR_WIDTH-1:0] m_axi_mem_araddr_u [C_M_AXI_MEM_NUM_BANKS];
+ 
++	// Per-bank XRT BO base offsets. Each m_axi_mem_<i> port goes to a different
++	// xrt::bo (one per DDR/HBM channel) which XRT places at a different virtual
++	// base address, so a single global PLATFORM_MEMORY_OFFSET cannot cover all
++	// banks. PLATFORM_MEMORY_OFFSET_<i> overrides per bank; each defaults to
++	// PLATFORM_MEMORY_OFFSET so existing single-bank platforms (HBM, VCK5000)
++	// are unchanged.
++	wire [C_M_AXI_MEM_ADDR_WIDTH-1:0] platform_memory_offsets [4];
++	assign platform_memory_offsets[0] = C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET_0);
++	assign platform_memory_offsets[1] = C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET_1);
++	assign platform_memory_offsets[2] = C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET_2);
++	assign platform_memory_offsets[3] = C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET_3);
++
+ 	for (genvar i = 0; i < C_M_AXI_MEM_NUM_BANKS; ++i) begin : g_addressing
+-		assign m_axi_mem_awaddr_a[i] = C_M_AXI_MEM_ADDR_WIDTH'(m_axi_mem_awaddr_u[i]) + C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET);
+-		assign m_axi_mem_araddr_a[i] = C_M_AXI_MEM_ADDR_WIDTH'(m_axi_mem_araddr_u[i]) + C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET);
++		assign m_axi_mem_awaddr_a[i] = C_M_AXI_MEM_ADDR_WIDTH'(m_axi_mem_awaddr_u[i]) + platform_memory_offsets[i];
++		assign m_axi_mem_araddr_a[i] = C_M_AXI_MEM_ADDR_WIDTH'(m_axi_mem_araddr_u[i]) + platform_memory_offsets[i];
+ 	end
+ 
+ 	`SCOPE_IO_SWITCH (2);
+diff --git a/hw/rtl/afu/xrt/vortex_afu.vh b/hw/rtl/afu/xrt/vortex_afu.vh
+index c66ede2b7..f1c6af810 100644
+--- a/hw/rtl/afu/xrt/vortex_afu.vh
++++ b/hw/rtl/afu/xrt/vortex_afu.vh
+@@ -18,6 +18,24 @@
+ `define PLATFORM_MEMORY_OFFSET 0
+ `endif
+ 
++// Per-bank XRT BO base address. Each m_axi_mem_<i> port's outgoing AXI byte
++// address gets this offset added so that Vortex's compile-time absolute
++// addresses (STARTUP_ADDR, STACK_BASE_ADDR, ...) land inside the xrt::bo
++// allocation that XRT placed in that bank. Defaults to PLATFORM_MEMORY_OFFSET
++// (single offset for all banks) for back-compatibility.
++`ifndef PLATFORM_MEMORY_OFFSET_0
++`define PLATFORM_MEMORY_OFFSET_0 `PLATFORM_MEMORY_OFFSET
++`endif
++`ifndef PLATFORM_MEMORY_OFFSET_1
++`define PLATFORM_MEMORY_OFFSET_1 `PLATFORM_MEMORY_OFFSET
++`endif
++`ifndef PLATFORM_MEMORY_OFFSET_2
++`define PLATFORM_MEMORY_OFFSET_2 `PLATFORM_MEMORY_OFFSET
++`endif
++`ifndef PLATFORM_MEMORY_OFFSET_3
++`define PLATFORM_MEMORY_OFFSET_3 `PLATFORM_MEMORY_OFFSET
++`endif
++
+ `ifndef PLATFORM_MEMORY_ID_WIDTH
+ `define PLATFORM_MEMORY_ID_WIDTH 32
+ `endif
+diff --git a/hw/syn/xilinx/xrt/platforms.mk b/hw/syn/xilinx/xrt/platforms.mk
+index a841e1a04..f732a40ab 100644
+--- a/hw/syn/xilinx/xrt/platforms.mk
++++ b/hw/syn/xilinx/xrt/platforms.mk
+@@ -30,8 +30,12 @@ else ifneq ($(findstring xilinx_u280,$(XSA)),)
+   CONFIGS += -DPLATFORM_MEMORY_NUM_BANKS=32 -DPLATFORM_MEMORY_ADDR_WIDTH=33
+   VPP_FLAGS += --connectivity.sp vortex_afu_1.m_axi_mem_0:HBM[0:31]
+ else ifneq ($(findstring xilinx_u250,$(XSA)),)
+-  # 64 GB of DDR4 with 4 channels (16 GB per channel)
+-  CONFIGS += -DPLATFORM_MEMORY_NUM_BANKS=4 -DPLATFORM_MEMORY_ADDR_WIDTH=36
++  # 16 GB of DDR4 (single channel, bank 0). Multi-bank requires per-bank XRT
++  # VA offsets that aren't known at synthesis time without runtime plumbing;
++  # see follow-up PR for a DCR-based runtime path.
++  CONFIGS += -DPLATFORM_MEMORY_NUM_BANKS=1 -DPLATFORM_MEMORY_ADDR_WIDTH=34
++  VPP_FLAGS += --connectivity.sp vortex_afu_1.m_axi_mem_0:DDR[0]
++  CONFIGS += -DPLATFORM_MEMORY_OFFSET_0=40\'h4000000000
+ else ifneq ($(findstring xilinx_u200,$(XSA)),)
+   # 64 GB of DDR4 with 4 channels (16 GB per channel)
+   CONFIGS += -DPLATFORM_MEMORY_NUM_BANKS=4 -DPLATFORM_MEMORY_ADDR_WIDTH=36
+diff --git a/hw/rtl/afu/xrt/VX_afu_wrap.sv b/hw/rtl/afu/xrt/VX_afu_wrap.sv
+index 19ade4fe4..5e5d296de 100644
+--- a/hw/rtl/afu/xrt/VX_afu_wrap.sv
++++ b/hw/rtl/afu/xrt/VX_afu_wrap.sv
+@@ -351,9 +351,21 @@ module VX_afu_wrap import VX_gpu_pkg::*; #(
+ 	wire [M_AXI_MEM_ADDR_WIDTH-1:0] m_axi_mem_awaddr_u [C_M_AXI_MEM_NUM_BANKS];
+ 	wire [M_AXI_MEM_ADDR_WIDTH-1:0] m_axi_mem_araddr_u [C_M_AXI_MEM_NUM_BANKS];
+ 
++	// Per-bank XRT BO base offsets. Each m_axi_mem_<i> port goes to a different
++	// xrt::bo (one per DDR/HBM channel) which XRT places at a different virtual
++	// base address, so a single global PLATFORM_MEMORY_OFFSET cannot cover all
++	// banks. PLATFORM_MEMORY_OFFSET_<i> overrides per bank; each defaults to
++	// PLATFORM_MEMORY_OFFSET so existing single-bank platforms (HBM, VCK5000)
++	// are unchanged.
++	wire [C_M_AXI_MEM_ADDR_WIDTH-1:0] platform_memory_offsets [4];
++	assign platform_memory_offsets[0] = C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET_0);
++	assign platform_memory_offsets[1] = C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET_1);
++	assign platform_memory_offsets[2] = C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET_2);
++	assign platform_memory_offsets[3] = C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET_3);
++
+ 	for (genvar i = 0; i < C_M_AXI_MEM_NUM_BANKS; ++i) begin : g_addressing
+-		assign m_axi_mem_awaddr_a[i] = C_M_AXI_MEM_ADDR_WIDTH'(m_axi_mem_awaddr_u[i]) + C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET);
+-		assign m_axi_mem_araddr_a[i] = C_M_AXI_MEM_ADDR_WIDTH'(m_axi_mem_araddr_u[i]) + C_M_AXI_MEM_ADDR_WIDTH'(`PLATFORM_MEMORY_OFFSET);
++		assign m_axi_mem_awaddr_a[i] = C_M_AXI_MEM_ADDR_WIDTH'(m_axi_mem_awaddr_u[i]) + platform_memory_offsets[i];
++		assign m_axi_mem_araddr_a[i] = C_M_AXI_MEM_ADDR_WIDTH'(m_axi_mem_araddr_u[i]) + platform_memory_offsets[i];
+ 	end
+ 
+ 	// ---- Intermediate Vortex AXI signals (per-bank) — arbiter sits on bank 0 ----
+diff --git a/hw/rtl/afu/xrt/vortex_afu.vh b/hw/rtl/afu/xrt/vortex_afu.vh
+index 90bd256bd..ef7e5ed9a 100644
+--- a/hw/rtl/afu/xrt/vortex_afu.vh
++++ b/hw/rtl/afu/xrt/vortex_afu.vh
+@@ -18,6 +18,24 @@
+ `define PLATFORM_MEMORY_OFFSET 0
+ `endif
+ 
++// Per-bank XRT BO base address. Each m_axi_mem_<i> port's outgoing AXI byte
++// address gets this offset added so that Vortex's compile-time absolute
++// addresses (STARTUP_ADDR, STACK_BASE_ADDR, ...) land inside the xrt::bo
++// allocation that XRT placed in that bank. Defaults to PLATFORM_MEMORY_OFFSET
++// (single offset for all banks) for back-compatibility.
++`ifndef PLATFORM_MEMORY_OFFSET_0
++`define PLATFORM_MEMORY_OFFSET_0 `PLATFORM_MEMORY_OFFSET
++`endif
++`ifndef PLATFORM_MEMORY_OFFSET_1
++`define PLATFORM_MEMORY_OFFSET_1 `PLATFORM_MEMORY_OFFSET
++`endif
++`ifndef PLATFORM_MEMORY_OFFSET_2
++`define PLATFORM_MEMORY_OFFSET_2 `PLATFORM_MEMORY_OFFSET
++`endif
++`ifndef PLATFORM_MEMORY_OFFSET_3
++`define PLATFORM_MEMORY_OFFSET_3 `PLATFORM_MEMORY_OFFSET
++`endif
++
+ `ifndef PLATFORM_MEMORY_ID_WIDTH
+ `define PLATFORM_MEMORY_ID_WIDTH 32
+ `endif
+diff --git a/hw/syn/xilinx/xrt/platforms.mk b/hw/syn/xilinx/xrt/platforms.mk
+index 8a34715c8..4d5c34c91 100644
+--- a/hw/syn/xilinx/xrt/platforms.mk
++++ b/hw/syn/xilinx/xrt/platforms.mk
+@@ -34,8 +34,12 @@ else ifneq ($(findstring xilinx_u280,$(XSA)),)
+   CONFIGS += -DVX_CFG_PLATFORM_MEMORY_NUM_BANKS=32 -DVX_CFG_PLATFORM_MEMORY_ADDR_WIDTH=33
+   VPP_FLAGS += --connectivity.sp vortex_afu_1.m_axi_mem_0:HBM[0:31]
+ else ifneq ($(findstring xilinx_u250,$(XSA)),)
+-  # 64 GB of DDR4 with 4 channels (16 GB per channel)
+-  CONFIGS += -DVX_CFG_PLATFORM_MEMORY_NUM_BANKS=4 -DVX_CFG_PLATFORM_MEMORY_ADDR_WIDTH=36
++  # 16 GB of DDR4 (single channel, bank 0). Multi-bank requires per-bank XRT
++  # VA offsets that aren't known at synthesis time without runtime plumbing;
++  # see follow-up PR for a DCR-based runtime path.
++  CONFIGS += -DVX_CFG_PLATFORM_MEMORY_NUM_BANKS=1 -DVX_CFG_PLATFORM_MEMORY_ADDR_WIDTH=34
++  VPP_FLAGS += --connectivity.sp vortex_afu_1.m_axi_mem_0:DDR[0]
++  CONFIGS += -DPLATFORM_MEMORY_OFFSET_0=40\'h4000000000
+ else ifneq ($(findstring xilinx_u200,$(XSA)),)
+   # 64 GB of DDR4 with 4 channels (16 GB per channel)
+   CONFIGS += -DVX_CFG_PLATFORM_MEMORY_NUM_BANKS=4 -DVX_CFG_PLATFORM_MEMORY_ADDR_WIDTH=36
+diff --git a/hw/rtl/afu/xrt/vortex_afu.vh b/hw/rtl/afu/xrt/vortex_afu.vh
+index 954434518..b083d3c86 100644
+--- a/hw/rtl/afu/xrt/vortex_afu.vh
++++ b/hw/rtl/afu/xrt/vortex_afu.vh
+@@ -22,6 +22,24 @@
+ `define PLATFORM_MEMORY_OFFSET 0
+ `endif
+ 
++// Per-bank XRT BO base address. Each m_axi_mem_<i> port's outgoing AXI byte
++// address gets this offset added so that Vortex's compile-time absolute
++// addresses (STARTUP_ADDR, STACK_BASE_ADDR, ...) land inside the xrt::bo
++// allocation that XRT placed in that bank. Defaults to PLATFORM_MEMORY_OFFSET
++// (single offset for all banks) for back-compatibility.
++`ifndef PLATFORM_MEMORY_OFFSET_0
++`define PLATFORM_MEMORY_OFFSET_0 `PLATFORM_MEMORY_OFFSET
++`endif
++`ifndef PLATFORM_MEMORY_OFFSET_1
++`define PLATFORM_MEMORY_OFFSET_1 `PLATFORM_MEMORY_OFFSET
++`endif
++`ifndef PLATFORM_MEMORY_OFFSET_2
++`define PLATFORM_MEMORY_OFFSET_2 `PLATFORM_MEMORY_OFFSET
++`endif
++`ifndef PLATFORM_MEMORY_OFFSET_3
++`define PLATFORM_MEMORY_OFFSET_3 `PLATFORM_MEMORY_OFFSET
++`endif
++
+ `ifndef PLATFORM_MEMORY_ID_WIDTH
+ `define PLATFORM_MEMORY_ID_WIDTH 32
+ `endif

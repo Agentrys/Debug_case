@@ -1,0 +1,11 @@
+diff --git a/zephyr/drivers/timer/serv_timer.c b/zephyr/drivers/timer/serv_timer.c
+index 1691fa1..2039217 100644
+--- a/zephyr/drivers/timer/serv_timer.c
++++ b/zephyr/drivers/timer/serv_timer.c
+@@ -122,3 +122,6 @@ uint32_t sys_timer_cycle_get_32(void)
+ {
+ 	return mtime();
+ }
++
++SYS_INIT(sys_clock_driver_init, PRE_KERNEL_2,
++	 CONFIG_SYSTEM_CLOCK_INIT_PRIORITY);

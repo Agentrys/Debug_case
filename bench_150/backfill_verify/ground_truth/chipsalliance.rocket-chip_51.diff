@@ -1,0 +1,51 @@
+diff --git a/src/main/scala/regmapper/RegField.scala b/src/main/scala/regmapper/RegField.scala
+index 662528ab5..385725c61 100644
+--- a/src/main/scala/regmapper/RegField.scala
++++ b/src/main/scala/regmapper/RegField.scala
+@@ -11,6 +11,8 @@ import org.json4s.jackson.JsonMethods.{pretty, render}
+ 
+ import freechips.rocketchip.util.{SimpleRegIO}
+ 
++import scala.util.matching.Regex
++
+ // This information is not used internally by the regmap(...) function.
+ // However, the author of a RegField may be the best person to provide this
+ // information which is likely to be needed by downstream SW and Documentation
+@@ -47,10 +49,26 @@ case class RegFieldDesc (
+   // TODO: testable?
+   reset: Option[BigInt] = None,
+   enumerations: Map[BigInt, (String, String)] = Map()
+-)
++) {
++  require(RegFieldDesc.nameAcceptable(name),
++    s"RegFieldDesc.name of '$name' is not of the form '${RegFieldDesc.nameRegex.toString}'")
++
++  // We could also check for group name here, but that has a pretty significant runtime
++  // overhead because every RegField can be annotated with the group name,
++  // so we put the check in the RegFieldGroup helper function instead.
++}
+ 
+ object RegFieldDesc {
+   def reserved: RegFieldDesc = RegFieldDesc("reserved", "", access=RegFieldAccessType.R, reset=Some(0))
++
++  // This Regex is considerably more limited than the IP-XACT standard,
++  // which allows some unicode characters as well.
++  val nameRegex: Regex = """^[_:A-Za-z][-._:A-Za-z0-9]*$""".r
++
++  def nameAcceptable(name: String): Boolean = name match {
++    case RegFieldDesc.nameRegex(_*) => true
++    case _ => false
++  }
+ }
+ 
+ // Our descriptions are in terms of RegFields only, which is somewhat
+@@ -61,6 +79,9 @@ object RegFieldDesc {
+ 
+ object RegFieldGroup {
+   def apply (name: String, desc: Option[String], regs: Seq[RegField], descFirstOnly: Boolean = true): Seq[RegField] = {
++    require(RegFieldDesc.nameAcceptable(name),
++      s"RegFieldDesc.group of '$name' is not of the form '${RegFieldDesc.nameRegex.toString}'")
++
+     regs.zipWithIndex.map {case (r, i) =>
+       val gDesc = if ((i > 0) & descFirstOnly) None else desc
+       r.desc.map { d =>

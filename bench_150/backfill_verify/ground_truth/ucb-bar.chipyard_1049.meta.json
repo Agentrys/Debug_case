@@ -1,0 +1,31 @@
+{
+  "case_id": "ucb-bar.chipyard#1049",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "allisonrandal",
+    "name": "chipyard"
+  },
+  "fix_oid": "aad573367aaa38c2cb5d33764d5f6ea5d77265f8",
+  "buggy_commit_sha": "70cc98c3312ec0dafdf3e7625bb3927ab944edba",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_1049.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "aad573367aaa38c2cb5d33764d5f6ea5d77265f8",
+    "9faacd2eab4d842368c5427d84d2b0977a33dd13"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "scripts/build-toolchains.sh"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_1049.raw.diff"
+}

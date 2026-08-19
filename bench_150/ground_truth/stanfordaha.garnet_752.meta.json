@@ -1,0 +1,33 @@
+{
+  "case_id": "stanfordaha.garnet#752",
+  "issue_repo": {
+    "owner": "StanfordAHA",
+    "name": "garnet"
+  },
+  "fix_repo": {
+    "owner": "mflowgen",
+    "name": "mflowgen"
+  },
+  "fix_oid": "ac3f8731c08b5cb2943fd367ae931f9b27105f91",
+  "buggy_commit_sha": "a98db997f7b393ffe42949adcc7d2ae621081e56",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/stanfordaha.garnet_752.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "ac3f8731c08b5cb2943fd367ae931f9b27105f91",
+    "0d594d81ed33245f878229a11d0c7084e502df33",
+    "3f7510919370798e0ecf5df962186632bcf67787"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "steps/mentor-calibre-lvs/configure.yml",
+    "steps/mentor-calibre-lvs/lvs.runset.template"
+  ],
+  "raw_diff_path": "ground_truth/stanfordaha.garnet_752.raw.diff"
+}

@@ -1,0 +1,51 @@
+{
+  "case_id": "chipsalliance.i3c-core#184",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "i3c-core"
+  },
+  "fix_repo": {
+    "owner": "clayton8",
+    "name": "i3c-core"
+  },
+  "fix_oid": "41f6c38e2a6c54f1cd51ee204dfbc0fbb5ebd0a2",
+  "buggy_commit_sha": "3009d5375c17b413f69374177fbbc5cf4009b8ea",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/chipsalliance.i3c-core_184.diff",
+  "diff_sha256": "c303e91bbbafff7025ceb270ed0baae1e538d4aca915a017e90e60996b89370c",
+  "fix_oids_sorted": [
+    "41f6c38e2a6c54f1cd51ee204dfbc0fbb5ebd0a2",
+    "51c3ff1ae591d83848c29d0ecb8cb8f94f49e2f9"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/ctrl/i3c_target_fsm.sv"
+  ],
+  "ground_truth_hunks": {
+    "src/ctrl/i3c_target_fsm.sv": [
+      [
+        152,
+        157
+      ],
+      [
+        451,
+        457
+      ],
+      [
+        850,
+        888
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    ".github/copilot-instructions.md",
+    ".github/skills/i3c-simulation/SKILL.md",
+    "verification/cocotb/common.mk",
+    "verification/cocotb/top/lib_i3c_top/test_interrupts.py"
+  ],
+  "raw_diff_path": "ground_truth/chipsalliance.i3c-core_184.raw.diff"
+}

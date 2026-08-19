@@ -1,0 +1,7 @@
+diff --git a/verif/core-v-verif b/verif/core-v-verif
+index 60e57248c..65593a9a2 160000
+--- a/verif/core-v-verif
++++ b/verif/core-v-verif
+@@ -1 +1 @@
+-Subproject commit 60e57248c48b0f8f90cf52af20aecc5c16e9d6d8
++Subproject commit 65593a9a29cd2a898b93936399a990bf4de506ad

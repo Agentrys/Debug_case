@@ -1,0 +1,32 @@
+{
+  "case_id": "enjoy-digital.litex#322",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_oid": "3664dfa17aa4c760440060d39b31c4a9b5f84680",
+  "buggy_commit_sha": "07503d22ac276ca830c7149426238d2cb845f258",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_322.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "3664dfa17aa4c760440060d39b31c4a9b5f84680",
+    "7bcf8cb7527cac66b6c0b7ae34d84040362ee38c"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/soc/software/bios/cmds/cmd_litedram.c",
+    "litex/soc/software/liblitedram/bist.c"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_322.raw.diff"
+}

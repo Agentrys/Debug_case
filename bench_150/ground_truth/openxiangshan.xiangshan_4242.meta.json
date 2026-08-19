@@ -1,0 +1,82 @@
+{
+  "case_id": "openxiangshan.xiangshan#4242",
+  "issue_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_oid": "8795ffc00d922e6e6cde93b1027e9f79782b0564",
+  "buggy_commit_sha": "4ec1f4627558e8f6ca953d0fee8586429f064bac",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openxiangshan.xiangshan_4242.diff",
+  "diff_sha256": "d4658856d8f92e383a011acc36ebf0cf88132dff6059449a9a643c816322d5be",
+  "fix_oids_sorted": [
+    "8795ffc00d922e6e6cde93b1027e9f79782b0564"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/xiangshan/frontend/SC.scala",
+    "src/main/scala/xiangshan/frontend/Tage.scala",
+    "src/main/scala/xiangshan/frontend/WrBypass.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/xiangshan/frontend/SC.scala": [
+      [
+        34,
+        39
+      ],
+      [
+        81,
+        87
+      ],
+      [
+        114,
+        119
+      ],
+      [
+        134,
+        185
+      ]
+    ],
+    "src/main/scala/xiangshan/frontend/Tage.scala": [
+      [
+        36,
+        41
+      ],
+      [
+        167,
+        175
+      ]
+    ],
+    "src/main/scala/xiangshan/frontend/WrBypass.scala": [
+      [
+        26,
+        33
+      ],
+      [
+        42,
+        59
+      ],
+      [
+        65,
+        71
+      ],
+      [
+        123,
+        152
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "build.sc",
+    "utility"
+  ],
+  "raw_diff_path": "ground_truth/openxiangshan.xiangshan_4242.raw.diff"
+}

@@ -1,0 +1,38 @@
+{
+  "case_id": "sld-columbia.esp#96",
+  "issue_repo": {
+    "owner": "sld-columbia",
+    "name": "esp"
+  },
+  "fix_repo": {
+    "owner": "sld-columbia",
+    "name": "esp"
+  },
+  "fix_oid": "767657a91f960c3e1b32d4a0b46c3613a33623e3",
+  "buggy_commit_sha": "607b249f06fb257c50e6f4e2e9d8a447f92eb1ee",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/sld-columbia.esp_96.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "767657a91f960c3e1b32d4a0b46c3613a33623e3",
+    "2d3a51be2f67ed9faf755dd9f72f898d0524aed1",
+    "57804de0988834c5ff325b1b2c0698819a16ebb3",
+    "2a11bfe79bc49d77a2b13c734fceb2fd5d796fc4",
+    "081b6562cfd5144c9184107f851193e4524215ed",
+    "d4e6bc8a19892c84c6d8b2c05a3e36e334768396"
+  ],
+  "n_fix_commits": 6,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "utils/toolchain/build_leon3_toolchain.sh",
+    "utils/toolchain/build_riscv32imc_toolchain.sh",
+    "utils/toolchain/build_riscv_toolchain.sh",
+    "utils/zynq"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/sld-columbia.esp_96.raw.diff"
+}

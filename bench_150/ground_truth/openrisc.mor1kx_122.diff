@@ -1,0 +1,801 @@
+diff --git a/rtl/verilog/mor1kx_immu.v b/rtl/verilog/mor1kx_immu.v
+index d05537d..c284ef6 100644
+--- a/rtl/verilog/mor1kx_immu.v
++++ b/rtl/verilog/mor1kx_immu.v
+@@ -174,13 +174,13 @@ endgenerate
+          if (itlb_match_reload_we & !tlb_reload_huge)
+            itlb_match_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !spr_bus_ack;
++           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r;
+ 
+          itlb_trans_we[j] = 0;
+          if (itlb_trans_reload_we & !tlb_reload_huge)
+            itlb_trans_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !spr_bus_ack;
++           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r;
+       end
+    end
+ 
+@@ -231,16 +231,16 @@ endgenerate
+    assign itlb_trans_spr_cs = spr_bus_stb_i & (spr_bus_addr_i[15:11] == 5'd2) &
+                               |spr_bus_addr_i[10:9] & spr_bus_addr_i[7];
+ 
+-   assign itlb_match_addr = itlb_match_spr_cs & !spr_bus_ack ?
++   assign itlb_match_addr = itlb_match_spr_cs & !itlb_match_spr_cs_r ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+-   assign itlb_trans_addr = itlb_trans_spr_cs & !spr_bus_ack ?
++   assign itlb_trans_addr = itlb_trans_spr_cs & !itlb_trans_spr_cs_r ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+ 
+-   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !spr_bus_ack ?
++   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r ?
+ 			   spr_bus_dat_i : itlb_match_reload_din;
+-   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !spr_bus_ack ?
++   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r ?
+ 			   spr_bus_dat_i : itlb_trans_reload_din;
+ 
+    assign itlb_match_huge_addr = virt_addr_i[24+(OPTION_IMMU_SET_WIDTH-1):24];
+diff --git a/rtl/verilog/mor1kx_immu.v b/rtl/verilog/mor1kx_immu.v
+index d05537d..c284ef6 100644
+--- a/rtl/verilog/mor1kx_immu.v
++++ b/rtl/verilog/mor1kx_immu.v
+@@ -174,13 +174,13 @@ endgenerate
+          if (itlb_match_reload_we & !tlb_reload_huge)
+            itlb_match_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !spr_bus_ack;
++           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r;
+ 
+          itlb_trans_we[j] = 0;
+          if (itlb_trans_reload_we & !tlb_reload_huge)
+            itlb_trans_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !spr_bus_ack;
++           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r;
+       end
+    end
+ 
+@@ -231,16 +231,16 @@ endgenerate
+    assign itlb_trans_spr_cs = spr_bus_stb_i & (spr_bus_addr_i[15:11] == 5'd2) &
+                               |spr_bus_addr_i[10:9] & spr_bus_addr_i[7];
+ 
+-   assign itlb_match_addr = itlb_match_spr_cs & !spr_bus_ack ?
++   assign itlb_match_addr = itlb_match_spr_cs & !itlb_match_spr_cs_r ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+-   assign itlb_trans_addr = itlb_trans_spr_cs & !spr_bus_ack ?
++   assign itlb_trans_addr = itlb_trans_spr_cs & !itlb_trans_spr_cs_r ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+ 
+-   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !spr_bus_ack ?
++   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r ?
+ 			   spr_bus_dat_i : itlb_match_reload_din;
+-   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !spr_bus_ack ?
++   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r ?
+ 			   spr_bus_dat_i : itlb_trans_reload_din;
+ 
+    assign itlb_match_huge_addr = virt_addr_i[24+(OPTION_IMMU_SET_WIDTH-1):24];
+diff --git a/rtl/verilog/mor1kx_dcache.v b/rtl/verilog/mor1kx_dcache.v
+index 979c9bc..6ba87df 100644
+--- a/rtl/verilog/mor1kx_dcache.v
++++ b/rtl/verilog/mor1kx_dcache.v
+@@ -342,6 +342,9 @@ module mor1kx_dcache
+     */
+    integer w1;
+    always @(posedge clk `OR_ASYNC_RST) begin
++      // The default is (of course) not to acknowledge the invalidate
++      invalidate_ack <= 1'b0;
++
+       if (rst) begin
+ 	 state <= IDLE;
+ 	 write_pending <= 0;
+@@ -377,7 +380,7 @@ module mor1kx_dcache
+ 		 // Store address in invalidate_adr that is muxed to the tag
+ 		 // memory write address
+ 		 invalidate_adr <= spr_bus_dat_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+-
++		 invalidate_ack <= 1'b1;
+ 		 // Change to invalidate state that actually accesses
+ 		 // the tag memory
+ 		 state <= INVALIDATE;
+@@ -440,8 +443,10 @@ module mor1kx_dcache
+ 		 // Store address in invalidate_adr that is muxed to the tag
+ 		 // memory write address
+ 		 invalidate_adr <= spr_bus_dat_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+-
++		 invalidate_ack <= 1'b1;
+ 		 state <= INVALIDATE;
++	      end else if (cpu_we_i | write_pending) begin
++		 state <= WRITE;
+ 	      end else begin
+ 		 state <= IDLE;
+ 	      end
+@@ -472,9 +477,6 @@ module mor1kx_dcache
+ 
+       way_wr_dat = wrdat_i;
+ 
+-      // The default is (of course) not to acknowledge the invalidate
+-      invalidate_ack = 1'b0;
+-
+       if (snoop_hit) begin
+ 	 // This is the write access
+ 	 tag_we = 1'b1;
+@@ -497,16 +499,6 @@ module mor1kx_dcache
+ 		      wradr_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+ 
+ 	 case (state)
+-	   IDLE: begin
+-	      //
+-	      // When idle we can always acknowledge the invalidate as it
+-	      // has the highest priority in handling. When something is
+-	      // changed on the state machine handling above this needs
+-	      // to be changed.
+-	      //
+-	      invalidate_ack = 1'b1;
+-	   end
+-
+ 	   READ: begin
+ 	      if (hit) begin
+ 		 //
+@@ -525,7 +517,7 @@ module mor1kx_dcache
+ 
+ 	   WRITE: begin
+ 	      way_wr_dat = cpu_dat_i;
+-	      if (hit & cpu_req_i) begin
++	      if (hit & (cpu_req_i | write_pending)) begin
+ 		 /* Mux cache output with write data */
+ 		 if (!cpu_bsel_i[3])
+ 		   way_wr_dat[31:24] = cpu_dat_o[31:24];
+@@ -536,9 +528,9 @@ module mor1kx_dcache
+ 		 if (!cpu_bsel_i[0])
+ 		   way_wr_dat[7:0] = cpu_dat_o[7:0];
+ 
+-	      way_we = way_hit;
++		 way_we = way_hit;
+ 
+-	      tag_lru_in = next_lru_history;
++		 tag_lru_in = next_lru_history;
+ 
+ 		 tag_we = 1'b1;
+ 	      end
+@@ -586,8 +578,6 @@ module mor1kx_dcache
+ 	   end
+ 
+ 	   INVALIDATE: begin
+-	      invalidate_ack = 1'b1;
+-
+ 	      // Lazy invalidation, invalidate everything that matches tag address
+               tag_lru_in = 0;
+               for (w2 = 0; w2 < OPTION_DCACHE_WAYS; w2 = w2 + 1) begin
+diff --git a/rtl/verilog/mor1kx_immu.v b/rtl/verilog/mor1kx_immu.v
+index 9f64aa4..81dcc7c 100644
+--- a/rtl/verilog/mor1kx_immu.v
++++ b/rtl/verilog/mor1kx_immu.v
+@@ -86,6 +86,11 @@ module mor1kx_immu
+    wire 			      itlb_trans_spr_cs;
+    reg 				      itlb_trans_spr_cs_r;
+ 
++   reg				      itlb_match_spr_wr_r;
++   wire				      itlb_match_spr_wr_busy;
++   reg				      itlb_trans_spr_wr_r;
++   wire				      itlb_trans_spr_wr_busy;
++
+    wire 			      immucr_spr_cs;
+    reg 				      immucr_spr_cs_r;
+    reg [OPTION_OPERAND_WIDTH-1:0]     immucr;
+@@ -187,9 +192,16 @@ endgenerate
+    assign pagefault_o = (supervisor_mode_i ? !sxe : !uxe) &
+ 			!tlb_reload_busy_o & !busy_o;
+ 
+-   assign busy_o = enable_i & (itlb_match_spr_cs | itlb_match_spr_cs_r |
+-			       itlb_trans_spr_cs | itlb_trans_spr_cs_r) &
+-			      (!spr_bus_ack_r);
++   // When we have SPR writes they cause the immu to output bad data for
++   // 2 clock cycles.  This is outputted as busy so fetch does not proceed.
++   always @(posedge clk) begin
++     itlb_match_spr_wr_r <= |itlb_match_we;
++     itlb_trans_spr_wr_r <= |itlb_trans_we;
++   end
++   assign itlb_match_spr_wr_busy = (|itlb_match_we) | itlb_match_spr_wr_r;
++   assign itlb_trans_spr_wr_busy = (|itlb_trans_we) | itlb_trans_spr_wr_r;
++
++   assign busy_o = enable_i & (itlb_match_spr_wr_busy | itlb_trans_spr_wr_busy);
+ 
+    assign spr_way_idx_full = {spr_bus_addr_i[10], spr_bus_addr_i[8]};
+    assign spr_way_idx = spr_way_idx_full[WAYS_WIDTH-1:0];
+diff --git a/rtl/verilog/mor1kx_immu.v b/rtl/verilog/mor1kx_immu.v
+index 9f64aa4..06d9632 100644
+--- a/rtl/verilog/mor1kx_immu.v
++++ b/rtl/verilog/mor1kx_immu.v
+@@ -86,6 +86,13 @@ module mor1kx_immu
+    wire 			      itlb_trans_spr_cs;
+    reg 				      itlb_trans_spr_cs_r;
+ 
++   wire				      itlb_match_spr_tx;
++   reg				      itlb_match_spr_tx_r;
++   wire				      itlb_match_spr_tx_busy;
++   wire				      itlb_trans_spr_tx;
++   reg				      itlb_trans_spr_tx_r;
++   wire				      itlb_trans_spr_tx_busy;
++
+    wire 			      immucr_spr_cs;
+    reg 				      immucr_spr_cs_r;
+    reg [OPTION_OPERAND_WIDTH-1:0]     immucr;
+@@ -174,22 +181,35 @@ endgenerate
+          if (itlb_match_reload_we & !tlb_reload_huge)
+            itlb_match_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r;
++           itlb_match_we[j] = itlb_match_spr_tx & spr_bus_we_i;
+ 
+          itlb_trans_we[j] = 0;
+          if (itlb_trans_reload_we & !tlb_reload_huge)
+            itlb_trans_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r;
++           itlb_trans_we[j] = itlb_trans_spr_tx & spr_bus_we_i;
+       end
+    end
+ 
+    assign pagefault_o = (supervisor_mode_i ? !sxe : !uxe) &
+ 			!tlb_reload_busy_o & !busy_o;
+ 
+-   assign busy_o = enable_i & (itlb_match_spr_cs | itlb_match_spr_cs_r |
+-			       itlb_trans_spr_cs | itlb_trans_spr_cs_r) &
+-			      (!spr_bus_ack_r);
++   // itlb_*_spr_tx - signals to indicate the start of a read/write
++   //                 transaction
++   // itlb_*_spr_cs_r is registered 1 clock cycle delay of itlb_*_spr_cs
++   assign itlb_match_spr_tx = itlb_match_spr_cs & !itlb_match_spr_cs_r;
++   assign itlb_trans_spr_tx = itlb_trans_spr_cs & !itlb_trans_spr_cs_r;
++
++   // When we have SPR writes they cause the immu to output bad data for
++   // 2 clock cycles.  For 2 clocks we signal busy so fetch does not proceed.
++   always @(posedge clk) begin
++     itlb_match_spr_tx_r <= itlb_match_spr_tx;
++     itlb_trans_spr_tx_r <= itlb_trans_spr_tx;
++   end
++   assign itlb_match_spr_tx_busy = itlb_match_spr_tx | itlb_match_spr_tx_r;
++   assign itlb_trans_spr_tx_busy = itlb_trans_spr_tx | itlb_trans_spr_tx_r;
++
++   assign busy_o = enable_i & (itlb_match_spr_tx_busy | itlb_trans_spr_tx_busy);
+ 
+    assign spr_way_idx_full = {spr_bus_addr_i[10], spr_bus_addr_i[8]};
+    assign spr_way_idx = spr_way_idx_full[WAYS_WIDTH-1:0];
+@@ -231,16 +251,16 @@ endgenerate
+    assign itlb_trans_spr_cs = spr_bus_stb_i & (spr_bus_addr_i[15:11] == 5'd2) &
+                               |spr_bus_addr_i[10:9] & spr_bus_addr_i[7];
+ 
+-   assign itlb_match_addr = itlb_match_spr_cs & !itlb_match_spr_cs_r ?
++   assign itlb_match_addr = itlb_match_spr_tx ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+-   assign itlb_trans_addr = itlb_trans_spr_cs & !itlb_trans_spr_cs_r ?
++   assign itlb_trans_addr = itlb_trans_spr_tx ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+ 
+-   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r ?
++   assign itlb_match_din = itlb_match_spr_tx & spr_bus_we_i ?
+ 			   spr_bus_dat_i : itlb_match_reload_din;
+-   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r ?
++   assign itlb_trans_din = itlb_trans_spr_tx & spr_bus_we_i ?
+ 			   spr_bus_dat_i : itlb_trans_reload_din;
+ 
+    assign itlb_match_huge_addr = virt_addr_i[24+(OPTION_IMMU_SET_WIDTH-1):24];
+diff --git a/rtl/verilog/mor1kx_immu.v b/rtl/verilog/mor1kx_immu.v
+index d05537d..c284ef6 100644
+--- a/rtl/verilog/mor1kx_immu.v
++++ b/rtl/verilog/mor1kx_immu.v
+@@ -174,13 +174,13 @@ endgenerate
+          if (itlb_match_reload_we & !tlb_reload_huge)
+            itlb_match_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !spr_bus_ack;
++           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r;
+ 
+          itlb_trans_we[j] = 0;
+          if (itlb_trans_reload_we & !tlb_reload_huge)
+            itlb_trans_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !spr_bus_ack;
++           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r;
+       end
+    end
+ 
+@@ -231,16 +231,16 @@ endgenerate
+    assign itlb_trans_spr_cs = spr_bus_stb_i & (spr_bus_addr_i[15:11] == 5'd2) &
+                               |spr_bus_addr_i[10:9] & spr_bus_addr_i[7];
+ 
+-   assign itlb_match_addr = itlb_match_spr_cs & !spr_bus_ack ?
++   assign itlb_match_addr = itlb_match_spr_cs & !itlb_match_spr_cs_r ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+-   assign itlb_trans_addr = itlb_trans_spr_cs & !spr_bus_ack ?
++   assign itlb_trans_addr = itlb_trans_spr_cs & !itlb_trans_spr_cs_r ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+ 
+-   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !spr_bus_ack ?
++   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r ?
+ 			   spr_bus_dat_i : itlb_match_reload_din;
+-   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !spr_bus_ack ?
++   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r ?
+ 			   spr_bus_dat_i : itlb_trans_reload_din;
+ 
+    assign itlb_match_huge_addr = virt_addr_i[24+(OPTION_IMMU_SET_WIDTH-1):24];
+diff --git a/rtl/verilog/mor1kx_dcache.v b/rtl/verilog/mor1kx_dcache.v
+index 979c9bc..6ba87df 100644
+--- a/rtl/verilog/mor1kx_dcache.v
++++ b/rtl/verilog/mor1kx_dcache.v
+@@ -342,6 +342,9 @@ module mor1kx_dcache
+     */
+    integer w1;
+    always @(posedge clk `OR_ASYNC_RST) begin
++      // The default is (of course) not to acknowledge the invalidate
++      invalidate_ack <= 1'b0;
++
+       if (rst) begin
+ 	 state <= IDLE;
+ 	 write_pending <= 0;
+@@ -377,7 +380,7 @@ module mor1kx_dcache
+ 		 // Store address in invalidate_adr that is muxed to the tag
+ 		 // memory write address
+ 		 invalidate_adr <= spr_bus_dat_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+-
++		 invalidate_ack <= 1'b1;
+ 		 // Change to invalidate state that actually accesses
+ 		 // the tag memory
+ 		 state <= INVALIDATE;
+@@ -440,8 +443,10 @@ module mor1kx_dcache
+ 		 // Store address in invalidate_adr that is muxed to the tag
+ 		 // memory write address
+ 		 invalidate_adr <= spr_bus_dat_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+-
++		 invalidate_ack <= 1'b1;
+ 		 state <= INVALIDATE;
++	      end else if (cpu_we_i | write_pending) begin
++		 state <= WRITE;
+ 	      end else begin
+ 		 state <= IDLE;
+ 	      end
+@@ -472,9 +477,6 @@ module mor1kx_dcache
+ 
+       way_wr_dat = wrdat_i;
+ 
+-      // The default is (of course) not to acknowledge the invalidate
+-      invalidate_ack = 1'b0;
+-
+       if (snoop_hit) begin
+ 	 // This is the write access
+ 	 tag_we = 1'b1;
+@@ -497,16 +499,6 @@ module mor1kx_dcache
+ 		      wradr_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+ 
+ 	 case (state)
+-	   IDLE: begin
+-	      //
+-	      // When idle we can always acknowledge the invalidate as it
+-	      // has the highest priority in handling. When something is
+-	      // changed on the state machine handling above this needs
+-	      // to be changed.
+-	      //
+-	      invalidate_ack = 1'b1;
+-	   end
+-
+ 	   READ: begin
+ 	      if (hit) begin
+ 		 //
+@@ -525,7 +517,7 @@ module mor1kx_dcache
+ 
+ 	   WRITE: begin
+ 	      way_wr_dat = cpu_dat_i;
+-	      if (hit & cpu_req_i) begin
++	      if (hit & (cpu_req_i | write_pending)) begin
+ 		 /* Mux cache output with write data */
+ 		 if (!cpu_bsel_i[3])
+ 		   way_wr_dat[31:24] = cpu_dat_o[31:24];
+@@ -536,9 +528,9 @@ module mor1kx_dcache
+ 		 if (!cpu_bsel_i[0])
+ 		   way_wr_dat[7:0] = cpu_dat_o[7:0];
+ 
+-	      way_we = way_hit;
++		 way_we = way_hit;
+ 
+-	      tag_lru_in = next_lru_history;
++		 tag_lru_in = next_lru_history;
+ 
+ 		 tag_we = 1'b1;
+ 	      end
+@@ -586,8 +578,6 @@ module mor1kx_dcache
+ 	   end
+ 
+ 	   INVALIDATE: begin
+-	      invalidate_ack = 1'b1;
+-
+ 	      // Lazy invalidation, invalidate everything that matches tag address
+               tag_lru_in = 0;
+               for (w2 = 0; w2 < OPTION_DCACHE_WAYS; w2 = w2 + 1) begin
+diff --git a/rtl/verilog/mor1kx_immu.v b/rtl/verilog/mor1kx_immu.v
+index c284ef6..06d9632 100644
+--- a/rtl/verilog/mor1kx_immu.v
++++ b/rtl/verilog/mor1kx_immu.v
+@@ -86,6 +86,13 @@ module mor1kx_immu
+    wire 			      itlb_trans_spr_cs;
+    reg 				      itlb_trans_spr_cs_r;
+ 
++   wire				      itlb_match_spr_tx;
++   reg				      itlb_match_spr_tx_r;
++   wire				      itlb_match_spr_tx_busy;
++   wire				      itlb_trans_spr_tx;
++   reg				      itlb_trans_spr_tx_r;
++   wire				      itlb_trans_spr_tx_busy;
++
+    wire 			      immucr_spr_cs;
+    reg 				      immucr_spr_cs_r;
+    reg [OPTION_OPERAND_WIDTH-1:0]     immucr;
+@@ -174,22 +181,35 @@ endgenerate
+          if (itlb_match_reload_we & !tlb_reload_huge)
+            itlb_match_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r;
++           itlb_match_we[j] = itlb_match_spr_tx & spr_bus_we_i;
+ 
+          itlb_trans_we[j] = 0;
+          if (itlb_trans_reload_we & !tlb_reload_huge)
+            itlb_trans_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r;
++           itlb_trans_we[j] = itlb_trans_spr_tx & spr_bus_we_i;
+       end
+    end
+ 
+    assign pagefault_o = (supervisor_mode_i ? !sxe : !uxe) &
+ 			!tlb_reload_busy_o & !busy_o;
+ 
+-   assign busy_o = ((itlb_match_spr_cs | itlb_trans_spr_cs) & !spr_bus_ack |
+-		    (itlb_match_spr_cs_r | itlb_trans_spr_cs_r) &
+-		    spr_bus_ack & !spr_bus_ack_r) & enable_i;
++   // itlb_*_spr_tx - signals to indicate the start of a read/write
++   //                 transaction
++   // itlb_*_spr_cs_r is registered 1 clock cycle delay of itlb_*_spr_cs
++   assign itlb_match_spr_tx = itlb_match_spr_cs & !itlb_match_spr_cs_r;
++   assign itlb_trans_spr_tx = itlb_trans_spr_cs & !itlb_trans_spr_cs_r;
++
++   // When we have SPR writes they cause the immu to output bad data for
++   // 2 clock cycles.  For 2 clocks we signal busy so fetch does not proceed.
++   always @(posedge clk) begin
++     itlb_match_spr_tx_r <= itlb_match_spr_tx;
++     itlb_trans_spr_tx_r <= itlb_trans_spr_tx;
++   end
++   assign itlb_match_spr_tx_busy = itlb_match_spr_tx | itlb_match_spr_tx_r;
++   assign itlb_trans_spr_tx_busy = itlb_trans_spr_tx | itlb_trans_spr_tx_r;
++
++   assign busy_o = enable_i & (itlb_match_spr_tx_busy | itlb_trans_spr_tx_busy);
+ 
+    assign spr_way_idx_full = {spr_bus_addr_i[10], spr_bus_addr_i[8]};
+    assign spr_way_idx = spr_way_idx_full[WAYS_WIDTH-1:0];
+@@ -231,16 +251,16 @@ endgenerate
+    assign itlb_trans_spr_cs = spr_bus_stb_i & (spr_bus_addr_i[15:11] == 5'd2) &
+                               |spr_bus_addr_i[10:9] & spr_bus_addr_i[7];
+ 
+-   assign itlb_match_addr = itlb_match_spr_cs & !itlb_match_spr_cs_r ?
++   assign itlb_match_addr = itlb_match_spr_tx ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+-   assign itlb_trans_addr = itlb_trans_spr_cs & !itlb_trans_spr_cs_r ?
++   assign itlb_trans_addr = itlb_trans_spr_tx ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+ 
+-   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r ?
++   assign itlb_match_din = itlb_match_spr_tx & spr_bus_we_i ?
+ 			   spr_bus_dat_i : itlb_match_reload_din;
+-   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r ?
++   assign itlb_trans_din = itlb_trans_spr_tx & spr_bus_we_i ?
+ 			   spr_bus_dat_i : itlb_trans_reload_din;
+ 
+    assign itlb_match_huge_addr = virt_addr_i[24+(OPTION_IMMU_SET_WIDTH-1):24];
+diff --git a/rtl/verilog/mor1kx_immu.v b/rtl/verilog/mor1kx_immu.v
+index d05537d..c284ef6 100644
+--- a/rtl/verilog/mor1kx_immu.v
++++ b/rtl/verilog/mor1kx_immu.v
+@@ -174,13 +174,13 @@ endgenerate
+          if (itlb_match_reload_we & !tlb_reload_huge)
+            itlb_match_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !spr_bus_ack;
++           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r;
+ 
+          itlb_trans_we[j] = 0;
+          if (itlb_trans_reload_we & !tlb_reload_huge)
+            itlb_trans_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !spr_bus_ack;
++           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r;
+       end
+    end
+ 
+@@ -231,16 +231,16 @@ endgenerate
+    assign itlb_trans_spr_cs = spr_bus_stb_i & (spr_bus_addr_i[15:11] == 5'd2) &
+                               |spr_bus_addr_i[10:9] & spr_bus_addr_i[7];
+ 
+-   assign itlb_match_addr = itlb_match_spr_cs & !spr_bus_ack ?
++   assign itlb_match_addr = itlb_match_spr_cs & !itlb_match_spr_cs_r ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+-   assign itlb_trans_addr = itlb_trans_spr_cs & !spr_bus_ack ?
++   assign itlb_trans_addr = itlb_trans_spr_cs & !itlb_trans_spr_cs_r ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+ 
+-   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !spr_bus_ack ?
++   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r ?
+ 			   spr_bus_dat_i : itlb_match_reload_din;
+-   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !spr_bus_ack ?
++   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r ?
+ 			   spr_bus_dat_i : itlb_trans_reload_din;
+ 
+    assign itlb_match_huge_addr = virt_addr_i[24+(OPTION_IMMU_SET_WIDTH-1):24];
+diff --git a/rtl/verilog/mor1kx_dcache.v b/rtl/verilog/mor1kx_dcache.v
+index 979c9bc..6ba87df 100644
+--- a/rtl/verilog/mor1kx_dcache.v
++++ b/rtl/verilog/mor1kx_dcache.v
+@@ -342,6 +342,9 @@ module mor1kx_dcache
+     */
+    integer w1;
+    always @(posedge clk `OR_ASYNC_RST) begin
++      // The default is (of course) not to acknowledge the invalidate
++      invalidate_ack <= 1'b0;
++
+       if (rst) begin
+ 	 state <= IDLE;
+ 	 write_pending <= 0;
+@@ -377,7 +380,7 @@ module mor1kx_dcache
+ 		 // Store address in invalidate_adr that is muxed to the tag
+ 		 // memory write address
+ 		 invalidate_adr <= spr_bus_dat_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+-
++		 invalidate_ack <= 1'b1;
+ 		 // Change to invalidate state that actually accesses
+ 		 // the tag memory
+ 		 state <= INVALIDATE;
+@@ -440,8 +443,10 @@ module mor1kx_dcache
+ 		 // Store address in invalidate_adr that is muxed to the tag
+ 		 // memory write address
+ 		 invalidate_adr <= spr_bus_dat_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+-
++		 invalidate_ack <= 1'b1;
+ 		 state <= INVALIDATE;
++	      end else if (cpu_we_i | write_pending) begin
++		 state <= WRITE;
+ 	      end else begin
+ 		 state <= IDLE;
+ 	      end
+@@ -472,9 +477,6 @@ module mor1kx_dcache
+ 
+       way_wr_dat = wrdat_i;
+ 
+-      // The default is (of course) not to acknowledge the invalidate
+-      invalidate_ack = 1'b0;
+-
+       if (snoop_hit) begin
+ 	 // This is the write access
+ 	 tag_we = 1'b1;
+@@ -497,16 +499,6 @@ module mor1kx_dcache
+ 		      wradr_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+ 
+ 	 case (state)
+-	   IDLE: begin
+-	      //
+-	      // When idle we can always acknowledge the invalidate as it
+-	      // has the highest priority in handling. When something is
+-	      // changed on the state machine handling above this needs
+-	      // to be changed.
+-	      //
+-	      invalidate_ack = 1'b1;
+-	   end
+-
+ 	   READ: begin
+ 	      if (hit) begin
+ 		 //
+@@ -525,7 +517,7 @@ module mor1kx_dcache
+ 
+ 	   WRITE: begin
+ 	      way_wr_dat = cpu_dat_i;
+-	      if (hit & cpu_req_i) begin
++	      if (hit & (cpu_req_i | write_pending)) begin
+ 		 /* Mux cache output with write data */
+ 		 if (!cpu_bsel_i[3])
+ 		   way_wr_dat[31:24] = cpu_dat_o[31:24];
+@@ -536,9 +528,9 @@ module mor1kx_dcache
+ 		 if (!cpu_bsel_i[0])
+ 		   way_wr_dat[7:0] = cpu_dat_o[7:0];
+ 
+-	      way_we = way_hit;
++		 way_we = way_hit;
+ 
+-	      tag_lru_in = next_lru_history;
++		 tag_lru_in = next_lru_history;
+ 
+ 		 tag_we = 1'b1;
+ 	      end
+@@ -586,8 +578,6 @@ module mor1kx_dcache
+ 	   end
+ 
+ 	   INVALIDATE: begin
+-	      invalidate_ack = 1'b1;
+-
+ 	      // Lazy invalidation, invalidate everything that matches tag address
+               tag_lru_in = 0;
+               for (w2 = 0; w2 < OPTION_DCACHE_WAYS; w2 = w2 + 1) begin
+diff --git a/rtl/verilog/mor1kx_immu.v b/rtl/verilog/mor1kx_immu.v
+index c284ef6..06d9632 100644
+--- a/rtl/verilog/mor1kx_immu.v
++++ b/rtl/verilog/mor1kx_immu.v
+@@ -86,6 +86,13 @@ module mor1kx_immu
+    wire 			      itlb_trans_spr_cs;
+    reg 				      itlb_trans_spr_cs_r;
+ 
++   wire				      itlb_match_spr_tx;
++   reg				      itlb_match_spr_tx_r;
++   wire				      itlb_match_spr_tx_busy;
++   wire				      itlb_trans_spr_tx;
++   reg				      itlb_trans_spr_tx_r;
++   wire				      itlb_trans_spr_tx_busy;
++
+    wire 			      immucr_spr_cs;
+    reg 				      immucr_spr_cs_r;
+    reg [OPTION_OPERAND_WIDTH-1:0]     immucr;
+@@ -174,22 +181,35 @@ endgenerate
+          if (itlb_match_reload_we & !tlb_reload_huge)
+            itlb_match_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_match_we[j] = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r;
++           itlb_match_we[j] = itlb_match_spr_tx & spr_bus_we_i;
+ 
+          itlb_trans_we[j] = 0;
+          if (itlb_trans_reload_we & !tlb_reload_huge)
+            itlb_trans_we[j] = 1;
+          if (j[WAYS_WIDTH-1:0] == spr_way_idx)
+-           itlb_trans_we[j] = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r;
++           itlb_trans_we[j] = itlb_trans_spr_tx & spr_bus_we_i;
+       end
+    end
+ 
+    assign pagefault_o = (supervisor_mode_i ? !sxe : !uxe) &
+ 			!tlb_reload_busy_o & !busy_o;
+ 
+-   assign busy_o = ((itlb_match_spr_cs | itlb_trans_spr_cs) & !spr_bus_ack |
+-		    (itlb_match_spr_cs_r | itlb_trans_spr_cs_r) &
+-		    spr_bus_ack & !spr_bus_ack_r) & enable_i;
++   // itlb_*_spr_tx - signals to indicate the start of a read/write
++   //                 transaction
++   // itlb_*_spr_cs_r is registered 1 clock cycle delay of itlb_*_spr_cs
++   assign itlb_match_spr_tx = itlb_match_spr_cs & !itlb_match_spr_cs_r;
++   assign itlb_trans_spr_tx = itlb_trans_spr_cs & !itlb_trans_spr_cs_r;
++
++   // When we have SPR writes they cause the immu to output bad data for
++   // 2 clock cycles.  For 2 clocks we signal busy so fetch does not proceed.
++   always @(posedge clk) begin
++     itlb_match_spr_tx_r <= itlb_match_spr_tx;
++     itlb_trans_spr_tx_r <= itlb_trans_spr_tx;
++   end
++   assign itlb_match_spr_tx_busy = itlb_match_spr_tx | itlb_match_spr_tx_r;
++   assign itlb_trans_spr_tx_busy = itlb_trans_spr_tx | itlb_trans_spr_tx_r;
++
++   assign busy_o = enable_i & (itlb_match_spr_tx_busy | itlb_trans_spr_tx_busy);
+ 
+    assign spr_way_idx_full = {spr_bus_addr_i[10], spr_bus_addr_i[8]};
+    assign spr_way_idx = spr_way_idx_full[WAYS_WIDTH-1:0];
+@@ -231,16 +251,16 @@ endgenerate
+    assign itlb_trans_spr_cs = spr_bus_stb_i & (spr_bus_addr_i[15:11] == 5'd2) &
+                               |spr_bus_addr_i[10:9] & spr_bus_addr_i[7];
+ 
+-   assign itlb_match_addr = itlb_match_spr_cs & !itlb_match_spr_cs_r ?
++   assign itlb_match_addr = itlb_match_spr_tx ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+-   assign itlb_trans_addr = itlb_trans_spr_cs & !itlb_trans_spr_cs_r ?
++   assign itlb_trans_addr = itlb_trans_spr_tx ?
+ 			    spr_bus_addr_i[OPTION_IMMU_SET_WIDTH-1:0] :
+ 			    virt_addr_i[13+(OPTION_IMMU_SET_WIDTH-1):13];
+ 
+-   assign itlb_match_din = itlb_match_spr_cs & spr_bus_we_i & !itlb_match_spr_cs_r ?
++   assign itlb_match_din = itlb_match_spr_tx & spr_bus_we_i ?
+ 			   spr_bus_dat_i : itlb_match_reload_din;
+-   assign itlb_trans_din = itlb_trans_spr_cs & spr_bus_we_i & !itlb_trans_spr_cs_r ?
++   assign itlb_trans_din = itlb_trans_spr_tx & spr_bus_we_i ?
+ 			   spr_bus_dat_i : itlb_trans_reload_din;
+ 
+    assign itlb_match_huge_addr = virt_addr_i[24+(OPTION_IMMU_SET_WIDTH-1):24];
+diff --git a/rtl/verilog/mor1kx_dcache.v b/rtl/verilog/mor1kx_dcache.v
+index 3948729..ca90d0a 100644
+--- a/rtl/verilog/mor1kx_dcache.v
++++ b/rtl/verilog/mor1kx_dcache.v
+@@ -513,7 +513,13 @@ module mor1kx_dcache
+ 	   end
+ 
+ 	   INVALIDATE: begin
+-	      if (invalidate) begin
++	      if (cpu_we_i) begin
++		 // If we get a write while we are in invalidate its because
++		 // We have already acked the invalidate and the control unit
++		 // has moved on.  So start the write as if we were in READ
++		 // or idle.
++		 state <= WRITE;
++	      end else if (invalidate) begin
+ 		 // Store address in invalidate_adr that is muxed to the tag
+ 		 // memory write address
+ 		 invalidate_adr <= spr_bus_dat_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+@@ -854,9 +860,6 @@ endgenerate
+       if ($past(cpu_we_i))
+ 	 assume (cpu_req_i);
+ 
+-      if (f_flush_pending)
+-	 assume (!cpu_req_i);
+-
+       if (|f_pending)
+ 	 assume (!cpu_we_i);
+ 
+@@ -899,7 +902,7 @@ endgenerate
+ 	 f_op_count <= F_COUNT_RESET;
+       end else if (f_past_valid & f_op_count[F_COUNT_MSB]) begin
+ 	 // If idle check if we can start a transaction
+-	 if (invalidate) begin
++	 if (invalidate & !spr_bus_ack_o) begin
+ 	    f_flush_pending <= 1;
+ 	    f_op_count <= F_COUNT_START;
+ 	 end else if (cpu_we_i | (write_pending & cpu_req_i)) begin
+@@ -930,7 +933,7 @@ endgenerate
+ 	       f_write_complete <= 1;
+ 	 end
+ 
+-	 if (spr_bus_ack_o) begin
++	 if (f_flush_pending & spr_bus_ack_o) begin
+ 	    f_flush_pending <= 0;
+ 	    f_op_count <= F_COUNT_RESET;
+ 	    if (f_spr_addr_here)
+diff --git a/rtl/verilog/mor1kx_dcache.v b/rtl/verilog/mor1kx_dcache.v
+index 5943dc0..692d223 100644
+--- a/rtl/verilog/mor1kx_dcache.v
++++ b/rtl/verilog/mor1kx_dcache.v
+@@ -513,7 +513,13 @@ module mor1kx_dcache
+ 	   end
+ 
+ 	   INVALIDATE: begin
+-	      if (invalidate) begin
++	      if (cpu_we_i) begin
++		 // If we get a write while we are in invalidate its because
++		 // We have already acked the invalidate and the control unit
++		 // has moved on.  So start the write as if we were in READ
++		 // or idle.
++		 state <= WRITE;
++	      end else if (invalidate) begin
+ 		 // Store address in invalidate_adr that is muxed to the tag
+ 		 // memory write address
+ 		 invalidate_adr <= spr_bus_dat_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];
+diff --git a/rtl/verilog/mor1kx_dcache.v b/rtl/verilog/mor1kx_dcache.v
+index 5943dc0..692d223 100644
+--- a/rtl/verilog/mor1kx_dcache.v
++++ b/rtl/verilog/mor1kx_dcache.v
+@@ -513,7 +513,13 @@ module mor1kx_dcache
+ 	   end
+ 
+ 	   INVALIDATE: begin
+-	      if (invalidate) begin
++	      if (cpu_we_i) begin
++		 // If we get a write while we are in invalidate its because
++		 // We have already acked the invalidate and the control unit
++		 // has moved on.  So start the write as if we were in READ
++		 // or idle.
++		 state <= WRITE;
++	      end else if (invalidate) begin
+ 		 // Store address in invalidate_adr that is muxed to the tag
+ 		 // memory write address
+ 		 invalidate_adr <= spr_bus_dat_i[WAY_WIDTH-1:OPTION_DCACHE_BLOCK_WIDTH];

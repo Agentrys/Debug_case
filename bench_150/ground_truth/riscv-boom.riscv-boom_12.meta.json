@@ -1,0 +1,110 @@
+{
+  "case_id": "riscv-boom.riscv-boom#12",
+  "issue_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_oid": "8e910df8baa6280d4afa6fb4dcbfbc153ee83504",
+  "buggy_commit_sha": "984827db2eef869538fdcc652f8f50a2757b378a",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/riscv-boom.riscv-boom_12.diff",
+  "diff_sha256": "36de80d8adbcc768de8b6c9b69cc7354d07eefc4178b515df3119055066a9afb",
+  "fix_oids_sorted": [
+    "8e910df8baa6280d4afa6fb4dcbfbc153ee83504",
+    "cc3cbf332d502b072df052af7c6d25e6b98dc54e",
+    "05c57b3ca7928f19e326094f468e81efc438edee"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/exu/rename/column-arbiter.scala",
+    "src/main/scala/exu/rename/ring-rename.scala",
+    "src/main/resources/vsrc/SimTMACounterDump.v",
+    "src/main/scala/v3/common/BoomPerfCounterDevice.scala",
+    "src/main/scala/v3/common/tile.scala",
+    "src/main/scala/v3/exu/core.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/exu/rename/column-arbiter.scala": [
+      [
+        33,
+        40
+      ]
+    ],
+    "src/main/scala/exu/rename/ring-rename.scala": [
+      [
+        279,
+        285
+      ]
+    ],
+    "src/main/resources/vsrc/SimTMACounterDump.v": [
+      [
+        47,
+        53
+      ],
+      [
+        65,
+        91
+      ],
+      [
+        127,
+        133
+      ],
+      [
+        148,
+        166
+      ]
+    ],
+    "src/main/scala/v3/common/BoomPerfCounterDevice.scala": [
+      [
+        51,
+        98
+      ],
+      [
+        154,
+        165
+      ],
+      [
+        167,
+        173
+      ]
+    ],
+    "src/main/scala/v3/common/tile.scala": [
+      [
+        266,
+        275
+      ],
+      [
+        287,
+        293
+      ]
+    ],
+    "src/main/scala/v3/exu/core.scala": [
+      [
+        948,
+        953
+      ],
+      [
+        978,
+        1016
+      ],
+      [
+        1064,
+        1088
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "Makefrag",
+    "README.md",
+    "src/main/resources/csrc/SimTMACounterDump.cc"
+  ],
+  "raw_diff_path": "ground_truth/riscv-boom.riscv-boom_12.raw.diff"
+}

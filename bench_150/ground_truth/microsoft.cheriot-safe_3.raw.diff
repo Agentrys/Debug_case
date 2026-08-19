@@ -1,0 +1,80 @@
+diff --git a/examples/01.hello_world/hello.cc b/examples/01.hello_world/hello.cc
+index 17ec80c..9db87a1 100644
+--- a/examples/01.hello_world/hello.cc
++++ b/examples/01.hello_world/hello.cc
+@@ -1,6 +1,5 @@
+-// Copyright Microsoft and CHERIoT Contributors.
+-// SPDX-License-Identifier: MIT
+-
++#include <platform-gpio-leds.hh>
++#include <thread.h>
+ #include <compartment.h>
+ #include <debug.hh>
+ #include <fail-simulator-on-error.h>
+@@ -11,6 +10,25 @@ using Debug = ConditionalDebug<true, "Hello world compartment">;
+ /// Thread entry point.
+ void __cheri_compartment("hello") say_hello()
+ {
+-	// Print hello world, along with the compartment's name to the default UART.
++	auto leds = MMIO_CAPABILITY(LEDs, gpio_led0);
++	leds->enable_all();
++	bool on = true;
+ 	Debug::log("Hello world");
++	while (true)
++	{
++		if (on)
++		{
++			leds->led_off(0);
++			leds->led_on(1);
++		}
++		else
++		{
++			leds->led_on(0);
++			leds->led_off(1);
++		}
++		on = !on;
++		Timeout t{100};
++		thread_sleep(&t);
++	}
++	// Print hello world, along with the compartment's name to the default UART.
+ }
+diff --git a/examples/01.hello_world/hello.cc b/examples/01.hello_world/hello.cc
+index 17ec80c..9db87a1 100644
+--- a/examples/01.hello_world/hello.cc
++++ b/examples/01.hello_world/hello.cc
+@@ -1,6 +1,5 @@
+-// Copyright Microsoft and CHERIoT Contributors.
+-// SPDX-License-Identifier: MIT
+-
++#include <platform-gpio-leds.hh>
++#include <thread.h>
+ #include <compartment.h>
+ #include <debug.hh>
+ #include <fail-simulator-on-error.h>
+@@ -11,6 +10,25 @@ using Debug = ConditionalDebug<true, "Hello world compartment">;
+ /// Thread entry point.
+ void __cheri_compartment("hello") say_hello()
+ {
+-	// Print hello world, along with the compartment's name to the default UART.
++	auto leds = MMIO_CAPABILITY(LEDs, gpio_led0);
++	leds->enable_all();
++	bool on = true;
+ 	Debug::log("Hello world");
++	while (true)
++	{
++		if (on)
++		{
++			leds->led_off(0);
++			leds->led_on(1);
++		}
++		else
++		{
++			leds->led_on(0);
++			leds->led_off(1);
++		}
++		on = !on;
++		Timeout t{100};
++		thread_sleep(&t);
++	}
++	// Print hello world, along with the compartment's name to the default UART.
+ }

@@ -1,0 +1,156 @@
+diff --git a/src/main/scala/HeaderEnum.scala b/src/main/scala/HeaderEnum.scala
+index 24e86331..995a8d0a 100644
+--- a/src/main/scala/HeaderEnum.scala
++++ b/src/main/scala/HeaderEnum.scala
+@@ -1,7 +1,7 @@
+ package testchipip
+ 
+ import Chisel._
+-import scala.collection.mutable.HashMap
++import scala.collection.mutable.{HashMap, ListBuffer}
+ 
+ class HeaderEnum(val prefix: String) {
+   val h = new HashMap[String,Int]
+@@ -12,10 +12,13 @@ class HeaderEnum(val prefix: String) {
+ }
+ 
+ object HeaderEnum {
++  val contents = new ListBuffer[String]
++
+   def apply(prefix: String, names: String*): HeaderEnum = {
+     val e = new HeaderEnum(prefix)
+     names.zipWithIndex.foreach { case (n,i) => e.h.put(n,i) }
+-    SCRHeaderOutput.add(e.makeHeader())
++    val header = e.makeHeader()
++    if(!HeaderEnum.contents.contains(header)) HeaderEnum.contents += header
+     e
+   }
+ }
+diff --git a/src/main/scala/SCR.scala b/src/main/scala/SCR.scala
+index dea22f00..d251308a 100644
+--- a/src/main/scala/SCR.scala
++++ b/src/main/scala/SCR.scala
+@@ -4,6 +4,7 @@ import Chisel._
+ import uncore.tilelink._
+ import cde.Parameters
+ import scala.collection.mutable.ListBuffer
++import scala.collection.mutable.HashMap
+ 
+ trait HasSCRParameters {
+   val scrDataBits = 64
+@@ -38,11 +39,12 @@ class SCRFile(
+ 
+   val acq = Queue(io.tl.acquire)
+   val addr = Cat(acq.bits.addr_block, acq.bits.addr_beat)
++  val index = addr(log2Up(nControl+nStatus), 0)
+   val wen = acq.valid && acq.bits.hasData()
+   val wdata = acq.bits.data
+ 
+   for (i <- 0 until nControl)
+-    when (wen && addr(log2Up(nControl), 0) === UInt(i)) { ctrl_reg(i) := wdata }
++    when (wen && index === UInt(i)) { ctrl_reg(i) := wdata }
+ 
+   acq.ready := io.tl.grant.ready
+   io.tl.grant.valid := acq.valid
+@@ -52,7 +54,7 @@ class SCRFile(
+     client_xact_id = acq.bits.client_xact_id,
+     manager_xact_id = UInt(0),
+     addr_beat = acq.bits.addr_beat,
+-    data = all_reg(addr))
++    data = all_reg(index))
+ 
+   io.control := ctrl_reg
+ }
+@@ -74,6 +76,7 @@ class SCRBuilder(val devName: String) extends HasSCRParameters {
+ 
+   def generate(start: BigInt, c: Clock = null, r: Bool = null)(implicit p: Parameters): SCRFile = {
+     SCRHeaderOutput.add(this.makeHeader(start))
++    SCRAddressMap.add(devName, this.makeHashMap(start))
+     Module(new SCRFile(controlNames.toSeq, statusNames.toSeq, controlInits.toSeq, c, r))
+   }
+ 
+@@ -89,6 +92,29 @@ class SCRBuilder(val devName: String) extends HasSCRParameters {
+ 
+     sb.toString
+   }
++
++  def makeHashMap(start: BigInt): HashMap[String,BigInt] = {
++    val map = new HashMap[String,BigInt]
++    val statusOff = controlNames.size*(scrDataBits/8)
++
++    for ((name, i) <- controlNames.zipWithIndex)
++      map.put(name, start + i*(scrDataBits/8))
++
++    for ((name, i) <- statusNames.zipWithIndex)
++      map.put(name, start + statusOff + i*(scrDataBits/8))
++
++    map
++  }
++}
++
++object SCRAddressMap {
++  val contents = new HashMap[String,HashMap[String,BigInt]]
++
++  def add(s: String, m: HashMap[String,BigInt]) {
++    contents.put(s, m)
++  }
++
++  def apply(s: String) = contents.get(s)
+ }
+ 
+ object SCRHeaderOutput {
+diff --git a/src/main/scala/Util.scala b/src/main/scala/Util.scala
+index 7dfb864a..182b5c2d 100644
+--- a/src/main/scala/Util.scala
++++ b/src/main/scala/Util.scala
+@@ -1,8 +1,12 @@
+ package testchipip
+ 
+ import chisel3.util.ShiftRegister
++import chisel3.util.Enum
++import chisel3.util.Counter
+ import util.WideCounter
+ import chisel3._
++import uncore.tilelink._
++import cde.Parameters
+ 
+ class ResetSync(c: Clock, lat: Int = 2) extends Module(_clock = c) {
+   val io = new Bundle {
+@@ -40,3 +44,37 @@ object WideCounterModule {
+     counter.io.value
+   }
+ }
++
++/**
++ * Simple widget to apply a sequence of puts to a port
++ * @param s a Seq of Puts
++ */
++class PutSeqDriver(val s: Seq[Tuple2[BigInt,Int]])(implicit p: Parameters) extends Driver()(p) {
++
++  val (s_idle :: s_put_req :: s_put_resp :: s_done :: Nil) = Enum(Bits(), 4)
++  val state = Reg(init = s_idle)
++
++  val n = s.size
++  val puts = Vec(s.map { case (a, d) =>
++    val addr = UInt(a)
++    val beatAddr = addr(tlBeatAddrBits+tlByteAddrBits-1,tlByteAddrBits)
++    val blockAddr = addr(tlBlockAddrBits+tlBeatAddrBits+tlByteAddrBits-1,tlBeatAddrBits+tlByteAddrBits)
++    Put(UInt(0), blockAddr, beatAddr, UInt(d))
++  })
++
++  val (put_cnt, put_done) = Counter(state === s_put_resp && io.mem.grant.valid, n)
++
++  io.mem.acquire.valid := state === s_put_req
++  io.mem.acquire.bits := puts(put_cnt)
++  io.mem.grant.ready := state === s_put_resp
++
++  when (state === s_idle && io.start) { state := s_put_req }
++  when (state === s_put_req && io.mem.acquire.ready) { state := s_put_resp }
++  when (state === s_put_resp && io.mem.grant.valid) {
++    state := Mux(put_done, s_done, s_put_req)
++  }
++
++  io.finished := (state === s_done)
++
++}
++

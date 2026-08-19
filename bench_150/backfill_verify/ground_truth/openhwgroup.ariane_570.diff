@@ -1,0 +1,3451 @@
+diff --git a/core/ariane.sv b/core/ariane.sv
+index 5668e606..6217c7fd 100644
+--- a/core/ariane.sv
++++ b/core/ariane.sv
+@@ -42,6 +42,11 @@ module ariane import ariane_pkg::*; #(
+   // firesim trace port
+   output traced_instr_pkg::trace_port_t trace_o,
+ `endif
++`ifdef RVFI_TRACE
++  // RISC-V formal interface port (`rvfi`):
++  // Can be left open when formal tracing is not needed.
++  output ariane_rvfi_pkg::rvfi_port_t  rvfi_o,
++`endif
+ `ifdef PITON_ARIANE
+   // L15 (memory side)
+   output wt_cache_pkg::l15_req_t       l15_req_o,
+@@ -894,4 +899,38 @@ module ariane import ariane_pkg::*; #(
+ `endif // VERILATOR
+ //pragma translate_on
+ 
++`ifdef RVFI_TRACE
++  always_comb
++    for (int i = 0; i < NR_COMMIT_PORTS; i++) begin
++      logic exception, mem_exception;
++      exception = commit_instr_id_commit[i].valid && commit_instr_id_commit[i].ex.valid && ex_commit.valid;
++      mem_exception = exception &&
++        (commit_instr_id_commit[i].ex.cause == riscv::INSTR_ADDR_MISALIGNED ||
++         commit_instr_id_commit[i].ex.cause == riscv::INSTR_ACCESS_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::ILLEGAL_INSTR ||
++         commit_instr_id_commit[i].ex.cause == riscv::LD_ADDR_MISALIGNED ||
++         commit_instr_id_commit[i].ex.cause == riscv::LD_ACCESS_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::ST_ADDR_MISALIGNED ||
++         commit_instr_id_commit[i].ex.cause == riscv::ST_ACCESS_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::INSTR_PAGE_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::LOAD_PAGE_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::STORE_PAGE_FAULT);
++      // when rvfi_valid, the instruction is executed
++      rvfi_o[i].valid    = (commit_ack[i] && !commit_instr_id_commit[i].ex.valid) ||
++        (exception && (commit_instr_id_commit[i].ex.cause == riscv::ENV_CALL_MMODE ||
++                  commit_instr_id_commit[i].ex.cause == riscv::ENV_CALL_SMODE ||
++                  commit_instr_id_commit[i].ex.cause == riscv::ENV_CALL_UMODE));
++      rvfi_o[i].insn     = commit_instr_id_commit[i].ex.tval[31:0];
++      // when trap, the instruction is not executed
++      rvfi_o[i].trap     = mem_exception;
++      rvfi_o[i].mode     = debug_mode ? 2'b10 : priv_lvl;
++      rvfi_o[i].ixl      = riscv::XLEN == 64 ? 2 : 1;
++      rvfi_o[i].rs1_addr = commit_instr_id_commit[i].rs1;
++      rvfi_o[i].rs2_addr = commit_instr_id_commit[i].rs2;
++      rvfi_o[i].rd_addr  = commit_instr_id_commit[i].rd;
++      rvfi_o[i].rd_wdata = ariane_pkg::is_rd_fpr(commit_instr_id_commit[i].op) == 0 ? wdata_commit_id[i] : commit_instr_id_commit[i].result;
++      rvfi_o[i].pc_rdata = commit_instr_id_commit[i].pc;
++    end
++`endif
++
+ endmodule // ariane
+diff --git a/core/ariane_wrapper.sv b/core/ariane_wrapper.sv
+new file mode 100644
+index 00000000..a430cb64
+--- /dev/null
++++ b/core/ariane_wrapper.sv
+@@ -0,0 +1,237 @@
++// Copyright 2021 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++module ariane_wrapper import ariane_pkg::*; #(
++  parameter ariane_pkg::ariane_cfg_t ArianeCfg     = ariane_pkg::ArianeDefaultConfig
++) (
++  input  logic                         clk_i,
++  input  logic                         rst_ni,
++  // Core ID, Cluster ID and boot address are considered more or less static
++  input  logic [63:0]                  boot_addr_i,  // reset boot address
++  input  logic [63:0]                  hart_id_i,    // hart id in a multicore environment (reflected in a CSR)
++
++  // Interrupt inputs
++  input  logic [1:0]                   irq_i,        // level sensitive IR lines, mip & sip (async)
++  input  logic                         ipi_i,        // inter-processor interrupts (async)
++  // Timer facilities
++  input  logic                         time_irq_i,   // timer interrupt in (async)
++  input  logic                         debug_req_i,  // debug request (async)
++`ifdef FIRESIM_TRACE
++  // firesim trace port
++  output traced_instr_pkg::trace_port_t trace_o,
++`endif
++  // RISC-V formal interface port (`rvfi`):
++  // Can be left open when formal tracing is not needed.
++  output logic                         rvfi_valid_1,
++  output logic[63:0]                   rvfi_order_1,
++  output logic[31:0]                   rvfi_insn_1,
++  output logic                         rvfi_trap_1,
++  output logic                         rvfi_halt_1,
++  output logic                         rvfi_intr_1,
++  output logic[2:0]                    rvfi_mode_1,
++  output logic[2:0]                    rvfi_ixl_1,
++  output logic[4:0]                    rvfi_rs1_addr_1,
++  output logic[4:0]                    rvfi_rs2_addr_1,
++  output logic[riscv::XLEN-1:0]        rvfi_rs1_rdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_rs2_rdata_1,
++  output logic[4:0]                    rvfi_rd_addr_1,
++  output logic[riscv::XLEN-1:0]        rvfi_rd_wdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_rdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_wdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_addr_1,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_rmask_1,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_wmask_1,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_rdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_wdata_1,
++  output logic                         rvfi_valid_0,
++  output logic[63:0]                   rvfi_order_0,
++  output logic[31:0]                   rvfi_insn_0,
++  output logic                         rvfi_trap_0,
++  output logic                         rvfi_halt_0,
++  output logic                         rvfi_intr_0,
++  output logic[2:0]                    rvfi_mode_0,
++  output logic[2:0]                    rvfi_ixl_0,
++  output logic[4:0]                    rvfi_rs1_addr_0,
++  output logic[4:0]                    rvfi_rs2_addr_0,
++  output logic[riscv::XLEN-1:0]        rvfi_rs1_rdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_rs2_rdata_0,
++  output logic[4:0]                    rvfi_rd_addr_0,
++  output logic[riscv::XLEN-1:0]        rvfi_rd_wdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_rdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_wdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_addr_0,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_rmask_0,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_wmask_0,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_rdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_wdata_0,
++`ifdef PITON_ARIANE
++  // L15 (memory side)
++  output wt_cache_pkg::l15_req_t       l15_req_o,
++  input  wt_cache_pkg::l15_rtrn_t      l15_rtrn_i
++`else
++  // memory side, AXI Master
++  output ariane_axi::id_t              aw_id_o,
++  output ariane_axi::addr_t            aw_addr_o,
++  output axi_pkg::len_t                aw_len_o,
++  output axi_pkg::size_t               aw_size_o,
++  output axi_pkg::burst_t              aw_burst_o,
++  output logic                         aw_lock_o,
++  output axi_pkg::cache_t              aw_cache_o,
++  output axi_pkg::prot_t               aw_prot_o,
++  output axi_pkg::qos_t                aw_qos_o,
++  output axi_pkg::region_t             aw_region_o,
++  output axi_pkg::atop_t               aw_atop_o,
++  output ariane_axi::user_t            aw_user_o,
++  output logic                         aw_valid_o,
++  output ariane_axi::data_t            w_data_o,
++  output ariane_axi::strb_t            w_strb_o,
++  output logic                         w_last_o,
++  output ariane_axi::user_t            w_user_o,
++  output logic                         w_valid_o,
++  output logic                         b_ready_o,
++  output ariane_axi::id_t              ar_id_o,
++  output ariane_axi::addr_t            ar_addr_o,
++  output axi_pkg::len_t                ar_len_o,
++  output axi_pkg::size_t               ar_size_o,
++  output axi_pkg::burst_t              ar_burst_o,
++  output logic                         ar_lock_o,
++  output axi_pkg::cache_t              ar_cache_o,
++  output axi_pkg::prot_t               ar_prot_o,
++  output axi_pkg::qos_t                ar_qos_o,
++  output axi_pkg::region_t             ar_region_o,
++  output ariane_axi::user_t            ar_user_o,
++  output logic                         ar_valid_o,
++  output logic                         r_ready_o,
++  input  logic                         aw_ready_i,
++  input  logic                         ar_ready_i,
++  input  logic                         w_ready_i,
++  input  logic                         b_valid_i,
++  input  ariane_axi::id_t              b_id_i,
++  input  axi_pkg::resp_t               b_resp_i,
++  input  ariane_axi::user_t            b_user_i,
++  input  logic                         r_valid_i,
++  input  ariane_axi::id_t              r_id_i,
++  input  ariane_axi::data_t            r_data_i,
++  input  axi_pkg::resp_t               r_resp_i,
++  input  logic                         r_last_i,
++  input  ariane_axi::user_t            r_user_i
++`endif
++);
++
++  ariane_axi::req_t               axi_ariane_req;
++  ariane_axi::resp_t              axi_ariane_resp;
++  ariane_rvfi_pkg::rvfi_port_t    rvfi;
++
++  assign aw_id_o                  = axi_ariane_req.aw.id;
++  assign aw_addr_o                = axi_ariane_req.aw.addr;
++  assign aw_len_o                 = axi_ariane_req.aw.len;
++  assign aw_size_o                = axi_ariane_req.aw.size;
++  assign aw_burst_o               = axi_ariane_req.aw.burst;
++  assign aw_lock_o                = axi_ariane_req.aw.lock;
++  assign aw_cache_o               = axi_ariane_req.aw.cache;
++  assign aw_prot_o                = axi_ariane_req.aw.prot;
++  assign aw_qos_o                 = axi_ariane_req.aw.qos;
++  assign aw_region_o              = axi_ariane_req.aw.region;
++  assign aw_atop_o                = axi_ariane_req.aw.atop;
++  assign aw_user_o                = axi_ariane_req.aw.user;
++  assign aw_valid_o               = axi_ariane_req.aw_valid;
++  assign w_data_o                 = axi_ariane_req.w.data;
++  assign w_strb_o                 = axi_ariane_req.w.strb;
++  assign w_last_o                 = axi_ariane_req.w.last;
++  assign w_user_o                 = axi_ariane_req.w.user;
++  assign w_valid_o                = axi_ariane_req.w_valid;
++  assign b_ready_o                = axi_ariane_req.b_ready;
++  assign ar_id_o                  = axi_ariane_req.ar.id;
++  assign ar_addr_o                = axi_ariane_req.ar.addr;
++  assign ar_len_o                 = axi_ariane_req.ar.len;
++  assign ar_size_o                = axi_ariane_req.ar.size;
++  assign ar_burst_o               = axi_ariane_req.ar.burst;
++  assign ar_lock_o                = axi_ariane_req.ar.lock;
++  assign ar_cache_o               = axi_ariane_req.ar.cache;
++  assign ar_prot_o                = axi_ariane_req.ar.prot;
++  assign ar_qos_o                 = axi_ariane_req.ar.qos;
++  assign ar_region_o              = axi_ariane_req.ar.region;
++  assign ar_user_o                = axi_ariane_req.ar.user;
++  assign ar_valid_o               = axi_ariane_req.ar_valid;
++  assign r_ready_o                = axi_ariane_req.r_ready;
++
++  assign axi_ariane_resp.aw_ready = aw_ready_i;
++  assign axi_ariane_resp.ar_ready = ar_ready_i;
++  assign axi_ariane_resp.w_ready  = w_ready_i;
++  assign axi_ariane_resp.b_valid  = b_valid_i;
++  assign axi_ariane_resp.b.id     = b_id_i;
++  assign axi_ariane_resp.b.resp   = b_resp_i;
++  assign axi_ariane_resp.b.user   = b_user_i;
++  assign axi_ariane_resp.r_valid  = r_valid_i;
++  assign axi_ariane_resp.r.id     = r_id_i;
++  assign axi_ariane_resp.r.data   = r_data_i;
++  assign axi_ariane_resp.r.resp   = r_resp_i;
++  assign axi_ariane_resp.r.last   = r_last_i;
++  assign axi_ariane_resp.r.user   = r_user_i;
++
++  assign rvfi_valid_1             = rvfi[1].valid;
++  assign rvfi_order_1             = rvfi[1].order;
++  assign rvfi_insn_1              = rvfi[1].insn;
++  assign rvfi_trap_1              = rvfi[1].trap;
++  assign rvfi_halt_1              = rvfi[1].halt;
++  assign rvfi_intr_1              = rvfi[1].intr;
++  assign rvfi_mode_1              = rvfi[1].mode;
++  assign rvfi_ixl_1               = rvfi[1].ixl;
++  assign rvfi_rs1_addr_1          = rvfi[1].rs1_addr;
++  assign rvfi_rs2_addr_1          = rvfi[1].rs2_addr;
++  assign rvfi_rs1_rdata_1         = rvfi[1].rs1_rdata;
++  assign rvfi_rs2_rdata_1         = rvfi[1].rs2_rdata;
++  assign rvfi_rd_addr_1           = rvfi[1].rd_addr;
++  assign rvfi_rd_wdata_1          = rvfi[1].rd_wdata;
++  assign rvfi_pc_rdata_1          = rvfi[1].pc_rdata;
++  assign rvfi_pc_wdata_1          = rvfi[1].pc_wdata;
++  assign rvfi_mem_addr_1          = rvfi[1].mem_addr;
++  assign rvfi_mem_rmask_1         = rvfi[1].mem_rmask;
++  assign rvfi_mem_wmask_1         = rvfi[1].mem_wmask;
++  assign rvfi_mem_rdata_1         = rvfi[1].mem_rdata;
++  assign rvfi_mem_wdata_1         = rvfi[1].mem_wdata;
++  assign rvfi_valid_0             = rvfi[0].valid;
++  assign rvfi_order_0             = rvfi[0].order;
++  assign rvfi_insn_0              = rvfi[0].insn;
++  assign rvfi_trap_0              = rvfi[0].trap;
++  assign rvfi_halt_0              = rvfi[0].halt;
++  assign rvfi_intr_0              = rvfi[0].intr;
++  assign rvfi_mode_0              = rvfi[0].mode;
++  assign rvfi_ixl_0               = rvfi[0].ixl;
++  assign rvfi_rs1_addr_0          = rvfi[0].rs1_addr;
++  assign rvfi_rs2_addr_0          = rvfi[0].rs2_addr;
++  assign rvfi_rs1_rdata_0         = rvfi[0].rs1_rdata;
++  assign rvfi_rs2_rdata_0         = rvfi[0].rs2_rdata;
++  assign rvfi_rd_addr_0           = rvfi[0].rd_addr;
++  assign rvfi_rd_wdata_0          = rvfi[0].rd_wdata;
++  assign rvfi_pc_rdata_0          = rvfi[0].pc_rdata;
++  assign rvfi_pc_wdata_0          = rvfi[0].pc_wdata;
++  assign rvfi_mem_addr_0          = rvfi[0].mem_addr;
++  assign rvfi_mem_rmask_0         = rvfi[0].mem_rmask;
++  assign rvfi_mem_wmask_0         = rvfi[0].mem_wmask;
++  assign rvfi_mem_rdata_0         = rvfi[0].mem_rdata;
++  assign rvfi_mem_wdata_0         = rvfi[0].mem_wdata;
++
++  ariane #(
++    .ArianeCfg  ( ariane_soc::ArianeSocCfg )
++  ) i_ariane (
++    .clk_i                ( clk_i           ),
++    .rst_ni               ( rst_ni          ),
++    .boot_addr_i          ( boot_addr_i     ),
++    .hart_id_i            ( hart_id_i       ),
++    .irq_i                ( irq_i           ),
++    .ipi_i                ( ipi_i           ),
++    .time_irq_i           ( time_irq_i      ),
++    .rvfi_o               ( rvfi            ),
++    .debug_req_i          ( debug_req_i     ),
++    .axi_req_o            ( axi_ariane_req  ),
++    .axi_resp_i           ( axi_ariane_resp )
++  );
++
++endmodule // ariane_wrapper
+diff --git a/core/example_tb/cva6_tb.sv b/core/example_tb/cva6_tb.sv
+deleted file mode 100644
+index b60d379b..00000000
+--- a/core/example_tb/cva6_tb.sv
++++ /dev/null
+@@ -1,190 +0,0 @@
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-// Copyright 2021 OpenHW Group
+-//
+-// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
+-// you may not use this file except in compliance with the License.
+-// You may obtain a copy of the License at
+-//
+-//    https://solderpad.org/licenses/
+-//
+-// Unless required by applicable law or agreed to in writing, software
+-// distributed under the License is distributed on an "AS IS" BASIS,
+-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-// See the License for the specific language governing permissions and
+-// limitations under the License.
+-//
+-// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-// CVA6 "core_only" testbench.
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-
+-module cva6_core_only_tb #(
+-  parameter int unsigned AXI_USER_WIDTH    = 1,
+-  parameter int unsigned AXI_ADDRESS_WIDTH = 64,
+-  parameter int unsigned AXI_DATA_WIDTH    = 64,
+-  //parameter int unsigned NUM_WORDS         = 2**25,       // memory size
+-  parameter int unsigned NUM_WORDS         = 2**10         // memory size
+-) (
+-  input  logic verilator_clk_i,
+-  input  logic verilator_rstn_i,
+-  output wire  tb_exit_o
+-);
+-
+-  localparam CLK_REPORT_COUNT  =  100;
+-  localparam CLK_TIMEOUT_COUNT = 1000;
+-  localparam CLK_PERIOD        =   10;
+-  localparam RESET_ASSERT_TIME = 1234;
+-
+-  reg     r_tb_clk;
+-  reg     r_tb_rstn;
+-  reg     r_tb_exit;
+-  integer clk_cntr;
+-
+-  wire    tb_clk;
+-  wire    tb_rstn;
+-
+-  //----------------------------------------------------------------------------
+-  // Core:
+-  //      The AXI REQ and RESP ports are implemented as structs which are
+-  //      defined in two packages:
+-  //            - package "ariane_axi_soc" defined in tb/ariane_axi_soc_pkg.sv
+-  //            - package "axi_pkg"        defined in src/axi/src/axi_pkg.sv
+-  //      TODO: extract these package definitions into a single file that is
+-  //            completely independ of the RTL.
+-  //----------------------------------------------------------------------------
+-  ariane_axi_soc::req_t    axi_ariane_req;
+-  ariane_axi_soc::resp_t   axi_ariane_resp;
+-
+-  ariane #(
+-    .ArianeCfg  ( ariane_soc::ArianeSocCfg )
+-  ) i_cva6 (
+-    .clk_i                ( tb_clk                    ),
+-    .rst_ni               ( tb_rstn                   ),
+-    .boot_addr_i          ( 64'h0000_0000_0001_0000   ), //ariane_soc::ROMBase
+-    .hart_id_i            ( 64'h0000_0000_0000_0000   ), //seriously? 2**64 harts?!?
+-    .irq_i                ( 2'b00 /*irqs*/            ),
+-    .ipi_i                ( 1'b0  /*ipi*/             ),
+-    .time_irq_i           ( 1'b0  /*timer_irq*/       ),
+-    .debug_req_i          ( 1'b0                      ),
+-    .axi_req_o            ( axi_ariane_req            ),
+-    .axi_resp_i           ( axi_ariane_resp           )
+-  );
+-
+-  //----------------------------------------------------------------------------
+-  // Memory
+-  //----------------------------------------------------------------------------
+-
+-  logic                         req;
+-  logic                         we;
+-  logic [AXI_ADDRESS_WIDTH-1:0] addr;
+-  logic [AXI_DATA_WIDTH/8-1:0]  be;
+-  logic [AXI_DATA_WIDTH-1:0]    wdata;
+-  logic [AXI_DATA_WIDTH-1:0]    rdata;
+-
+-  AXI_BUS #(
+-    .AXI_ADDR_WIDTH ( AXI_ADDRESS_WIDTH        ),
+-    .AXI_DATA_WIDTH ( AXI_DATA_WIDTH           ),
+-    .AXI_ID_WIDTH   ( ariane_soc::IdWidthSlave ),
+-    .AXI_USER_WIDTH ( AXI_USER_WIDTH           )
+-  ) cva6_axi_bus();
+-
+-  axi_master_connect #(
+-  ) i_axi_master_connect_cva6_to_mem (
+-    .axi_req_i  (axi_ariane_req),
+-    .axi_resp_o (axi_ariane_resp),
+-    .master     (cva6_axi_bus)
+-  );
+-
+-  axi2mem #(
+-    .AXI_ID_WIDTH   ( ariane_soc::IdWidthSlave ),
+-    .AXI_ADDR_WIDTH ( AXI_ADDRESS_WIDTH        ),
+-    .AXI_DATA_WIDTH ( AXI_DATA_WIDTH           ),
+-    .AXI_USER_WIDTH ( AXI_USER_WIDTH           )
+-  ) i_cva6_axi2mem (
+-    .clk_i  ( tb_clk       ),
+-    .rst_ni ( tb_rstn      ),
+-    .slave  ( cva6_axi_bus ),
+-    .req_o  ( req          ),
+-    .we_o   ( we           ),
+-    .addr_o ( addr         ),
+-    .be_o   ( be           ),
+-    .data_o ( wdata        ),
+-    .data_i ( rdata        )
+-  );
+-
+-  cva6_core_tb_sram #(
+-    .DATA_WIDTH ( AXI_DATA_WIDTH ),
+-    .NUM_WORDS  ( NUM_WORDS      )
+-  ) i_cva6_core_tb_sram (
+-    .clk_i      ( tb_clk                                                                      ),
+-    .rstn_i     ( tb_rstn                                                                     ),
+-    .req_i      ( req                                                                         ),
+-    .we_i       ( we                                                                          ),
+-    .addr_i     ( addr[$clog2(NUM_WORDS)-1+$clog2(AXI_DATA_WIDTH/8):$clog2(AXI_DATA_WIDTH/8)] ),
+-    .wdata_i    ( wdata                                                                       ),
+-    .be_i       ( be                                                                          ),
+-    .rdata_o    ( rdata                                                                       )
+-  );
+-
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-// Testbench control:
+-//   - clock and reset generation
+-//   - wavedumping
+-//   - simulator init
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-`ifdef VERILATOR
+-  // testbench control for Verilator is handled in cva6_tb_verilator.cpp.
+-  assign tb_clk    = verilator_clk_i;
+-  assign tb_rstn   = verilator_rstn_i;
+-  assign tb_exit_o = 0;
+-`else  // VERILATOR
+-  assign tb_clk    = r_tb_clk;
+-  assign tb_rstn   = r_tb_rstn;
+-  assign tb_exit_o = r_tb_exit;
+-
+-  initial begin
+-    // units, precision, suffix-string, minimum-field-width)
+-    $timeformat(-9, 3, "ns", 5);
+-    //$dumpfile("cva6_tb.vcd");
+-    //$dumpvars(0, cva6_tb);
+-    r_tb_clk    = 0;
+-    r_tb_rstn   = 0;
+-    r_tb_exit   = 0;
+-    fork
+-      begin
+-        #RESET_ASSERT_TIME;
+-        r_tb_rstn = 1;
+-        $display("%m @ %0t: Reset de-asserted", $time);
+-      end
+-      begin
+-        #(CLK_PERIOD/2) r_tb_clk = ~r_tb_clk;
+-        $display("%m @ %0t: Clock started", $time);
+-        forever #(CLK_PERIOD/2) r_tb_clk = ~r_tb_clk;
+-      end
+-    join
+-  end
+-`endif // VERILATOR
+-
+-  always @(posedge tb_clk) begin
+-    if (!tb_rstn) begin
+-      clk_cntr  <= 0;
+-    end
+-    else begin
+-      clk_cntr++;
+-      if (!(clk_cntr%CLK_REPORT_COUNT)) begin
+-        $display("%m @ %0t: %0d clocks", $time, clk_cntr);
+-      end
+-      if (clk_cntr > (CLK_TIMEOUT_COUNT+2)) begin
+-        $display("%m @ %0t: FINISHED", $time);
+-        $finish;
+-      end
+-    end
+-  end
+-
+-endmodule
+diff --git a/core/example_tb/tb_components/cva6_core_tb_sram.sv b/core/example_tb/tb_components/cva6_core_tb_sram.sv
+deleted file mode 100644
+index 3e21b0a2..00000000
+--- a/core/example_tb/tb_components/cva6_core_tb_sram.sv
++++ /dev/null
+@@ -1,180 +0,0 @@
+-////////////////////////////////////////////////////////////////////////////////
+-//
+-// Copyright 2021 OpenHW Group
+-//
+-// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
+-// you may not use this file except in compliance with the License.
+-// You may obtain a copy of the License at
+-//
+-//     https://solderpad.org/licenses/
+-//
+-// Unless required by applicable law or agreed to in writing, software
+-// distributed under the License is distributed on an "AS IS" BASIS,
+-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-// See the License for the specific language governing permissions and
+-// limitations under the License.
+-//
+-// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
+-//
+-////////////////////////////////////////////////////////////////////////////////
+-//
+-// Copyright 2018 ETH Zurich and University of Bologna.
+-// Copyright and related rights are licensed under the Solderpad Hardware
+-// License, Version 0.51 (the "License"); you may not use this file except in
+-// compliance with the License.  You may obtain a copy of the License at
+-// http://solderpad.org/licenses/SHL-0.51. Unless required by applicable law
+-// or agreed to in writing, software, hardware and materials distributed under
+-// this License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-//
+-////////////////////////////////////////////////////////////////////////////////
+-// Description: Synchronous single-port synchronous memory model for the CVA6
+-//              core testbench. Support byte-wise enables.  Size of memory is
+-//              $ceil(DATA_WIDTH%64)-by-NUM_WORDS. (which may be overkill)
+-//              Author: Mike Thompson, OpenHW Group
+-//
+-//              Adapted from FPGA wrapper (requires the fpga-support submodule)
+-//              and "SyncSpRamBeNx64" originally developed for the Ariane
+-//              testharness by:
+-//                Florian Zaruba    <zarubaf@iis.ee.ethz.ch>, ETH Zurich
+-//                Michael Schaffner <schaffner@iis.ee.ethz.ch>, ETH Zurich
+-//                Date: 15.08.2018
+-////////////////////////////////////////////////////////////////////////////////
+-
+-module cva6_core_tb_sram #(
+-    parameter DATA_WIDTH  = 64,
+-    parameter NUM_WORDS   = 1024,
+-    parameter OUT_REGS    = 0    // enables output registers in FPGA macro (read lat = 2)
+-)(
+-   input  logic                          clk_i,
+-   input  logic                          rstn_i,
+-   input  logic                          req_i,
+-   input  logic                          we_i,
+-   input  logic [$clog2(NUM_WORDS)-1:0]  addr_i,
+-   input  logic [DATA_WIDTH-1:0]         wdata_i,
+-   input  logic [(DATA_WIDTH+7)/8-1:0]   be_i,
+-   output logic [DATA_WIDTH-1:0]         rdata_o
+-);
+-
+-localparam DATA_WIDTH_ALIGNED = ((DATA_WIDTH+63)/64)*64;
+-localparam BE_WIDTH_ALIGNED   = (((DATA_WIDTH+7)/8+7)/8)*8;
+-
+-logic [DATA_WIDTH_ALIGNED-1:0]  wdata_aligned;
+-logic [BE_WIDTH_ALIGNED-1:0]    be_aligned;
+-logic [DATA_WIDTH_ALIGNED-1:0]  rdata_aligned;
+-
+-// align to 64 bits for inferrable macro below
+-always_comb begin : p_align
+-    wdata_aligned                    ='0;
+-    be_aligned                       ='0;
+-    wdata_aligned[DATA_WIDTH-1:0]    = wdata_i;
+-    be_aligned[BE_WIDTH_ALIGNED-1:0] = be_i;
+-
+-    rdata_o = rdata_aligned[DATA_WIDTH-1:0];
+-end
+-
+-  for (genvar k = 0; k<(DATA_WIDTH+63)/64; k++) begin : gen_cut
+-      // unused byte-enable segments (8bits) are culled by the tool
+-      sync_sram_nx64 #(
+-        .ADDR_WIDTH($clog2(NUM_WORDS)),
+-        .DATA_DEPTH(NUM_WORDS),
+-        .SIM_INIT (4) // 0: no init, 1: zero init, 2: random init, 3: deadbeef init, 4: init from file
+-      ) i_ram (
+-          .Clk_CI    ( clk_i                     ),
+-          .Rst_RBI   ( rstn_i                    ),
+-          .CSel_SI   ( req_i                     ),
+-          .WrEn_SI   ( we_i                      ),
+-          .BEn_SI    ( be_aligned[k*8 +: 8]      ),
+-          .WrData_DI ( wdata_aligned[k*64 +: 64] ),
+-          .Addr_DI   ( addr_i                    ),
+-          .RdData_DO ( rdata_aligned[k*64 +: 64] )
+-      );
+-  end
+-endmodule : cva6_core_tb_sram
+-
+-
+-////////////////////////////////////////////////////////////////////////////////
+-// N-word by 64-bit synchronous SRAM model
+-////////////////////////////////////////////////////////////////////////////////
+-module sync_sram_nx64
+-#(
+-  parameter ADDR_WIDTH = 10,
+-  parameter DATA_DEPTH = 1024, // usually 2**ADDR_WIDTH, but can be lower
+-  parameter SIM_INIT   = 0     // for simulation only, will not be synthesized
+-                               // 0: no init, 1: zero init, 2: random init, 3: deadbeef init, 4: init from file
+-                               // note: on verilator, 2 is not supported. define the VERILATOR macro to work around.
+-)(
+-  input  logic                  Clk_CI,
+-  input  logic                  Rst_RBI,
+-  input  logic                  CSel_SI,
+-  input  logic                  WrEn_SI,
+-  input  logic [7:0]            BEn_SI,
+-  input  logic [63:0]           WrData_DI,
+-  input  logic [ADDR_WIDTH-1:0] Addr_DI,
+-  output logic [63:0]           RdData_DO
+-);
+-
+-  ////////////////////////////
+-  // signals, localparams
+-  ////////////////////////////
+-
+-  localparam DATA_BYTES = 8;
+-
+-  logic [DATA_BYTES*8-1:0] RdData_DN;
+-  logic [DATA_BYTES*8-1:0] RdData_DP;
+-
+-  logic [DATA_BYTES*8-1:0] Mem_DP[DATA_DEPTH-1:0];
+-  logic [7:0] Mem_init[0:'hFFFFFF];
+-
+-  initial begin
+-    $readmemh("../Mem_init.txt", Mem_init);
+-  end
+-
+-  assign RdData_DO = RdData_DP;
+-  assign RdData_DP = RdData_DN;
+-
+-  always_ff @(posedge Clk_CI) begin
+-    automatic logic [63:0] val;
+-    if(Rst_RBI == 1'b0 && SIM_INIT>0) begin
+-      for(int k=0; k<DATA_DEPTH;k++) begin
+-        // 0: no init, 1: zero init, 2: random init, 3: deadbeef init, 4: init from file
+-        if(SIM_INIT==1) val = '0;
+-    `ifndef VERILATOR
+-        else if(SIM_INIT==2) void'(randomize(val));
+-    `endif
+-        else if(SIM_INIT==3) val = 64'hdeadbeefdeadbeef;
+-        else val = {Mem_init[8*k+7], Mem_init[8*k+6],
+-                    Mem_init[8*k+5], Mem_init[8*k+4],
+-                    Mem_init[8*k+3], Mem_init[8*k+2],
+-                    Mem_init[8*k+1], Mem_init[8*k+0]};
+-        Mem_DP[k] = val;
+-        //$write("%m @ %0t: Mem_DP[%0d] = %h\n", $time, k, val);
+-      end
+-    end
+-    else begin
+-      if(CSel_SI) begin
+-        if(WrEn_SI) begin
+-          if(BEn_SI[0]) Mem_DP[Addr_DI][ 7: 0] <= WrData_DI[ 7: 0];
+-          if(BEn_SI[1]) Mem_DP[Addr_DI][15: 8] <= WrData_DI[15: 8];
+-          if(BEn_SI[2]) Mem_DP[Addr_DI][23:16] <= WrData_DI[23:16];
+-          if(BEn_SI[3]) Mem_DP[Addr_DI][31:24] <= WrData_DI[31:24];
+-          if(BEn_SI[4]) Mem_DP[Addr_DI][39:32] <= WrData_DI[39:32];
+-          if(BEn_SI[5]) Mem_DP[Addr_DI][47:40] <= WrData_DI[47:40];
+-          if(BEn_SI[6]) Mem_DP[Addr_DI][55:48] <= WrData_DI[55:48];
+-          if(BEn_SI[7]) Mem_DP[Addr_DI][63:56] <= WrData_DI[63:56];
+-        end
+-        RdData_DN <= Mem_DP[Addr_DI];
+-      end
+-    end
+-  end
+-
+-  ////////////////////////////
+-  // assertions
+-  ////////////////////////////
+-
+-  assert property
+-    (@(posedge Clk_CI) (longint'(2)**longint'(ADDR_WIDTH) >= longint'(DATA_DEPTH)))
+-    else $error("depth out of bounds");
+-
+-endmodule : sync_sram_nx64
+diff --git a/core/include/ariane_rvfi_pkg.sv b/core/include/ariane_rvfi_pkg.sv
+new file mode 100644
+index 00000000..18a2eed0
+--- /dev/null
++++ b/core/include/ariane_rvfi_pkg.sv
+@@ -0,0 +1,43 @@
++// Copyright 2020 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++package ariane_rvfi_pkg;
++
++  localparam NRET = 1;
++  localparam ILEN = 32;
++
++  typedef struct packed {
++    logic [NRET-1:0]                 valid;
++    logic [NRET*63:0]                order;
++    logic [NRET*ILEN-1:0]            insn;
++    logic [NRET-1:0]                 trap;
++    logic [NRET-1:0]                 halt;
++    logic [NRET-1:0]                 intr;
++    logic [NRET*2-1:0]               mode;
++    logic [NRET*2-1:0]               ixl;
++    logic [NRET*5-1:0]               rs1_addr;
++    logic [NRET*5-1:0]               rs2_addr;
++    logic [NRET*riscv::XLEN-1:0]     rs1_rdata;
++    logic [NRET*riscv::XLEN-1:0]     rs2_rdata;
++    logic [NRET*5-1:0]               rd_addr;
++    logic [NRET*riscv::XLEN-1:0]     rd_wdata;
++
++    logic [NRET*riscv::XLEN-1:0]     pc_rdata;
++    logic [NRET*riscv::XLEN-1:0]     pc_wdata;
++
++    logic [NRET*riscv::XLEN-1:0]     mem_addr;
++    logic [NRET*(riscv::XLEN/8)-1:0] mem_rmask;
++    logic [NRET*(riscv::XLEN/8)-1:0] mem_wmask;
++    logic [NRET*riscv::XLEN-1:0]     mem_rdata;
++    logic [NRET*riscv::XLEN-1:0]     mem_wdata;
++  } rvfi_instr_t;
++
++  typedef rvfi_instr_t [ariane_pkg::NR_COMMIT_PORTS-1:0] rvfi_port_t;
++
++endpackage
+diff --git a/core/include/cv32a6_imac_sv0_config_pkg.sv b/core/include/cv32a6_imac_sv0_config_pkg.sv
+new file mode 100644
+index 00000000..54f7c5c8
+--- /dev/null
++++ b/core/include/cv32a6_imac_sv0_config_pkg.sv
+@@ -0,0 +1,15 @@
++// Copyright 2021 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++
++package cva6_config_pkg;
++
++    localparam CVA6ConfigXlen = 32;
++
++endpackage
+diff --git a/core/include/cv64a6_imacfd_sv39_config_pkg.sv b/core/include/cv64a6_imacfd_sv39_config_pkg.sv
+new file mode 100644
+index 00000000..2ce3898f
+--- /dev/null
++++ b/core/include/cv64a6_imacfd_sv39_config_pkg.sv
+@@ -0,0 +1,15 @@
++// Copyright 2021 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++
++package cva6_config_pkg;
++
++    localparam CVA6ConfigXlen = 64;
++
++endpackage
+diff --git a/core/include/riscv_pkg.sv b/core/include/riscv_pkg.sv
+index 10ddf807..50c4ea58 100644
+--- a/core/include/riscv_pkg.sv
++++ b/core/include/riscv_pkg.sv
+@@ -14,8 +14,14 @@
+  *
+  * Description: Common RISC-V definitions.
+  */
++
+ package riscv;
+ 
++    // ----------------------
++    // Import cva6 config from cva6_config_pkg
++    // ----------------------
++    localparam XLEN = cva6_config_pkg::CVA6ConfigXlen;
++
+     // ----------------------
+     // Data and Address length
+     // ----------------------
+@@ -28,8 +34,6 @@ package riscv;
+        ModeSv64 = 11
+     } vm_mode_t;
+ 
+-    localparam XLEN = 64;
+-
+     // Warning: When using STD_CACHE, configuration must be PLEN=56 and VLEN=64
+     // Warning: VLEN must be superior or equal to PLEN
+     localparam VLEN       = (XLEN == 32) ? 32 : 64;    // virtual address length
+diff --git a/src/util/axi_master_connect.sv b/common/local/util/axi_master_connect.sv
+similarity index 100%
+rename from src/util/axi_master_connect.sv
+rename to common/local/util/axi_master_connect.sv
+diff --git a/src/util/axi_master_connect_rev.sv b/common/local/util/axi_master_connect_rev.sv
+similarity index 100%
+rename from src/util/axi_master_connect_rev.sv
+rename to common/local/util/axi_master_connect_rev.sv
+diff --git a/src/util/axi_slave_connect.sv b/common/local/util/axi_slave_connect.sv
+similarity index 100%
+rename from src/util/axi_slave_connect.sv
+rename to common/local/util/axi_slave_connect.sv
+diff --git a/src/util/axi_slave_connect_rev.sv b/common/local/util/axi_slave_connect_rev.sv
+similarity index 100%
+rename from src/util/axi_slave_connect_rev.sv
+rename to common/local/util/axi_slave_connect_rev.sv
+diff --git a/src/util/ex_trace_item.svh b/common/local/util/ex_trace_item.svh
+similarity index 100%
+rename from src/util/ex_trace_item.svh
+rename to common/local/util/ex_trace_item.svh
+diff --git a/src/util/find_first_one.sv b/common/local/util/find_first_one.sv
+similarity index 100%
+rename from src/util/find_first_one.sv
+rename to common/local/util/find_first_one.sv
+diff --git a/src/util/instr_trace_item.svh b/common/local/util/instr_trace_item.svh
+similarity index 100%
+rename from src/util/instr_trace_item.svh
+rename to common/local/util/instr_trace_item.svh
+diff --git a/src/util/instr_tracer.sv b/common/local/util/instr_tracer.sv
+similarity index 100%
+rename from src/util/instr_tracer.sv
+rename to common/local/util/instr_tracer.sv
+diff --git a/src/util/instr_tracer_if.sv b/common/local/util/instr_tracer_if.sv
+similarity index 100%
+rename from src/util/instr_tracer_if.sv
+rename to common/local/util/instr_tracer_if.sv
+diff --git a/src/util/sram.sv b/common/local/util/sram.sv
+similarity index 100%
+rename from src/util/sram.sv
+rename to common/local/util/sram.sv
+diff --git a/src/alu.sv b/core/alu.sv
+similarity index 100%
+rename from src/alu.sv
+rename to core/alu.sv
+diff --git a/src/amo_buffer.sv b/core/amo_buffer.sv
+similarity index 100%
+rename from src/amo_buffer.sv
+rename to core/amo_buffer.sv
+diff --git a/src/ariane.sv b/core/ariane.sv
+similarity index 94%
+rename from src/ariane.sv
+rename to core/ariane.sv
+index c0e4e5ac..ff398e61 100644
+--- a/src/ariane.sv
++++ b/core/ariane.sv
+@@ -42,6 +42,11 @@ module ariane import ariane_pkg::*; #(
+   // firesim trace port
+   output traced_instr_pkg::trace_port_t trace_o,
+ `endif
++`ifdef RVFI_TRACE
++  // RISC-V formal interface port (`rvfi`):
++  // Can be left open when formal tracing is not needed.
++  output ariane_rvfi_pkg::rvfi_port_t  rvfi_o,
++`endif
+ `ifdef PITON_ARIANE
+   // L15 (memory side)
+   output wt_cache_pkg::l15_req_t       l15_req_o,
+@@ -894,4 +899,38 @@ module ariane import ariane_pkg::*; #(
+ `endif // VERILATOR
+ //pragma translate_on
+ 
++`ifdef RVFI_TRACE
++  always_comb
++    for (int i = 0; i < NR_COMMIT_PORTS; i++) begin
++      logic exception, mem_exception;
++      exception = commit_instr_id_commit[i].valid && commit_instr_id_commit[i].ex.valid && ex_commit.valid;
++      mem_exception = exception &&
++        (commit_instr_id_commit[i].ex.cause == riscv::INSTR_ADDR_MISALIGNED ||
++         commit_instr_id_commit[i].ex.cause == riscv::INSTR_ACCESS_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::ILLEGAL_INSTR ||
++         commit_instr_id_commit[i].ex.cause == riscv::LD_ADDR_MISALIGNED ||
++         commit_instr_id_commit[i].ex.cause == riscv::LD_ACCESS_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::ST_ADDR_MISALIGNED ||
++         commit_instr_id_commit[i].ex.cause == riscv::ST_ACCESS_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::INSTR_PAGE_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::LOAD_PAGE_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::STORE_PAGE_FAULT);
++      // when rvfi_valid, the instruction is executed
++      rvfi_o[i].valid    = (commit_ack[i] && !commit_instr_id_commit[i].ex.valid) ||
++        (exception && (commit_instr_id_commit[i].ex.cause == riscv::ENV_CALL_MMODE ||
++                  commit_instr_id_commit[i].ex.cause == riscv::ENV_CALL_SMODE ||
++                  commit_instr_id_commit[i].ex.cause == riscv::ENV_CALL_UMODE));
++      rvfi_o[i].insn     = commit_instr_id_commit[i].ex.tval[31:0];
++      // when trap, the instruction is not executed
++      rvfi_o[i].trap     = mem_exception;
++      rvfi_o[i].mode     = debug_mode ? 2'b10 : priv_lvl;
++      rvfi_o[i].ixl      = riscv::XLEN == 64 ? 2 : 1;
++      rvfi_o[i].rs1_addr = commit_instr_id_commit[i].rs1;
++      rvfi_o[i].rs2_addr = commit_instr_id_commit[i].rs2;
++      rvfi_o[i].rd_addr  = commit_instr_id_commit[i].rd;
++      rvfi_o[i].rd_wdata = ariane_pkg::is_rd_fpr(commit_instr_id_commit[i].op) == 0 ? wdata_commit_id[i] : commit_instr_id_commit[i].result;
++      rvfi_o[i].pc_rdata = commit_instr_id_commit[i].pc;
++    end
++`endif
++
+ endmodule // ariane
+diff --git a/src/ariane_regfile.sv b/core/ariane_regfile.sv
+similarity index 100%
+rename from src/ariane_regfile.sv
+rename to core/ariane_regfile.sv
+diff --git a/src/ariane_regfile_ff.sv b/core/ariane_regfile_ff.sv
+similarity index 100%
+rename from src/ariane_regfile_ff.sv
+rename to core/ariane_regfile_ff.sv
+diff --git a/core/ariane_wrapper.sv b/core/ariane_wrapper.sv
+new file mode 100644
+index 00000000..a430cb64
+--- /dev/null
++++ b/core/ariane_wrapper.sv
+@@ -0,0 +1,237 @@
++// Copyright 2021 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++module ariane_wrapper import ariane_pkg::*; #(
++  parameter ariane_pkg::ariane_cfg_t ArianeCfg     = ariane_pkg::ArianeDefaultConfig
++) (
++  input  logic                         clk_i,
++  input  logic                         rst_ni,
++  // Core ID, Cluster ID and boot address are considered more or less static
++  input  logic [63:0]                  boot_addr_i,  // reset boot address
++  input  logic [63:0]                  hart_id_i,    // hart id in a multicore environment (reflected in a CSR)
++
++  // Interrupt inputs
++  input  logic [1:0]                   irq_i,        // level sensitive IR lines, mip & sip (async)
++  input  logic                         ipi_i,        // inter-processor interrupts (async)
++  // Timer facilities
++  input  logic                         time_irq_i,   // timer interrupt in (async)
++  input  logic                         debug_req_i,  // debug request (async)
++`ifdef FIRESIM_TRACE
++  // firesim trace port
++  output traced_instr_pkg::trace_port_t trace_o,
++`endif
++  // RISC-V formal interface port (`rvfi`):
++  // Can be left open when formal tracing is not needed.
++  output logic                         rvfi_valid_1,
++  output logic[63:0]                   rvfi_order_1,
++  output logic[31:0]                   rvfi_insn_1,
++  output logic                         rvfi_trap_1,
++  output logic                         rvfi_halt_1,
++  output logic                         rvfi_intr_1,
++  output logic[2:0]                    rvfi_mode_1,
++  output logic[2:0]                    rvfi_ixl_1,
++  output logic[4:0]                    rvfi_rs1_addr_1,
++  output logic[4:0]                    rvfi_rs2_addr_1,
++  output logic[riscv::XLEN-1:0]        rvfi_rs1_rdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_rs2_rdata_1,
++  output logic[4:0]                    rvfi_rd_addr_1,
++  output logic[riscv::XLEN-1:0]        rvfi_rd_wdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_rdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_wdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_addr_1,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_rmask_1,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_wmask_1,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_rdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_wdata_1,
++  output logic                         rvfi_valid_0,
++  output logic[63:0]                   rvfi_order_0,
++  output logic[31:0]                   rvfi_insn_0,
++  output logic                         rvfi_trap_0,
++  output logic                         rvfi_halt_0,
++  output logic                         rvfi_intr_0,
++  output logic[2:0]                    rvfi_mode_0,
++  output logic[2:0]                    rvfi_ixl_0,
++  output logic[4:0]                    rvfi_rs1_addr_0,
++  output logic[4:0]                    rvfi_rs2_addr_0,
++  output logic[riscv::XLEN-1:0]        rvfi_rs1_rdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_rs2_rdata_0,
++  output logic[4:0]                    rvfi_rd_addr_0,
++  output logic[riscv::XLEN-1:0]        rvfi_rd_wdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_rdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_wdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_addr_0,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_rmask_0,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_wmask_0,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_rdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_wdata_0,
++`ifdef PITON_ARIANE
++  // L15 (memory side)
++  output wt_cache_pkg::l15_req_t       l15_req_o,
++  input  wt_cache_pkg::l15_rtrn_t      l15_rtrn_i
++`else
++  // memory side, AXI Master
++  output ariane_axi::id_t              aw_id_o,
++  output ariane_axi::addr_t            aw_addr_o,
++  output axi_pkg::len_t                aw_len_o,
++  output axi_pkg::size_t               aw_size_o,
++  output axi_pkg::burst_t              aw_burst_o,
++  output logic                         aw_lock_o,
++  output axi_pkg::cache_t              aw_cache_o,
++  output axi_pkg::prot_t               aw_prot_o,
++  output axi_pkg::qos_t                aw_qos_o,
++  output axi_pkg::region_t             aw_region_o,
++  output axi_pkg::atop_t               aw_atop_o,
++  output ariane_axi::user_t            aw_user_o,
++  output logic                         aw_valid_o,
++  output ariane_axi::data_t            w_data_o,
++  output ariane_axi::strb_t            w_strb_o,
++  output logic                         w_last_o,
++  output ariane_axi::user_t            w_user_o,
++  output logic                         w_valid_o,
++  output logic                         b_ready_o,
++  output ariane_axi::id_t              ar_id_o,
++  output ariane_axi::addr_t            ar_addr_o,
++  output axi_pkg::len_t                ar_len_o,
++  output axi_pkg::size_t               ar_size_o,
++  output axi_pkg::burst_t              ar_burst_o,
++  output logic                         ar_lock_o,
++  output axi_pkg::cache_t              ar_cache_o,
++  output axi_pkg::prot_t               ar_prot_o,
++  output axi_pkg::qos_t                ar_qos_o,
++  output axi_pkg::region_t             ar_region_o,
++  output ariane_axi::user_t            ar_user_o,
++  output logic                         ar_valid_o,
++  output logic                         r_ready_o,
++  input  logic                         aw_ready_i,
++  input  logic                         ar_ready_i,
++  input  logic                         w_ready_i,
++  input  logic                         b_valid_i,
++  input  ariane_axi::id_t              b_id_i,
++  input  axi_pkg::resp_t               b_resp_i,
++  input  ariane_axi::user_t            b_user_i,
++  input  logic                         r_valid_i,
++  input  ariane_axi::id_t              r_id_i,
++  input  ariane_axi::data_t            r_data_i,
++  input  axi_pkg::resp_t               r_resp_i,
++  input  logic                         r_last_i,
++  input  ariane_axi::user_t            r_user_i
++`endif
++);
++
++  ariane_axi::req_t               axi_ariane_req;
++  ariane_axi::resp_t              axi_ariane_resp;
++  ariane_rvfi_pkg::rvfi_port_t    rvfi;
++
++  assign aw_id_o                  = axi_ariane_req.aw.id;
++  assign aw_addr_o                = axi_ariane_req.aw.addr;
++  assign aw_len_o                 = axi_ariane_req.aw.len;
++  assign aw_size_o                = axi_ariane_req.aw.size;
++  assign aw_burst_o               = axi_ariane_req.aw.burst;
++  assign aw_lock_o                = axi_ariane_req.aw.lock;
++  assign aw_cache_o               = axi_ariane_req.aw.cache;
++  assign aw_prot_o                = axi_ariane_req.aw.prot;
++  assign aw_qos_o                 = axi_ariane_req.aw.qos;
++  assign aw_region_o              = axi_ariane_req.aw.region;
++  assign aw_atop_o                = axi_ariane_req.aw.atop;
++  assign aw_user_o                = axi_ariane_req.aw.user;
++  assign aw_valid_o               = axi_ariane_req.aw_valid;
++  assign w_data_o                 = axi_ariane_req.w.data;
++  assign w_strb_o                 = axi_ariane_req.w.strb;
++  assign w_last_o                 = axi_ariane_req.w.last;
++  assign w_user_o                 = axi_ariane_req.w.user;
++  assign w_valid_o                = axi_ariane_req.w_valid;
++  assign b_ready_o                = axi_ariane_req.b_ready;
++  assign ar_id_o                  = axi_ariane_req.ar.id;
++  assign ar_addr_o                = axi_ariane_req.ar.addr;
++  assign ar_len_o                 = axi_ariane_req.ar.len;
++  assign ar_size_o                = axi_ariane_req.ar.size;
++  assign ar_burst_o               = axi_ariane_req.ar.burst;
++  assign ar_lock_o                = axi_ariane_req.ar.lock;
++  assign ar_cache_o               = axi_ariane_req.ar.cache;
++  assign ar_prot_o                = axi_ariane_req.ar.prot;
++  assign ar_qos_o                 = axi_ariane_req.ar.qos;
++  assign ar_region_o              = axi_ariane_req.ar.region;
++  assign ar_user_o                = axi_ariane_req.ar.user;
++  assign ar_valid_o               = axi_ariane_req.ar_valid;
++  assign r_ready_o                = axi_ariane_req.r_ready;
++
++  assign axi_ariane_resp.aw_ready = aw_ready_i;
++  assign axi_ariane_resp.ar_ready = ar_ready_i;
++  assign axi_ariane_resp.w_ready  = w_ready_i;
++  assign axi_ariane_resp.b_valid  = b_valid_i;
++  assign axi_ariane_resp.b.id     = b_id_i;
++  assign axi_ariane_resp.b.resp   = b_resp_i;
++  assign axi_ariane_resp.b.user   = b_user_i;
++  assign axi_ariane_resp.r_valid  = r_valid_i;
++  assign axi_ariane_resp.r.id     = r_id_i;
++  assign axi_ariane_resp.r.data   = r_data_i;
++  assign axi_ariane_resp.r.resp   = r_resp_i;
++  assign axi_ariane_resp.r.last   = r_last_i;
++  assign axi_ariane_resp.r.user   = r_user_i;
++
++  assign rvfi_valid_1             = rvfi[1].valid;
++  assign rvfi_order_1             = rvfi[1].order;
++  assign rvfi_insn_1              = rvfi[1].insn;
++  assign rvfi_trap_1              = rvfi[1].trap;
++  assign rvfi_halt_1              = rvfi[1].halt;
++  assign rvfi_intr_1              = rvfi[1].intr;
++  assign rvfi_mode_1              = rvfi[1].mode;
++  assign rvfi_ixl_1               = rvfi[1].ixl;
++  assign rvfi_rs1_addr_1          = rvfi[1].rs1_addr;
++  assign rvfi_rs2_addr_1          = rvfi[1].rs2_addr;
++  assign rvfi_rs1_rdata_1         = rvfi[1].rs1_rdata;
++  assign rvfi_rs2_rdata_1         = rvfi[1].rs2_rdata;
++  assign rvfi_rd_addr_1           = rvfi[1].rd_addr;
++  assign rvfi_rd_wdata_1          = rvfi[1].rd_wdata;
++  assign rvfi_pc_rdata_1          = rvfi[1].pc_rdata;
++  assign rvfi_pc_wdata_1          = rvfi[1].pc_wdata;
++  assign rvfi_mem_addr_1          = rvfi[1].mem_addr;
++  assign rvfi_mem_rmask_1         = rvfi[1].mem_rmask;
++  assign rvfi_mem_wmask_1         = rvfi[1].mem_wmask;
++  assign rvfi_mem_rdata_1         = rvfi[1].mem_rdata;
++  assign rvfi_mem_wdata_1         = rvfi[1].mem_wdata;
++  assign rvfi_valid_0             = rvfi[0].valid;
++  assign rvfi_order_0             = rvfi[0].order;
++  assign rvfi_insn_0              = rvfi[0].insn;
++  assign rvfi_trap_0              = rvfi[0].trap;
++  assign rvfi_halt_0              = rvfi[0].halt;
++  assign rvfi_intr_0              = rvfi[0].intr;
++  assign rvfi_mode_0              = rvfi[0].mode;
++  assign rvfi_ixl_0               = rvfi[0].ixl;
++  assign rvfi_rs1_addr_0          = rvfi[0].rs1_addr;
++  assign rvfi_rs2_addr_0          = rvfi[0].rs2_addr;
++  assign rvfi_rs1_rdata_0         = rvfi[0].rs1_rdata;
++  assign rvfi_rs2_rdata_0         = rvfi[0].rs2_rdata;
++  assign rvfi_rd_addr_0           = rvfi[0].rd_addr;
++  assign rvfi_rd_wdata_0          = rvfi[0].rd_wdata;
++  assign rvfi_pc_rdata_0          = rvfi[0].pc_rdata;
++  assign rvfi_pc_wdata_0          = rvfi[0].pc_wdata;
++  assign rvfi_mem_addr_0          = rvfi[0].mem_addr;
++  assign rvfi_mem_rmask_0         = rvfi[0].mem_rmask;
++  assign rvfi_mem_wmask_0         = rvfi[0].mem_wmask;
++  assign rvfi_mem_rdata_0         = rvfi[0].mem_rdata;
++  assign rvfi_mem_wdata_0         = rvfi[0].mem_wdata;
++
++  ariane #(
++    .ArianeCfg  ( ariane_soc::ArianeSocCfg )
++  ) i_ariane (
++    .clk_i                ( clk_i           ),
++    .rst_ni               ( rst_ni          ),
++    .boot_addr_i          ( boot_addr_i     ),
++    .hart_id_i            ( hart_id_i       ),
++    .irq_i                ( irq_i           ),
++    .ipi_i                ( ipi_i           ),
++    .time_irq_i           ( time_irq_i      ),
++    .rvfi_o               ( rvfi            ),
++    .debug_req_i          ( debug_req_i     ),
++    .axi_req_o            ( axi_ariane_req  ),
++    .axi_resp_i           ( axi_ariane_resp )
++  );
++
++endmodule // ariane_wrapper
+diff --git a/src/axi_adapter.sv b/core/axi_adapter.sv
+similarity index 100%
+rename from src/axi_adapter.sv
+rename to core/axi_adapter.sv
+diff --git a/src/axi_shim.sv b/core/axi_shim.sv
+similarity index 100%
+rename from src/axi_shim.sv
+rename to core/axi_shim.sv
+diff --git a/src/branch_unit.sv b/core/branch_unit.sv
+similarity index 100%
+rename from src/branch_unit.sv
+rename to core/branch_unit.sv
+diff --git a/src/cache_subsystem/amo_alu.sv b/core/cache_subsystem/amo_alu.sv
+similarity index 100%
+rename from src/cache_subsystem/amo_alu.sv
+rename to core/cache_subsystem/amo_alu.sv
+diff --git a/src/cache_subsystem/cache_ctrl.sv b/core/cache_subsystem/cache_ctrl.sv
+similarity index 100%
+rename from src/cache_subsystem/cache_ctrl.sv
+rename to core/cache_subsystem/cache_ctrl.sv
+diff --git a/src/cache_subsystem/cva6_icache.sv b/core/cache_subsystem/cva6_icache.sv
+similarity index 100%
+rename from src/cache_subsystem/cva6_icache.sv
+rename to core/cache_subsystem/cva6_icache.sv
+diff --git a/src/cache_subsystem/cva6_icache_axi_wrapper.sv b/core/cache_subsystem/cva6_icache_axi_wrapper.sv
+similarity index 100%
+rename from src/cache_subsystem/cva6_icache_axi_wrapper.sv
+rename to core/cache_subsystem/cva6_icache_axi_wrapper.sv
+diff --git a/src/cache_subsystem/miss_handler.sv b/core/cache_subsystem/miss_handler.sv
+similarity index 100%
+rename from src/cache_subsystem/miss_handler.sv
+rename to core/cache_subsystem/miss_handler.sv
+diff --git a/src/cache_subsystem/std_cache_subsystem.sv b/core/cache_subsystem/std_cache_subsystem.sv
+similarity index 100%
+rename from src/cache_subsystem/std_cache_subsystem.sv
+rename to core/cache_subsystem/std_cache_subsystem.sv
+diff --git a/src/cache_subsystem/std_nbdcache.sv b/core/cache_subsystem/std_nbdcache.sv
+similarity index 100%
+rename from src/cache_subsystem/std_nbdcache.sv
+rename to core/cache_subsystem/std_nbdcache.sv
+diff --git a/src/cache_subsystem/std_no_dcache.sv b/core/cache_subsystem/std_no_dcache.sv
+similarity index 100%
+rename from src/cache_subsystem/std_no_dcache.sv
+rename to core/cache_subsystem/std_no_dcache.sv
+diff --git a/src/cache_subsystem/tag_cmp.sv b/core/cache_subsystem/tag_cmp.sv
+similarity index 100%
+rename from src/cache_subsystem/tag_cmp.sv
+rename to core/cache_subsystem/tag_cmp.sv
+diff --git a/src/cache_subsystem/wt_axi_adapter.sv b/core/cache_subsystem/wt_axi_adapter.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_axi_adapter.sv
+rename to core/cache_subsystem/wt_axi_adapter.sv
+diff --git a/src/cache_subsystem/wt_cache_subsystem.sv b/core/cache_subsystem/wt_cache_subsystem.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_cache_subsystem.sv
+rename to core/cache_subsystem/wt_cache_subsystem.sv
+diff --git a/src/cache_subsystem/wt_dcache.sv b/core/cache_subsystem/wt_dcache.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache.sv
+rename to core/cache_subsystem/wt_dcache.sv
+diff --git a/src/cache_subsystem/wt_dcache_ctrl.sv b/core/cache_subsystem/wt_dcache_ctrl.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache_ctrl.sv
+rename to core/cache_subsystem/wt_dcache_ctrl.sv
+diff --git a/src/cache_subsystem/wt_dcache_mem.sv b/core/cache_subsystem/wt_dcache_mem.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache_mem.sv
+rename to core/cache_subsystem/wt_dcache_mem.sv
+diff --git a/src/cache_subsystem/wt_dcache_missunit.sv b/core/cache_subsystem/wt_dcache_missunit.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache_missunit.sv
+rename to core/cache_subsystem/wt_dcache_missunit.sv
+diff --git a/src/cache_subsystem/wt_dcache_wbuffer.sv b/core/cache_subsystem/wt_dcache_wbuffer.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache_wbuffer.sv
+rename to core/cache_subsystem/wt_dcache_wbuffer.sv
+diff --git a/src/cache_subsystem/wt_l15_adapter.sv b/core/cache_subsystem/wt_l15_adapter.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_l15_adapter.sv
+rename to core/cache_subsystem/wt_l15_adapter.sv
+diff --git a/src/commit_stage.sv b/core/commit_stage.sv
+similarity index 100%
+rename from src/commit_stage.sv
+rename to core/commit_stage.sv
+diff --git a/src/compressed_decoder.sv b/core/compressed_decoder.sv
+similarity index 100%
+rename from src/compressed_decoder.sv
+rename to core/compressed_decoder.sv
+diff --git a/src/controller.sv b/core/controller.sv
+similarity index 100%
+rename from src/controller.sv
+rename to core/controller.sv
+diff --git a/src/csr_buffer.sv b/core/csr_buffer.sv
+similarity index 100%
+rename from src/csr_buffer.sv
+rename to core/csr_buffer.sv
+diff --git a/src/csr_regfile.sv b/core/csr_regfile.sv
+similarity index 100%
+rename from src/csr_regfile.sv
+rename to core/csr_regfile.sv
+diff --git a/src/decoder.sv b/core/decoder.sv
+similarity index 100%
+rename from src/decoder.sv
+rename to core/decoder.sv
+diff --git a/src/dromajo_ram.sv b/core/dromajo_ram.sv
+similarity index 100%
+rename from src/dromajo_ram.sv
+rename to core/dromajo_ram.sv
+diff --git a/src/ex_stage.sv b/core/ex_stage.sv
+similarity index 100%
+rename from src/ex_stage.sv
+rename to core/ex_stage.sv
+diff --git a/src/fpu_wrap.sv b/core/fpu_wrap.sv
+similarity index 100%
+rename from src/fpu_wrap.sv
+rename to core/fpu_wrap.sv
+diff --git a/src/frontend/bht.sv b/core/frontend/bht.sv
+similarity index 100%
+rename from src/frontend/bht.sv
+rename to core/frontend/bht.sv
+diff --git a/src/frontend/btb.sv b/core/frontend/btb.sv
+similarity index 100%
+rename from src/frontend/btb.sv
+rename to core/frontend/btb.sv
+diff --git a/src/frontend/frontend.sv b/core/frontend/frontend.sv
+similarity index 100%
+rename from src/frontend/frontend.sv
+rename to core/frontend/frontend.sv
+diff --git a/src/frontend/instr_queue.sv b/core/frontend/instr_queue.sv
+similarity index 100%
+rename from src/frontend/instr_queue.sv
+rename to core/frontend/instr_queue.sv
+diff --git a/src/frontend/instr_scan.sv b/core/frontend/instr_scan.sv
+similarity index 100%
+rename from src/frontend/instr_scan.sv
+rename to core/frontend/instr_scan.sv
+diff --git a/src/frontend/ras.sv b/core/frontend/ras.sv
+similarity index 100%
+rename from src/frontend/ras.sv
+rename to core/frontend/ras.sv
+diff --git a/src/id_stage.sv b/core/id_stage.sv
+similarity index 100%
+rename from src/id_stage.sv
+rename to core/id_stage.sv
+diff --git a/include/ariane_axi_pkg.sv b/core/include/ariane_axi_pkg.sv
+similarity index 100%
+rename from include/ariane_axi_pkg.sv
+rename to core/include/ariane_axi_pkg.sv
+diff --git a/include/ariane_pkg.sv b/core/include/ariane_pkg.sv
+similarity index 100%
+rename from include/ariane_pkg.sv
+rename to core/include/ariane_pkg.sv
+diff --git a/core/include/ariane_rvfi_pkg.sv b/core/include/ariane_rvfi_pkg.sv
+new file mode 100644
+index 00000000..18a2eed0
+--- /dev/null
++++ b/core/include/ariane_rvfi_pkg.sv
+@@ -0,0 +1,43 @@
++// Copyright 2020 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++package ariane_rvfi_pkg;
++
++  localparam NRET = 1;
++  localparam ILEN = 32;
++
++  typedef struct packed {
++    logic [NRET-1:0]                 valid;
++    logic [NRET*63:0]                order;
++    logic [NRET*ILEN-1:0]            insn;
++    logic [NRET-1:0]                 trap;
++    logic [NRET-1:0]                 halt;
++    logic [NRET-1:0]                 intr;
++    logic [NRET*2-1:0]               mode;
++    logic [NRET*2-1:0]               ixl;
++    logic [NRET*5-1:0]               rs1_addr;
++    logic [NRET*5-1:0]               rs2_addr;
++    logic [NRET*riscv::XLEN-1:0]     rs1_rdata;
++    logic [NRET*riscv::XLEN-1:0]     rs2_rdata;
++    logic [NRET*5-1:0]               rd_addr;
++    logic [NRET*riscv::XLEN-1:0]     rd_wdata;
++
++    logic [NRET*riscv::XLEN-1:0]     pc_rdata;
++    logic [NRET*riscv::XLEN-1:0]     pc_wdata;
++
++    logic [NRET*riscv::XLEN-1:0]     mem_addr;
++    logic [NRET*(riscv::XLEN/8)-1:0] mem_rmask;
++    logic [NRET*(riscv::XLEN/8)-1:0] mem_wmask;
++    logic [NRET*riscv::XLEN-1:0]     mem_rdata;
++    logic [NRET*riscv::XLEN-1:0]     mem_wdata;
++  } rvfi_instr_t;
++
++  typedef rvfi_instr_t [ariane_pkg::NR_COMMIT_PORTS-1:0] rvfi_port_t;
++
++endpackage
+diff --git a/include/axi_intf.sv b/core/include/axi_intf.sv
+similarity index 100%
+rename from include/axi_intf.sv
+rename to core/include/axi_intf.sv
+diff --git a/core/include/cv32a6_imac_sv0_config_pkg.sv b/core/include/cv32a6_imac_sv0_config_pkg.sv
+new file mode 100644
+index 00000000..54f7c5c8
+--- /dev/null
++++ b/core/include/cv32a6_imac_sv0_config_pkg.sv
+@@ -0,0 +1,15 @@
++// Copyright 2021 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++
++package cva6_config_pkg;
++
++    localparam CVA6ConfigXlen = 32;
++
++endpackage
+diff --git a/core/include/cv64a6_imacfd_sv39_config_pkg.sv b/core/include/cv64a6_imacfd_sv39_config_pkg.sv
+new file mode 100644
+index 00000000..2ce3898f
+--- /dev/null
++++ b/core/include/cv64a6_imacfd_sv39_config_pkg.sv
+@@ -0,0 +1,15 @@
++// Copyright 2021 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++
++package cva6_config_pkg;
++
++    localparam CVA6ConfigXlen = 64;
++
++endpackage
+diff --git a/include/instr_tracer_pkg.sv b/core/include/instr_tracer_pkg.sv
+similarity index 100%
+rename from include/instr_tracer_pkg.sv
+rename to core/include/instr_tracer_pkg.sv
+diff --git a/include/riscv_pkg.sv b/core/include/riscv_pkg.sv
+similarity index 99%
+rename from include/riscv_pkg.sv
+rename to core/include/riscv_pkg.sv
+index d34a40ea..65bf94ab 100644
+--- a/include/riscv_pkg.sv
++++ b/core/include/riscv_pkg.sv
+@@ -14,8 +14,14 @@
+  *
+  * Description: Common RISC-V definitions.
+  */
++
+ package riscv;
+ 
++    // ----------------------
++    // Import cva6 config from cva6_config_pkg
++    // ----------------------
++    localparam XLEN = cva6_config_pkg::CVA6ConfigXlen;
++
+     // ----------------------
+     // Data and Address length
+     // ----------------------
+@@ -28,8 +34,6 @@ package riscv;
+        ModeSv64 = 11
+     } vm_mode_t;
+ 
+-    localparam XLEN = 64;
+-
+     // Warning: When using STD_CACHE, configuration must be PLEN=56 and VLEN=64
+     // Warning: VLEN must be superior or equal to PLEN
+     localparam VLEN       = (XLEN == 32) ? 32 : 64;    // virtual address length
+diff --git a/include/std_cache_pkg.sv b/core/include/std_cache_pkg.sv
+similarity index 100%
+rename from include/std_cache_pkg.sv
+rename to core/include/std_cache_pkg.sv
+diff --git a/include/wt_cache_pkg.sv b/core/include/wt_cache_pkg.sv
+similarity index 100%
+rename from include/wt_cache_pkg.sv
+rename to core/include/wt_cache_pkg.sv
+diff --git a/src/instr_realign.sv b/core/instr_realign.sv
+similarity index 100%
+rename from src/instr_realign.sv
+rename to core/instr_realign.sv
+diff --git a/src/issue_read_operands.sv b/core/issue_read_operands.sv
+similarity index 100%
+rename from src/issue_read_operands.sv
+rename to core/issue_read_operands.sv
+diff --git a/src/issue_stage.sv b/core/issue_stage.sv
+similarity index 100%
+rename from src/issue_stage.sv
+rename to core/issue_stage.sv
+diff --git a/src/load_store_unit.sv b/core/load_store_unit.sv
+similarity index 100%
+rename from src/load_store_unit.sv
+rename to core/load_store_unit.sv
+diff --git a/src/load_unit.sv b/core/load_unit.sv
+similarity index 100%
+rename from src/load_unit.sv
+rename to core/load_unit.sv
+diff --git a/core/mmu.sv b/core/mmu.sv
+new file mode 100644
+index 00000000..f98fdeff
+--- /dev/null
++++ b/core/mmu.sv
+@@ -0,0 +1,454 @@
++// Copyright 2018 ETH Zurich and University of Bologna.
++// Copyright and related rights are licensed under the Solderpad Hardware
++// License, Version 0.51 (the "License"); you may not use this file except in
++// compliance with the License.  You may obtain a copy of the License at
++// http://solderpad.org/licenses/SHL-0.51. Unless required by applicable law
++// or agreed to in writing, software, hardware and materials distributed under
++// this License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++//
++// Author: Florian Zaruba, ETH Zurich
++// Date: 19/04/2017
++// Description: Memory Management Unit for Ariane, contains TLB and
++//              address translation unit. SV39 as defined in RISC-V
++//              privilege specification 1.11-WIP
++
++
++module mmu import ariane_pkg::*; #(
++    parameter int unsigned INSTR_TLB_ENTRIES     = 4,
++    parameter int unsigned DATA_TLB_ENTRIES      = 4,
++    parameter int unsigned ASID_WIDTH            = 1,
++    parameter ariane_pkg::ariane_cfg_t ArianeCfg = ariane_pkg::ArianeDefaultConfig
++) (
++    input  logic                            clk_i,
++    input  logic                            rst_ni,
++    input  logic                            flush_i,
++    input  logic                            enable_translation_i,
++    input  logic                            en_ld_st_translation_i,   // enable virtual memory translation for load/stores
++    // IF interface
++    input  icache_areq_o_t                  icache_areq_i,
++    output icache_areq_i_t                  icache_areq_o,
++    // LSU interface
++    // this is a more minimalistic interface because the actual addressing logic is handled
++    // in the LSU as we distinguish load and stores, what we do here is simple address translation
++    input  exception_t                      misaligned_ex_i,
++    input  logic                            lsu_req_i,        // request address translation
++    input  logic [riscv::VLEN-1:0]          lsu_vaddr_i,      // virtual address in
++    input  logic                            lsu_is_store_i,   // the translation is requested by a store
++    // if we need to walk the page table we can't grant in the same cycle
++    // Cycle 0
++    output logic                            lsu_dtlb_hit_o,   // sent in the same cycle as the request if translation hits in the DTLB
++    output logic [riscv::PPNW-1:0]          lsu_dtlb_ppn_o,   // ppn (send same cycle as hit)
++    // Cycle 1
++    output logic                            lsu_valid_o,      // translation is valid
++    output logic [riscv::PLEN-1:0]          lsu_paddr_o,      // translated address
++    output exception_t                      lsu_exception_o,  // address translation threw an exception
++    // General control signals
++    input riscv::priv_lvl_t                 priv_lvl_i,
++    input riscv::priv_lvl_t                 ld_st_priv_lvl_i,
++    input logic                             sum_i,
++    input logic                             mxr_i,
++    // input logic flag_mprv_i,
++    input logic [riscv::PPNW-1:0]           satp_ppn_i,
++    input logic [ASID_WIDTH-1:0]            asid_i,
++    input logic [ASID_WIDTH-1:0]            asid_to_be_flushed_i,
++    input logic [riscv::VLEN-1:0]           vaddr_to_be_flushed_i,
++    input logic                             flush_tlb_i,
++    // Performance counters
++    output logic                            itlb_miss_o,
++    output logic                            dtlb_miss_o,
++    // PTW memory interface
++    input  dcache_req_o_t                   req_port_i,
++    output dcache_req_i_t                   req_port_o,
++    // PMP
++    input  riscv::pmpcfg_t [15:0]           pmpcfg_i,
++    input  logic [15:0][riscv::PLEN-3:0]    pmpaddr_i
++);
++
++    logic                   iaccess_err;   // insufficient privilege to access this instruction page
++    logic                   daccess_err;   // insufficient privilege to access this data page
++    logic                   ptw_active;    // PTW is currently walking a page table
++    logic                   walking_instr; // PTW is walking because of an ITLB miss
++    logic                   ptw_error;     // PTW threw an exception
++    logic                   ptw_access_exception; // PTW threw an access exception (PMPs)
++    logic [riscv::PLEN-1:0] ptw_bad_paddr; // PTW PMP exception bad physical addr
++
++    logic [riscv::VLEN-1:0] update_vaddr;
++    tlb_update_t update_ptw_itlb, update_ptw_dtlb;
++
++    logic        itlb_lu_access;
++    riscv::pte_t itlb_content;
++    logic        itlb_is_2M;
++    logic        itlb_is_1G;
++    logic        itlb_lu_hit;
++
++    logic        dtlb_lu_access;
++    riscv::pte_t dtlb_content;
++    logic        dtlb_is_2M;
++    logic        dtlb_is_1G;
++    logic        dtlb_lu_hit;
++
++
++    // Assignments
++    assign itlb_lu_access = icache_areq_i.fetch_req;
++    assign dtlb_lu_access = lsu_req_i;
++
++
++    tlb #(
++        .TLB_ENTRIES      ( INSTR_TLB_ENTRIES          ),
++        .ASID_WIDTH       ( ASID_WIDTH                 )
++    ) i_itlb (
++        .clk_i            ( clk_i                      ),
++        .rst_ni           ( rst_ni                     ),
++        .flush_i          ( flush_tlb_i                ),
++
++        .update_i         ( update_ptw_itlb            ),
++
++        .lu_access_i      ( itlb_lu_access             ),
++        .lu_asid_i        ( asid_i                     ),
++        .asid_to_be_flushed_i  ( asid_to_be_flushed_i  ),
++        .vaddr_to_be_flushed_i ( vaddr_to_be_flushed_i ),
++        .lu_vaddr_i       ( icache_areq_i.fetch_vaddr  ),
++        .lu_content_o     ( itlb_content               ),
++
++        .lu_is_2M_o       ( itlb_is_2M                 ),
++        .lu_is_1G_o       ( itlb_is_1G                 ),
++        .lu_hit_o         ( itlb_lu_hit                )
++    );
++
++    tlb #(
++        .TLB_ENTRIES     ( DATA_TLB_ENTRIES             ),
++        .ASID_WIDTH      ( ASID_WIDTH                   )
++    ) i_dtlb (
++        .clk_i            ( clk_i                       ),
++        .rst_ni           ( rst_ni                      ),
++        .flush_i          ( flush_tlb_i                 ),
++
++        .update_i         ( update_ptw_dtlb             ),
++
++        .lu_access_i      ( dtlb_lu_access              ),
++        .lu_asid_i        ( asid_i                      ),
++	      .asid_to_be_flushed_i  ( asid_to_be_flushed_i   ),
++	      .vaddr_to_be_flushed_i ( vaddr_to_be_flushed_i  ),
++        .lu_vaddr_i       ( lsu_vaddr_i                 ),
++        .lu_content_o     ( dtlb_content                ),
++
++        .lu_is_2M_o       ( dtlb_is_2M                  ),
++        .lu_is_1G_o       ( dtlb_is_1G                  ),
++        .lu_hit_o         ( dtlb_lu_hit                 )
++    );
++
++
++    ptw  #(
++        .ASID_WIDTH             ( ASID_WIDTH            ),
++        .ArianeCfg              ( ArianeCfg             )
++    ) i_ptw (
++        .clk_i                  ( clk_i                 ),
++        .rst_ni                 ( rst_ni                ),
++        .ptw_active_o           ( ptw_active            ),
++        .walking_instr_o        ( walking_instr         ),
++        .ptw_error_o            ( ptw_error             ),
++        .ptw_access_exception_o ( ptw_access_exception  ),
++        .enable_translation_i   ( enable_translation_i  ),
++
++        .update_vaddr_o         ( update_vaddr          ),
++        .itlb_update_o          ( update_ptw_itlb       ),
++        .dtlb_update_o          ( update_ptw_dtlb       ),
++
++        .itlb_access_i          ( itlb_lu_access        ),
++        .itlb_hit_i             ( itlb_lu_hit           ),
++        .itlb_vaddr_i           ( icache_areq_i.fetch_vaddr ),
++
++        .dtlb_access_i          ( dtlb_lu_access        ),
++        .dtlb_hit_i             ( dtlb_lu_hit           ),
++        .dtlb_vaddr_i           ( lsu_vaddr_i           ),
++
++        .req_port_i             ( req_port_i            ),
++        .req_port_o             ( req_port_o            ),
++        .pmpcfg_i,
++        .pmpaddr_i,
++        .bad_paddr_o            ( ptw_bad_paddr         ),
++        .*
++    );
++
++    // ila_1 i_ila_1 (
++    //     .clk(clk_i), // input wire clk
++    //     .probe0({req_port_o.address_tag, req_port_o.address_index}),
++    //     .probe1(req_port_o.data_req), // input wire [63:0]  probe1
++    //     .probe2(req_port_i.data_gnt), // input wire [0:0]  probe2
++    //     .probe3(req_port_i.data_rdata), // input wire [0:0]  probe3
++    //     .probe4(req_port_i.data_rvalid), // input wire [0:0]  probe4
++    //     .probe5(ptw_error), // input wire [1:0]  probe5
++    //     .probe6(update_vaddr), // input wire [0:0]  probe6
++    //     .probe7(update_ptw_itlb.valid), // input wire [0:0]  probe7
++    //     .probe8(update_ptw_dtlb.valid), // input wire [0:0]  probe8
++    //     .probe9(dtlb_lu_access), // input wire [0:0]  probe9
++    //     .probe10(lsu_vaddr_i), // input wire [0:0]  probe10
++    //     .probe11(dtlb_lu_hit), // input wire [0:0]  probe11
++    //     .probe12(itlb_lu_access), // input wire [0:0]  probe12
++    //     .probe13(icache_areq_i.fetch_vaddr), // input wire [0:0]  probe13
++    //     .probe14(itlb_lu_hit) // input wire [0:0]  probe13
++    // );
++
++    //-----------------------
++    // Instruction Interface
++    //-----------------------
++    logic match_any_execute_region;
++    logic pmp_instr_allow;
++
++    // The instruction interface is a simple request response interface
++    always_comb begin : instr_interface
++        // MMU disabled: just pass through
++        icache_areq_o.fetch_valid  = icache_areq_i.fetch_req;
++        icache_areq_o.fetch_paddr  = icache_areq_i.fetch_vaddr[riscv::PLEN-1:0]; // play through in case we disabled address translation
++        // two potential exception sources:
++        // 1. HPTW threw an exception -> signal with a page fault exception
++        // 2. We got an access error because of insufficient permissions -> throw an access exception
++        icache_areq_o.fetch_exception      = '0;
++        // Check whether we are allowed to access this memory region from a fetch perspective
++        iaccess_err   = icache_areq_i.fetch_req && (((priv_lvl_i == riscv::PRIV_LVL_U) && ~itlb_content.u)
++                                                 || ((priv_lvl_i == riscv::PRIV_LVL_S) && itlb_content.u));
++
++        // MMU enabled: address from TLB, request delayed until hit. Error when TLB
++        // hit and no access right or TLB hit and translated address not valid (e.g.
++        // AXI decode error), or when PTW performs walk due to ITLB miss and raises
++        // an error.
++        if (enable_translation_i) begin
++            // we work with SV39 or SV32, so if VM is enabled, check that all bits [riscv::VLEN-1:riscv::SV-1] are equal
++            if (icache_areq_i.fetch_req && !((&icache_areq_i.fetch_vaddr[riscv::VLEN-1:riscv::SV-1]) == 1'b1 || (|icache_areq_i.fetch_vaddr[riscv::VLEN-1:riscv::SV-1]) == 1'b0)) begin
++                icache_areq_o.fetch_exception = {riscv::INSTR_ACCESS_FAULT, {{riscv::XLEN-riscv::VLEN{1'b0}}, icache_areq_i.fetch_vaddr}, 1'b1};
++            end
++
++            icache_areq_o.fetch_valid = 1'b0;
++
++            // 4K page
++            icache_areq_o.fetch_paddr = {itlb_content.ppn, icache_areq_i.fetch_vaddr[11:0]};
++            // Mega page
++            if (itlb_is_2M) begin
++                icache_areq_o.fetch_paddr[20:12] = icache_areq_i.fetch_vaddr[20:12];
++            end
++            // Giga page
++            if (itlb_is_1G) begin
++                icache_areq_o.fetch_paddr[29:12] = icache_areq_i.fetch_vaddr[29:12];
++            end
++
++            // ---------
++            // ITLB Hit
++            // --------
++            // if we hit the ITLB output the request signal immediately
++            if (itlb_lu_hit) begin
++                icache_areq_o.fetch_valid = icache_areq_i.fetch_req;
++                // we got an access error
++                if (iaccess_err) begin
++                    // throw a page fault
++                    icache_areq_o.fetch_exception = {riscv::INSTR_PAGE_FAULT, {{riscv::XLEN-riscv::VLEN{1'b0}}, icache_areq_i.fetch_vaddr}, 1'b1};
++                end else if (!pmp_instr_allow) begin
++                    icache_areq_o.fetch_exception = {riscv::INSTR_ACCESS_FAULT, {{riscv::XLEN-riscv::PLEN{1'b0}}, icache_areq_i.fetch_vaddr}, 1'b1};
++                end
++            end else
++            // ---------
++            // ITLB Miss
++            // ---------
++            // watch out for exceptions happening during walking the page table
++            if (ptw_active && walking_instr) begin
++                icache_areq_o.fetch_valid = ptw_error | ptw_access_exception;
++                if (ptw_error) icache_areq_o.fetch_exception = {riscv::INSTR_PAGE_FAULT, {{riscv::XLEN-riscv::VLEN{1'b0}}, update_vaddr}, 1'b1};
++                // TODO(moschn,zarubaf): What should the value of tval be in this case?
++                else icache_areq_o.fetch_exception = {riscv::INSTR_ACCESS_FAULT, {{riscv::XLEN-riscv::VLEN{1'b0}}, ptw_bad_paddr}, 1'b1};
++            end
++        end
++        // if it didn't match any execute region throw an `Instruction Access Fault`
++        // or: if we are not translating, check PMPs immediately on the paddr
++        if (!match_any_execute_region || (!enable_translation_i && !pmp_instr_allow)) begin
++          icache_areq_o.fetch_exception = {riscv::INSTR_ACCESS_FAULT, {{riscv::XLEN-riscv::PLEN{1'b0}}, icache_areq_o.fetch_paddr}, 1'b1};
++        end
++    end
++
++    // check for execute flag on memory
++    assign match_any_execute_region = ariane_pkg::is_inside_execute_regions(ArianeCfg, {{64-riscv::PLEN{1'b0}}, icache_areq_o.fetch_paddr});
++
++    // Instruction fetch
++    pmp #(
++        .PLEN       ( riscv::PLEN            ),
++        .PMP_LEN    ( riscv::PLEN - 2        ),
++        .NR_ENTRIES ( ArianeCfg.NrPMPEntries )
++    ) i_pmp_if (
++        .addr_i        ( icache_areq_o.fetch_paddr ),
++        .priv_lvl_i,
++        // we will always execute on the instruction fetch port
++        .access_type_i ( riscv::ACCESS_EXEC        ),
++        // Configuration
++        .conf_addr_i   ( pmpaddr_i                 ),
++        .conf_i        ( pmpcfg_i                  ),
++        .allow_o       ( pmp_instr_allow           )
++    );
++
++    //-----------------------
++    // Data Interface
++    //-----------------------
++    logic [riscv::VLEN-1:0] lsu_vaddr_n,     lsu_vaddr_q;
++    riscv::pte_t dtlb_pte_n,      dtlb_pte_q;
++    exception_t  misaligned_ex_n, misaligned_ex_q;
++    logic        lsu_req_n,       lsu_req_q;
++    logic        lsu_is_store_n,  lsu_is_store_q;
++    logic        dtlb_hit_n,      dtlb_hit_q;
++    logic        dtlb_is_2M_n,    dtlb_is_2M_q;
++    logic        dtlb_is_1G_n,    dtlb_is_1G_q;
++
++    // check if we need to do translation or if we are always ready (e.g.: we are not translating anything)
++    assign lsu_dtlb_hit_o = (en_ld_st_translation_i) ? dtlb_lu_hit :  1'b1;
++
++    // Wires to PMP checks
++    riscv::pmp_access_t pmp_access_type;
++    logic        pmp_data_allow;
++    localparam   PPNWMin = (riscv::PPNW-1 > 29) ? 29 : riscv::PPNW-1;
++    // The data interface is simpler and only consists of a request/response interface
++    always_comb begin : data_interface
++        // save request and DTLB response
++        lsu_vaddr_n           = lsu_vaddr_i;
++        lsu_req_n             = lsu_req_i;
++        misaligned_ex_n       = misaligned_ex_i;
++        dtlb_pte_n            = dtlb_content;
++        dtlb_hit_n            = dtlb_lu_hit;
++        lsu_is_store_n        = lsu_is_store_i;
++        dtlb_is_2M_n          = dtlb_is_2M;
++        dtlb_is_1G_n          = dtlb_is_1G;
++
++        lsu_paddr_o           = lsu_vaddr_q[riscv::PLEN-1:0];
++        lsu_dtlb_ppn_o        = lsu_vaddr_n[riscv::PLEN-1:12];
++        lsu_valid_o           = lsu_req_q;
++        lsu_exception_o       = misaligned_ex_q;
++        pmp_access_type       = lsu_is_store_q ? riscv::ACCESS_WRITE : riscv::ACCESS_READ;
++
++        // mute misaligned exceptions if there is no request otherwise they will throw accidental exceptions
++        misaligned_ex_n.valid = misaligned_ex_i.valid & lsu_req_i;
++
++        // Check if the User flag is set, then we may only access it in supervisor mode
++        // if SUM is enabled
++        daccess_err = (ld_st_priv_lvl_i == riscv::PRIV_LVL_S && !sum_i && dtlb_pte_q.u) || // SUM is not set and we are trying to access a user page in supervisor mode
++                      (ld_st_priv_lvl_i == riscv::PRIV_LVL_U && !dtlb_pte_q.u);            // this is not a user page but we are in user mode and trying to access it
++        // translation is enabled and no misaligned exception occurred
++        if (en_ld_st_translation_i && !misaligned_ex_q.valid) begin
++            lsu_valid_o = 1'b0;
++            // 4K page
++            lsu_paddr_o = {dtlb_pte_q.ppn, lsu_vaddr_q[11:0]};
++            lsu_dtlb_ppn_o = dtlb_content.ppn;
++            // Mega page
++            if (dtlb_is_2M_q) begin
++              lsu_paddr_o[20:12] = lsu_vaddr_q[20:12];
++              lsu_dtlb_ppn_o[20:12] = lsu_vaddr_n[20:12];
++            end
++            // Giga page
++            if (dtlb_is_1G_q) begin
++                lsu_paddr_o[PPNWMin:12] = lsu_vaddr_q[PPNWMin:12];
++                lsu_dtlb_ppn_o[PPNWMin:12] = lsu_vaddr_n[PPNWMin:12];
++            end
++            // ---------
++            // DTLB Hit
++            // --------
++            if (dtlb_hit_q && lsu_req_q) begin
++                lsu_valid_o = 1'b1;
++                // exception priority:
++                // PAGE_FAULTS have higher priority than ACCESS_FAULTS
++                // virtual memory based exceptions are PAGE_FAULTS
++                // physical memory based exceptions are ACCESS_FAULTS (PMA/PMP)
++
++                // this is a store
++                if (lsu_is_store_q) begin
++                    // check if the page is write-able and we are not violating privileges
++                    // also check if the dirty flag is set
++                    if (!dtlb_pte_q.w || daccess_err || !dtlb_pte_q.d) begin
++                        lsu_exception_o = {riscv::STORE_PAGE_FAULT, {{riscv::XLEN-riscv::VLEN{lsu_vaddr_q[riscv::VLEN-1]}},lsu_vaddr_q}, 1'b1};
++                    // Check if any PMPs are violated
++                    end else if (!pmp_data_allow) begin
++                        lsu_exception_o = {riscv::ST_ACCESS_FAULT, {{riscv::XLEN-riscv::PLEN{1'b0}}, lsu_paddr_o}, 1'b1};
++                    end
++
++                // this is a load
++                end else begin
++                    // check for sufficient access privileges - throw a page fault if necessary
++                    if (daccess_err) begin
++                        lsu_exception_o = {riscv::LOAD_PAGE_FAULT, {{riscv::XLEN-riscv::VLEN{lsu_vaddr_q[riscv::VLEN-1]}},lsu_vaddr_q}, 1'b1};
++                    // Check if any PMPs are violated
++                    end else if (!pmp_data_allow) begin
++                        lsu_exception_o = {riscv::LD_ACCESS_FAULT, {{riscv::XLEN-riscv::PLEN{1'b0}}, lsu_paddr_o}, 1'b1};
++                    end
++                end
++            end else
++
++            // ---------
++            // DTLB Miss
++            // ---------
++            // watch out for exceptions
++            if (ptw_active && !walking_instr) begin
++                // page table walker threw an exception
++                if (ptw_error) begin
++                    // an error makes the translation valid
++                    lsu_valid_o = 1'b1;
++                    // the page table walker can only throw page faults
++                    if (lsu_is_store_q) begin
++                        lsu_exception_o = {riscv::STORE_PAGE_FAULT, {{riscv::XLEN-riscv::VLEN{lsu_vaddr_q[riscv::VLEN-1]}},update_vaddr}, 1'b1};
++                    end else begin
++                        lsu_exception_o = {riscv::LOAD_PAGE_FAULT, {{riscv::XLEN-riscv::VLEN{lsu_vaddr_q[riscv::VLEN-1]}},update_vaddr}, 1'b1};
++                    end
++                end
++
++                if (ptw_access_exception) begin
++                    // an error makes the translation valid
++                    lsu_valid_o = 1'b1;
++                    // the page table walker can only throw page faults
++                    lsu_exception_o = {riscv::LD_ACCESS_FAULT, {{riscv::XLEN-riscv::PLEN{1'b0}}, ptw_bad_paddr}, 1'b1};
++                end
++            end
++        end
++        // If translation is not enabled, check the paddr immediately against PMPs
++        else if (lsu_req_q && !misaligned_ex_q.valid && !pmp_data_allow) begin
++            if (lsu_is_store_q) begin
++                lsu_exception_o = {riscv::ST_ACCESS_FAULT, {{riscv::XLEN-riscv::PLEN{1'b0}}, lsu_paddr_o}, 1'b1};
++            end else begin
++                lsu_exception_o = {riscv::LD_ACCESS_FAULT, {{riscv::XLEN-riscv::PLEN{1'b0}}, lsu_paddr_o}, 1'b1};
++            end
++        end
++    end
++
++    // Load/store PMP check
++    pmp #(
++        .PLEN       ( riscv::PLEN            ),
++        .PMP_LEN    ( riscv::PLEN - 2        ),
++        .NR_ENTRIES ( ArianeCfg.NrPMPEntries )
++    ) i_pmp_data (
++        .addr_i        ( lsu_paddr_o         ),
++        .priv_lvl_i    ( ld_st_priv_lvl_i    ),
++        .access_type_i ( pmp_access_type     ),
++        // Configuration
++        .conf_addr_i   ( pmpaddr_i           ),
++        .conf_i        ( pmpcfg_i            ),
++        .allow_o       ( pmp_data_allow      )
++    );
++
++    // ----------
++    // Registers
++    // ----------
++    always_ff @(posedge clk_i or negedge rst_ni) begin
++        if (~rst_ni) begin
++            lsu_vaddr_q      <= '0;
++            lsu_req_q        <= '0;
++            misaligned_ex_q  <= '0;
++            dtlb_pte_q       <= '0;
++            dtlb_hit_q       <= '0;
++            lsu_is_store_q   <= '0;
++            dtlb_is_2M_q     <= '0;
++            dtlb_is_1G_q     <= '0;
++        end else begin
++            lsu_vaddr_q      <=  lsu_vaddr_n;
++            lsu_req_q        <=  lsu_req_n;
++            misaligned_ex_q  <=  misaligned_ex_n;
++            dtlb_pte_q       <=  dtlb_pte_n;
++            dtlb_hit_q       <=  dtlb_hit_n;
++            lsu_is_store_q   <=  lsu_is_store_n;
++            dtlb_is_2M_q     <=  dtlb_is_2M_n;
++            dtlb_is_1G_q     <=  dtlb_is_1G_n;
++        end
++    end
++endmodule
+diff --git a/src/mult.sv b/core/mult.sv
+similarity index 100%
+rename from src/mult.sv
+rename to core/mult.sv
+diff --git a/src/multiplier.sv b/core/multiplier.sv
+similarity index 100%
+rename from src/multiplier.sv
+rename to core/multiplier.sv
+diff --git a/src/perf_counters.sv b/core/perf_counters.sv
+similarity index 100%
+rename from src/perf_counters.sv
+rename to core/perf_counters.sv
+diff --git a/src/pmp/include/riscv.sv b/core/pmp/include/riscv.sv
+similarity index 100%
+rename from src/pmp/include/riscv.sv
+rename to core/pmp/include/riscv.sv
+diff --git a/src/pmp/src/pmp.sv b/core/pmp/src/pmp.sv
+similarity index 100%
+rename from src/pmp/src/pmp.sv
+rename to core/pmp/src/pmp.sv
+diff --git a/src/pmp/src/pmp_entry.sv b/core/pmp/src/pmp_entry.sv
+similarity index 100%
+rename from src/pmp/src/pmp_entry.sv
+rename to core/pmp/src/pmp_entry.sv
+diff --git a/core/ptw.sv b/core/ptw.sv
+new file mode 100644
+index 00000000..5ba0feb7
+--- /dev/null
++++ b/core/ptw.sv
+@@ -0,0 +1,405 @@
++// Copyright 2018 ETH Zurich and University of Bologna.
++// Copyright and related rights are licensed under the Solderpad Hardware
++// License, Version 0.51 (the "License"); you may not use this file except in
++// compliance with the License.  You may obtain a copy of the License at
++// http://solderpad.org/licenses/SHL-0.51. Unless required by applicable law
++// or agreed to in writing, software, hardware and materials distributed under
++// this License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++//
++// Author: David Schaffenrath, TU Graz
++// Author: Florian Zaruba, ETH Zurich
++// Date: 24.4.2017
++// Description: Hardware-PTW
++
++/* verilator lint_off WIDTH */
++
++module ptw import ariane_pkg::*; #(
++        parameter int ASID_WIDTH = 1,
++        parameter ariane_pkg::ariane_cfg_t ArianeCfg = ariane_pkg::ArianeDefaultConfig
++) (
++    input  logic                    clk_i,                  // Clock
++    input  logic                    rst_ni,                 // Asynchronous reset active low
++    input  logic                    flush_i,                // flush everything, we need to do this because
++                                                            // actually everything we do is speculative at this stage
++                                                            // e.g.: there could be a CSR instruction that changes everything
++    output logic                    ptw_active_o,
++    output logic                    walking_instr_o,        // set when walking for TLB
++    output logic                    ptw_error_o,            // set when an error occurred
++    output logic                    ptw_access_exception_o, // set when an PMP access exception occured
++    input  logic                    enable_translation_i,   // CSRs indicate to enable SV39
++    input  logic                    en_ld_st_translation_i, // enable virtual memory translation for load/stores
++
++    input  logic                    lsu_is_store_i,         // this translation was triggered by a store
++    // PTW memory interface
++    input  dcache_req_o_t           req_port_i,
++    output dcache_req_i_t           req_port_o,
++
++
++    // to TLBs, update logic
++    output tlb_update_t             itlb_update_o,
++    output tlb_update_t             dtlb_update_o,
++
++    output logic [riscv::VLEN-1:0]  update_vaddr_o,
++
++    input  logic [ASID_WIDTH-1:0]   asid_i,
++    // from TLBs
++    // did we miss?
++    input  logic                    itlb_access_i,
++    input  logic                    itlb_hit_i,
++    input  logic [riscv::VLEN-1:0]  itlb_vaddr_i,
++
++    input  logic                    dtlb_access_i,
++    input  logic                    dtlb_hit_i,
++    input  logic [riscv::VLEN-1:0]  dtlb_vaddr_i,
++    // from CSR file
++    input  logic [riscv::PPNW-1:0]  satp_ppn_i, // ppn from satp
++    input  logic                    mxr_i,
++    // Performance counters
++    output logic                    itlb_miss_o,
++    output logic                    dtlb_miss_o,
++    // PMP
++
++    input  riscv::pmpcfg_t [15:0]   pmpcfg_i,
++    input  logic [15:0][riscv::PLEN-3:0] pmpaddr_i,
++    output logic [riscv::PLEN-1:0]  bad_paddr_o
++
++);
++
++    // input registers
++    logic data_rvalid_q;
++    logic [63:0] data_rdata_q;
++
++    riscv::pte_t pte;
++    assign pte = riscv::pte_t'(data_rdata_q);
++
++    enum logic[2:0] {
++      IDLE,
++      WAIT_GRANT,
++      PTE_LOOKUP,
++      WAIT_RVALID,
++      PROPAGATE_ERROR,
++      PROPAGATE_ACCESS_ERROR
++    } state_q, state_d;
++
++    // SV39 defines three levels of page tables
++    enum logic [1:0] {
++        LVL1, LVL2, LVL3
++    } ptw_lvl_q, ptw_lvl_n;
++
++    // is this an instruction page table walk?
++    logic is_instr_ptw_q,   is_instr_ptw_n;
++    logic global_mapping_q, global_mapping_n;
++    // latched tag signal
++    logic tag_valid_n,      tag_valid_q;
++    // register the ASID
++    logic [ASID_WIDTH-1:0]  tlb_update_asid_q, tlb_update_asid_n;
++    // register the VPN we need to walk, SV39 defines a 39 bit virtual address
++    logic [riscv::VLEN-1:0] vaddr_q,   vaddr_n;
++    // 4 byte aligned physical pointer
++    logic [riscv::PLEN-1:0] ptw_pptr_q, ptw_pptr_n;
++
++    // Assignments
++    assign update_vaddr_o  = vaddr_q;
++
++    assign ptw_active_o    = (state_q != IDLE);
++    assign walking_instr_o = is_instr_ptw_q;
++    // directly output the correct physical address
++    assign req_port_o.address_index = ptw_pptr_q[DCACHE_INDEX_WIDTH-1:0];
++    assign req_port_o.address_tag   = ptw_pptr_q[DCACHE_INDEX_WIDTH+DCACHE_TAG_WIDTH-1:DCACHE_INDEX_WIDTH];
++    // we are never going to kill this request
++    assign req_port_o.kill_req      = '0;
++    // we are never going to write with the HPTW
++    assign req_port_o.data_wdata    = 64'b0;
++    // -----------
++    // TLB Update
++    // -----------
++    assign itlb_update_o.vpn = {{39-riscv::SV{1'b0}}, vaddr_q[riscv::SV-1:12]};
++    assign dtlb_update_o.vpn = {{39-riscv::SV{1'b0}}, vaddr_q[riscv::SV-1:12]};
++    // update the correct page table level
++    assign itlb_update_o.is_2M = (ptw_lvl_q == LVL2);
++    assign itlb_update_o.is_1G = (ptw_lvl_q == LVL1);
++    assign dtlb_update_o.is_2M = (ptw_lvl_q == LVL2);
++    assign dtlb_update_o.is_1G = (ptw_lvl_q == LVL1);
++    // output the correct ASID
++    assign itlb_update_o.asid = tlb_update_asid_q;
++    assign dtlb_update_o.asid = tlb_update_asid_q;
++    // set the global mapping bit
++    assign itlb_update_o.content = pte | (global_mapping_q << 5);
++    assign dtlb_update_o.content = pte | (global_mapping_q << 5);
++
++    assign req_port_o.tag_valid      = tag_valid_q;
++
++    logic allow_access;
++
++    assign bad_paddr_o = ptw_access_exception_o ? ptw_pptr_q : 'b0;
++
++    pmp #(
++        .PLEN       ( riscv::PLEN            ),
++        .PMP_LEN    ( riscv::PLEN - 2        ),
++        .NR_ENTRIES ( ArianeCfg.NrPMPEntries )
++    ) i_pmp_ptw (
++        .addr_i        ( ptw_pptr_q         ),
++        // PTW access are always checked as if in S-Mode...
++        .priv_lvl_i    ( riscv::PRIV_LVL_S  ),
++        // ...and they are always loads
++        .access_type_i ( riscv::ACCESS_READ ),
++        // Configuration
++        .conf_addr_i   ( pmpaddr_i          ),
++        .conf_i        ( pmpcfg_i           ),
++        .allow_o       ( allow_access       )
++    );
++
++    //-------------------
++    // Page table walker
++    //-------------------
++    // A virtual address va is translated into a physical address pa as follows:
++    // 1. Let a be sptbr.ppn × PAGESIZE, and let i = LEVELS-1. (For Sv39,
++    //    PAGESIZE=2^12 and LEVELS=3.)
++    // 2. Let pte be the value of the PTE at address a+va.vpn[i]×PTESIZE. (For
++    //    Sv32, PTESIZE=4.)
++    // 3. If pte.v = 0, or if pte.r = 0 and pte.w = 1, stop and raise an access
++    //    exception.
++    // 4. Otherwise, the PTE is valid. If pte.r = 1 or pte.x = 1, go to step 5.
++    //    Otherwise, this PTE is a pointer to the next level of the page table.
++    //    Let i=i-1. If i < 0, stop and raise an access exception. Otherwise, let
++    //    a = pte.ppn × PAGESIZE and go to step 2.
++    // 5. A leaf PTE has been found. Determine if the requested memory access
++    //    is allowed by the pte.r, pte.w, and pte.x bits. If not, stop and
++    //    raise an access exception. Otherwise, the translation is successful.
++    //    Set pte.a to 1, and, if the memory access is a store, set pte.d to 1.
++    //    The translated physical address is given as follows:
++    //      - pa.pgoff = va.pgoff.
++    //      - If i > 0, then this is a superpage translation and
++    //        pa.ppn[i-1:0] = va.vpn[i-1:0].
++    //      - pa.ppn[LEVELS-1:i] = pte.ppn[LEVELS-1:i].
++    always_comb begin : ptw
++        // default assignments
++        // PTW memory interface
++        tag_valid_n            = 1'b0;
++        req_port_o.data_req    = 1'b0;
++        req_port_o.data_be     = 8'hFF;
++        req_port_o.data_size   = 2'b11;
++        req_port_o.data_we     = 1'b0;
++        ptw_error_o            = 1'b0;
++        ptw_access_exception_o = 1'b0;
++        itlb_update_o.valid    = 1'b0;
++        dtlb_update_o.valid    = 1'b0;
++        is_instr_ptw_n         = is_instr_ptw_q;
++        ptw_lvl_n              = ptw_lvl_q;
++        ptw_pptr_n             = ptw_pptr_q;
++        state_d                = state_q;
++        global_mapping_n       = global_mapping_q;
++        // input registers
++        tlb_update_asid_n     = tlb_update_asid_q;
++        vaddr_n               = vaddr_q;
++
++        itlb_miss_o           = 1'b0;
++        dtlb_miss_o           = 1'b0;
++
++        case (state_q)
++
++            IDLE: begin
++                // by default we start with the top-most page table
++                ptw_lvl_n        = LVL1;
++                global_mapping_n = 1'b0;
++                is_instr_ptw_n   = 1'b0;
++                // if we got an ITLB miss
++                if (enable_translation_i & itlb_access_i & ~itlb_hit_i & ~dtlb_access_i) begin
++                    ptw_pptr_n          = {satp_ppn_i, itlb_vaddr_i[riscv::SV-1:30], 3'b0};
++                    is_instr_ptw_n      = 1'b1;
++                    tlb_update_asid_n   = asid_i;
++                    vaddr_n             = itlb_vaddr_i;
++                    state_d             = WAIT_GRANT;
++                    itlb_miss_o         = 1'b1;
++                // we got an DTLB miss
++                end else if (en_ld_st_translation_i & dtlb_access_i & ~dtlb_hit_i) begin
++                    ptw_pptr_n          = {satp_ppn_i, dtlb_vaddr_i[riscv::SV-1:30], 3'b0};
++                    tlb_update_asid_n   = asid_i;
++                    vaddr_n             = dtlb_vaddr_i;
++                    state_d             = WAIT_GRANT;
++                    dtlb_miss_o         = 1'b1;
++                end
++            end
++
++            WAIT_GRANT: begin
++                // send a request out
++                req_port_o.data_req = 1'b1;
++                // wait for the WAIT_GRANT
++                if (req_port_i.data_gnt) begin
++                    // send the tag valid signal one cycle later
++                    tag_valid_n = 1'b1;
++                    state_d     = PTE_LOOKUP;
++                end
++            end
++
++            PTE_LOOKUP: begin
++                // we wait for the valid signal
++                if (data_rvalid_q) begin
++
++                    // check if the global mapping bit is set
++                    if (pte.g)
++                        global_mapping_n = 1'b1;
++
++                    // -------------
++                    // Invalid PTE
++                    // -------------
++                    // If pte.v = 0, or if pte.r = 0 and pte.w = 1, stop and raise a page-fault exception.
++                    if (!pte.v || (!pte.r && pte.w))
++                        state_d = PROPAGATE_ERROR;
++                    // -----------
++                    // Valid PTE
++                    // -----------
++                    else begin
++                        state_d = IDLE;
++                        // it is a valid PTE
++                        // if pte.r = 1 or pte.x = 1 it is a valid PTE
++                        if (pte.r || pte.x) begin
++                            // Valid translation found (either 1G, 2M or 4K entry)
++                            if (is_instr_ptw_q) begin
++                                // ------------
++                                // Update ITLB
++                                // ------------
++                                // If page is not executable, we can directly raise an error. This
++                                // doesn't put a useless entry into the TLB. The same idea applies
++                                // to the access flag since we let the access flag be managed by SW.
++                                if (!pte.x || !pte.a)
++                                  state_d = PROPAGATE_ERROR;
++                                else
++                                  itlb_update_o.valid = 1'b1;
++
++                            end else begin
++                                // ------------
++                                // Update DTLB
++                                // ------------
++                                // Check if the access flag has been set, otherwise throw a page-fault
++                                // and let the software handle those bits.
++                                // If page is not readable (there are no write-only pages)
++                                // we can directly raise an error. This doesn't put a useless
++                                // entry into the TLB.
++                                if (pte.a && (pte.r || (pte.x && mxr_i))) begin
++                                  dtlb_update_o.valid = 1'b1;
++                                end else begin
++                                  state_d   = PROPAGATE_ERROR;
++                                end
++                                // Request is a store: perform some additional checks
++                                // If the request was a store and the page is not write-able, raise an error
++                                // the same applies if the dirty flag is not set
++                                if (lsu_is_store_i && (!pte.w || !pte.d)) begin
++                                    dtlb_update_o.valid = 1'b0;
++                                    state_d   = PROPAGATE_ERROR;
++                                end
++                            end
++                            // check if the ppn is correctly aligned:
++                            // 6. If i > 0 and pa.ppn[i − 1 : 0] != 0, this is a misaligned superpage; stop and raise a page-fault
++                            // exception.
++                            if (ptw_lvl_q == LVL1 && pte.ppn[17:0] != '0) begin
++                                state_d             = PROPAGATE_ERROR;
++                                dtlb_update_o.valid = 1'b0;
++                                itlb_update_o.valid = 1'b0;
++                            end else if (ptw_lvl_q == LVL2 && pte.ppn[8:0] != '0) begin
++                                state_d             = PROPAGATE_ERROR;
++                                dtlb_update_o.valid = 1'b0;
++                                itlb_update_o.valid = 1'b0;
++                            end
++                        // this is a pointer to the next TLB level
++                        end else begin
++                            // pointer to next level of page table
++                            if (ptw_lvl_q == LVL1) begin
++                                // we are in the second level now
++                                ptw_lvl_n  = LVL2;
++                                ptw_pptr_n = {pte.ppn, vaddr_q[29:21], 3'b0};
++                            end
++
++                            if (ptw_lvl_q == LVL2) begin
++                                // here we received a pointer to the third level
++                                ptw_lvl_n  = LVL3;
++                                ptw_pptr_n = {pte.ppn, vaddr_q[20:12], 3'b0};
++                            end
++
++                            state_d = WAIT_GRANT;
++
++                            if (ptw_lvl_q == LVL3) begin
++                              // Should already be the last level page table => Error
++                              ptw_lvl_n   = LVL3;
++                              state_d = PROPAGATE_ERROR;
++                            end
++                        end
++                    end
++
++                    // Check if this access was actually allowed from a PMP perspective
++                    if (!allow_access) begin
++                        itlb_update_o.valid = 1'b0;
++                        dtlb_update_o.valid = 1'b0;
++                        // we have to return the failed address in bad_addr
++                        ptw_pptr_n = ptw_pptr_q;
++                        state_d = PROPAGATE_ACCESS_ERROR;
++                    end
++                end
++                // we've got a data WAIT_GRANT so tell the cache that the tag is valid
++            end
++            // Propagate error to MMU/LSU
++            PROPAGATE_ERROR: begin
++                state_d     = IDLE;
++                ptw_error_o = 1'b1;
++            end
++            PROPAGATE_ACCESS_ERROR: begin
++                state_d     = IDLE;
++                ptw_access_exception_o = 1'b1;
++            end
++            // wait for the rvalid before going back to IDLE
++            WAIT_RVALID: begin
++                if (data_rvalid_q)
++                    state_d = IDLE;
++            end
++            default: begin
++                state_d = IDLE;
++            end
++        endcase
++
++        // -------
++        // Flush
++        // -------
++        // should we have flushed before we got an rvalid, wait for it until going back to IDLE
++        if (flush_i) begin
++            // on a flush check whether we are
++            // 1. in the PTE Lookup check whether we still need to wait for an rvalid
++            // 2. waiting for a grant, if so: wait for it
++            // if not, go back to idle
++            if ((state_q == PTE_LOOKUP && !data_rvalid_q) || ((state_q == WAIT_GRANT) && req_port_i.data_gnt))
++                state_d = WAIT_RVALID;
++            else
++                state_d = IDLE;
++        end
++    end
++
++    // sequential process
++    always_ff @(posedge clk_i or negedge rst_ni) begin
++        if (~rst_ni) begin
++            state_q            <= IDLE;
++            is_instr_ptw_q     <= 1'b0;
++            ptw_lvl_q          <= LVL1;
++            tag_valid_q        <= 1'b0;
++            tlb_update_asid_q  <= '0;
++            vaddr_q            <= '0;
++            ptw_pptr_q         <= '0;
++            global_mapping_q   <= 1'b0;
++            data_rdata_q       <= '0;
++            data_rvalid_q      <= 1'b0;
++        end else begin
++            state_q            <= state_d;
++            ptw_pptr_q         <= ptw_pptr_n;
++            is_instr_ptw_q     <= is_instr_ptw_n;
++            ptw_lvl_q          <= ptw_lvl_n;
++            tag_valid_q        <= tag_valid_n;
++            tlb_update_asid_q  <= tlb_update_asid_n;
++            vaddr_q            <= vaddr_n;
++            global_mapping_q   <= global_mapping_n;
++            data_rdata_q       <= req_port_i.data_rdata;
++            data_rvalid_q      <= req_port_i.data_rvalid;
++        end
++    end
++
++endmodule
++/* verilator lint_on WIDTH */
+diff --git a/src/re_name.sv b/core/re_name.sv
+similarity index 100%
+rename from src/re_name.sv
+rename to core/re_name.sv
+diff --git a/src/scoreboard.sv b/core/scoreboard.sv
+similarity index 100%
+rename from src/scoreboard.sv
+rename to core/scoreboard.sv
+diff --git a/src/serdiv.sv b/core/serdiv.sv
+similarity index 100%
+rename from src/serdiv.sv
+rename to core/serdiv.sv
+diff --git a/src/store_buffer.sv b/core/store_buffer.sv
+similarity index 100%
+rename from src/store_buffer.sv
+rename to core/store_buffer.sv
+diff --git a/src/store_unit.sv b/core/store_unit.sv
+similarity index 100%
+rename from src/store_unit.sv
+rename to core/store_unit.sv
+diff --git a/core/tlb.sv b/core/tlb.sv
+new file mode 100644
+index 00000000..d540e55f
+--- /dev/null
++++ b/core/tlb.sv
+@@ -0,0 +1,273 @@
++// Copyright 2018 ETH Zurich and University of Bologna.
++// Copyright and related rights are licensed under the Solderpad Hardware
++// License, Version 0.51 (the "License"); you may not use this file except in
++// compliance with the License.  You may obtain a copy of the License at
++// http://solderpad.org/licenses/SHL-0.51. Unless required by applicable law
++// or agreed to in writing, software, hardware and materials distributed under
++// this License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++//
++// Author: David Schaffenrath, TU Graz
++// Author: Florian Zaruba, ETH Zurich
++// Date: 21.4.2017
++// Description: Translation Lookaside Buffer, SV39
++//              fully set-associative
++
++
++module tlb import ariane_pkg::*; #(
++      parameter int unsigned TLB_ENTRIES = 4,
++      parameter int unsigned ASID_WIDTH  = 1
++  )(
++    input  logic                    clk_i,    // Clock
++    input  logic                    rst_ni,   // Asynchronous reset active low
++    input  logic                    flush_i,  // Flush signal
++    // Update TLB
++    input  tlb_update_t             update_i,
++    // Lookup signals
++    input  logic                    lu_access_i,
++    input  logic [ASID_WIDTH-1:0]   lu_asid_i,
++    input  logic [riscv::VLEN-1:0]  lu_vaddr_i,
++    output riscv::pte_t             lu_content_o,
++    input  logic [ASID_WIDTH-1:0]   asid_to_be_flushed_i,
++    input  logic [riscv::VLEN-1:0]  vaddr_to_be_flushed_i,
++    output logic                    lu_is_2M_o,
++    output logic                    lu_is_1G_o,
++    output logic                    lu_hit_o
++);
++
++    // SV39 defines three levels of page tables
++    struct packed {
++      logic [ASID_WIDTH-1:0] asid;
++      logic [riscv::VPN2:0]  vpn2;
++      logic [8:0]            vpn1;
++      logic [8:0]            vpn0;
++      logic                  is_2M;
++      logic                  is_1G;
++      logic                  valid;
++    } [TLB_ENTRIES-1:0] tags_q, tags_n;
++
++    riscv::pte_t [TLB_ENTRIES-1:0] content_q, content_n;
++    logic [8:0] vpn0, vpn1;
++    logic [riscv::VPN2:0] vpn2;
++    logic [TLB_ENTRIES-1:0] lu_hit;     // to replacement logic
++    logic [TLB_ENTRIES-1:0] replace_en; // replace the following entry, set by replacement strategy
++    //-------------
++    // Translation
++    //-------------
++    always_comb begin : translation
++        vpn0 = lu_vaddr_i[20:12];
++        vpn1 = lu_vaddr_i[29:21];
++        vpn2 = lu_vaddr_i[30+riscv::VPN2:30];
++
++        // default assignment
++        lu_hit       = '{default: 0};
++        lu_hit_o     = 1'b0;
++        lu_content_o = '{default: 0};
++        lu_is_1G_o   = 1'b0;
++        lu_is_2M_o   = 1'b0;
++
++        for (int unsigned i = 0; i < TLB_ENTRIES; i++) begin
++            // first level match, this may be a giga page, check the ASID flags as well
++            // if the entry is associated to a global address, don't match the ASID (ASID is don't care)
++            if (tags_q[i].valid && ((lu_asid_i == tags_q[i].asid) || content_q[i].g)  && vpn2 == tags_q[i].vpn2) begin
++                // second level
++                if (tags_q[i].is_1G) begin
++                    lu_is_1G_o = 1'b1;
++                    lu_content_o = content_q[i];
++                    lu_hit_o   = 1'b1;
++                    lu_hit[i]  = 1'b1;
++                // not a giga page hit so check further
++                end else if (vpn1 == tags_q[i].vpn1) begin
++                    // this could be a 2 mega page hit or a 4 kB hit
++                    // output accordingly
++                    if (tags_q[i].is_2M || vpn0 == tags_q[i].vpn0) begin
++                        lu_is_2M_o   = tags_q[i].is_2M;
++                        lu_content_o = content_q[i];
++                        lu_hit_o     = 1'b1;
++                        lu_hit[i]    = 1'b1;
++                    end
++                end
++            end
++        end
++    end
++
++
++
++    logic asid_to_be_flushed_is0;  // indicates that the ASID provided by SFENCE.VMA (rs2)is 0, active high
++    logic vaddr_to_be_flushed_is0;  // indicates that the VADDR provided by SFENCE.VMA (rs1)is 0, active high
++    logic  [TLB_ENTRIES-1:0] vaddr_vpn0_match;
++    logic  [TLB_ENTRIES-1:0] vaddr_vpn1_match;
++    logic  [TLB_ENTRIES-1:0] vaddr_vpn2_match;
++
++    assign asid_to_be_flushed_is0 =  ~(|asid_to_be_flushed_i);
++    assign vaddr_to_be_flushed_is0 = ~(|vaddr_to_be_flushed_i);
++
++	  // ------------------
++    // Update and Flush
++    // ------------------
++    always_comb begin : update_flush
++        tags_n    = tags_q;
++        content_n = content_q;
++
++        for (int unsigned i = 0; i < TLB_ENTRIES; i++) begin
++
++            vaddr_vpn0_match[i] = (vaddr_to_be_flushed_i[20:12] == tags_q[i].vpn0);
++            vaddr_vpn1_match[i] = (vaddr_to_be_flushed_i[29:21] == tags_q[i].vpn1);
++            vaddr_vpn2_match[i] = (vaddr_to_be_flushed_i[30+riscv::VPN2:30] == tags_q[i].vpn2);
++
++            if (flush_i) begin
++                // invalidate logic
++                // flush everything if ASID is 0 and vaddr is 0 ("SFENCE.VMA x0 x0" case)
++        				if (asid_to_be_flushed_is0 && vaddr_to_be_flushed_is0 )
++                    tags_n[i].valid = 1'b0;
++                // flush vaddr in all addressing space ("SFENCE.VMA vaddr x0" case), it should happen only for leaf pages
++                else if (asid_to_be_flushed_is0 && ((vaddr_vpn0_match[i] && vaddr_vpn1_match[i] && vaddr_vpn2_match[i]) || (vaddr_vpn2_match[i] && tags_q[i].is_1G) || (vaddr_vpn1_match[i] && vaddr_vpn2_match[i] && tags_q[i].is_2M) ) && (~vaddr_to_be_flushed_is0))
++                    tags_n[i].valid = 1'b0;
++                // the entry is flushed if it's not global and asid and vaddr both matches with the entry to be flushed ("SFENCE.VMA vaddr asid" case)
++                else if ((!content_q[i].g) && ((vaddr_vpn0_match[i] && vaddr_vpn1_match[i] && vaddr_vpn2_match[i]) || (vaddr_vpn2_match[i] && tags_q[i].is_1G) || (vaddr_vpn1_match[i] && vaddr_vpn2_match[i] && tags_q[i].is_2M)) && (asid_to_be_flushed_i == tags_q[i].asid) && (!vaddr_to_be_flushed_is0) && (!asid_to_be_flushed_is0))
++				          	tags_n[i].valid = 1'b0;
++                // the entry is flushed if it's not global, and the asid matches and vaddr is 0. ("SFENCE.VMA 0 asid" case)
++				        else if ((!content_q[i].g) && (vaddr_to_be_flushed_is0) && (asid_to_be_flushed_i == tags_q[i].asid) && (!asid_to_be_flushed_is0))
++				        	  tags_n[i].valid = 1'b0;
++            // normal replacement
++            end else if (update_i.valid & replace_en[i]) begin
++                // update tag array
++                tags_n[i] = '{
++                    asid:  update_i.asid,
++                    vpn2:  update_i.vpn [18+riscv::VPN2:18],
++                    vpn1:  update_i.vpn [17:9],
++                    vpn0:  update_i.vpn [8:0],
++                    is_1G: update_i.is_1G,
++                    is_2M: update_i.is_2M,
++                    valid: 1'b1
++                };
++                // and content as well
++                content_n[i] = update_i.content;
++            end
++        end
++    end
++
++    // -----------------------------------------------
++    // PLRU - Pseudo Least Recently Used Replacement
++    // -----------------------------------------------
++    logic[2*(TLB_ENTRIES-1)-1:0] plru_tree_q, plru_tree_n;
++    always_comb begin : plru_replacement
++        plru_tree_n = plru_tree_q;
++        // The PLRU-tree indexing:
++        // lvl0        0
++        //            / \
++        //           /   \
++        // lvl1     1     2
++        //         / \   / \
++        // lvl2   3   4 5   6
++        //       / \ /\/\  /\
++        //      ... ... ... ...
++        // Just predefine which nodes will be set/cleared
++        // E.g. for a TLB with 8 entries, the for-loop is semantically
++        // equivalent to the following pseudo-code:
++        // unique case (1'b1)
++        // lu_hit[7]: plru_tree_n[0, 2, 6] = {1, 1, 1};
++        // lu_hit[6]: plru_tree_n[0, 2, 6] = {1, 1, 0};
++        // lu_hit[5]: plru_tree_n[0, 2, 5] = {1, 0, 1};
++        // lu_hit[4]: plru_tree_n[0, 2, 5] = {1, 0, 0};
++        // lu_hit[3]: plru_tree_n[0, 1, 4] = {0, 1, 1};
++        // lu_hit[2]: plru_tree_n[0, 1, 4] = {0, 1, 0};
++        // lu_hit[1]: plru_tree_n[0, 1, 3] = {0, 0, 1};
++        // lu_hit[0]: plru_tree_n[0, 1, 3] = {0, 0, 0};
++        // default: begin /* No hit */ end
++        // endcase
++        for (int unsigned i = 0; i < TLB_ENTRIES; i++) begin
++            automatic int unsigned idx_base, shift, new_index;
++            // we got a hit so update the pointer as it was least recently used
++            if (lu_hit[i] & lu_access_i) begin
++                // Set the nodes to the values we would expect
++                for (int unsigned lvl = 0; lvl < $clog2(TLB_ENTRIES); lvl++) begin
++                  idx_base = $unsigned((2**lvl)-1);
++                  // lvl0 <=> MSB, lvl1 <=> MSB-1, ...
++                  shift = $clog2(TLB_ENTRIES) - lvl;
++                  // to circumvent the 32 bit integer arithmetic assignment
++                  new_index =  ~((i >> (shift-1)) & 32'b1);
++                  plru_tree_n[idx_base + (i >> shift)] = new_index[0];
++                end
++            end
++        end
++        // Decode tree to write enable signals
++        // Next for-loop basically creates the following logic for e.g. an 8 entry
++        // TLB (note: pseudo-code obviously):
++        // replace_en[7] = &plru_tree_q[ 6, 2, 0]; //plru_tree_q[0,2,6]=={1,1,1}
++        // replace_en[6] = &plru_tree_q[~6, 2, 0]; //plru_tree_q[0,2,6]=={1,1,0}
++        // replace_en[5] = &plru_tree_q[ 5,~2, 0]; //plru_tree_q[0,2,5]=={1,0,1}
++        // replace_en[4] = &plru_tree_q[~5,~2, 0]; //plru_tree_q[0,2,5]=={1,0,0}
++        // replace_en[3] = &plru_tree_q[ 4, 1,~0]; //plru_tree_q[0,1,4]=={0,1,1}
++        // replace_en[2] = &plru_tree_q[~4, 1,~0]; //plru_tree_q[0,1,4]=={0,1,0}
++        // replace_en[1] = &plru_tree_q[ 3,~1,~0]; //plru_tree_q[0,1,3]=={0,0,1}
++        // replace_en[0] = &plru_tree_q[~3,~1,~0]; //plru_tree_q[0,1,3]=={0,0,0}
++        // For each entry traverse the tree. If every tree-node matches,
++        // the corresponding bit of the entry's index, this is
++        // the next entry to replace.
++        for (int unsigned i = 0; i < TLB_ENTRIES; i += 1) begin
++            automatic logic en;
++            automatic int unsigned idx_base, shift, new_index;
++            en = 1'b1;
++            for (int unsigned lvl = 0; lvl < $clog2(TLB_ENTRIES); lvl++) begin
++                idx_base = $unsigned((2**lvl)-1);
++                // lvl0 <=> MSB, lvl1 <=> MSB-1, ...
++                shift = $clog2(TLB_ENTRIES) - lvl;
++
++                // en &= plru_tree_q[idx_base + (i>>shift)] == ((i >> (shift-1)) & 1'b1);
++                new_index =  (i >> (shift-1)) & 32'b1;
++                if (new_index[0]) begin
++                  en &= plru_tree_q[idx_base + (i>>shift)];
++                end else begin
++                  en &= ~plru_tree_q[idx_base + (i>>shift)];
++                end
++            end
++            replace_en[i] = en;
++        end
++    end
++
++    // sequential process
++    always_ff @(posedge clk_i or negedge rst_ni) begin
++        if(~rst_ni) begin
++            tags_q      <= '{default: 0};
++            content_q   <= '{default: 0};
++            plru_tree_q <= '{default: 0};
++        end else begin
++            tags_q      <= tags_n;
++            content_q   <= content_n;
++            plru_tree_q <= plru_tree_n;
++        end
++    end
++    //--------------
++    // Sanity checks
++    //--------------
++
++    //pragma translate_off
++    `ifndef VERILATOR
++
++    initial begin : p_assertions
++      assert ((TLB_ENTRIES % 2 == 0) && (TLB_ENTRIES > 1))
++        else begin $error("TLB size must be a multiple of 2 and greater than 1"); $stop(); end
++      assert (ASID_WIDTH >= 1)
++        else begin $error("ASID width must be at least 1"); $stop(); end
++    end
++
++    // Just for checking
++    function int countSetBits(logic[TLB_ENTRIES-1:0] vector);
++      automatic int count = 0;
++      foreach (vector[idx]) begin
++        count += vector[idx];
++      end
++      return count;
++    endfunction
++
++    assert property (@(posedge clk_i)(countSetBits(lu_hit) <= 1))
++      else begin $error("More then one hit in TLB!"); $stop(); end
++    assert property (@(posedge clk_i)(countSetBits(replace_en) <= 1))
++      else begin $error("More then one TLB entry selected for next replace!"); $stop(); end
++
++    `endif
++    //pragma translate_on
++
++endmodule
+diff --git a/bootrom/bootrom.sv b/corev_apu/bootrom/bootrom.sv
+similarity index 100%
+rename from bootrom/bootrom.sv
+rename to corev_apu/bootrom/bootrom.sv
+diff --git a/bootrom/dromajo_bootrom.sv b/corev_apu/bootrom/dromajo_bootrom.sv
+similarity index 100%
+rename from bootrom/dromajo_bootrom.sv
+rename to corev_apu/bootrom/dromajo_bootrom.sv
+diff --git a/src/clint/axi_lite_interface.sv b/corev_apu/clint/axi_lite_interface.sv
+similarity index 100%
+rename from src/clint/axi_lite_interface.sv
+rename to corev_apu/clint/axi_lite_interface.sv
+diff --git a/src/clint/clint.sv b/corev_apu/clint/clint.sv
+similarity index 100%
+rename from src/clint/clint.sv
+rename to corev_apu/clint/clint.sv
+diff --git a/include/traced_instr_pkg.sv b/corev_apu/include/traced_instr_pkg.sv
+similarity index 100%
+rename from include/traced_instr_pkg.sv
+rename to corev_apu/include/traced_instr_pkg.sv
+diff --git a/openpiton/ariane_verilog_wrap.sv b/corev_apu/openpiton/ariane_verilog_wrap.sv
+similarity index 100%
+rename from openpiton/ariane_verilog_wrap.sv
+rename to corev_apu/openpiton/ariane_verilog_wrap.sv
+diff --git a/openpiton/riscv_peripherals.sv b/corev_apu/openpiton/riscv_peripherals.sv
+similarity index 100%
+rename from openpiton/riscv_peripherals.sv
+rename to corev_apu/openpiton/riscv_peripherals.sv
+diff --git a/src/util/axi_master_connect.sv b/common/local/util/axi_master_connect.sv
+similarity index 100%
+rename from src/util/axi_master_connect.sv
+rename to common/local/util/axi_master_connect.sv
+diff --git a/src/util/axi_master_connect_rev.sv b/common/local/util/axi_master_connect_rev.sv
+similarity index 100%
+rename from src/util/axi_master_connect_rev.sv
+rename to common/local/util/axi_master_connect_rev.sv
+diff --git a/src/util/axi_slave_connect.sv b/common/local/util/axi_slave_connect.sv
+similarity index 100%
+rename from src/util/axi_slave_connect.sv
+rename to common/local/util/axi_slave_connect.sv
+diff --git a/src/util/axi_slave_connect_rev.sv b/common/local/util/axi_slave_connect_rev.sv
+similarity index 100%
+rename from src/util/axi_slave_connect_rev.sv
+rename to common/local/util/axi_slave_connect_rev.sv
+diff --git a/src/util/ex_trace_item.svh b/common/local/util/ex_trace_item.svh
+similarity index 100%
+rename from src/util/ex_trace_item.svh
+rename to common/local/util/ex_trace_item.svh
+diff --git a/src/util/find_first_one.sv b/common/local/util/find_first_one.sv
+similarity index 100%
+rename from src/util/find_first_one.sv
+rename to common/local/util/find_first_one.sv
+diff --git a/src/util/instr_trace_item.svh b/common/local/util/instr_trace_item.svh
+similarity index 100%
+rename from src/util/instr_trace_item.svh
+rename to common/local/util/instr_trace_item.svh
+diff --git a/src/util/instr_tracer.sv b/common/local/util/instr_tracer.sv
+similarity index 100%
+rename from src/util/instr_tracer.sv
+rename to common/local/util/instr_tracer.sv
+diff --git a/src/util/instr_tracer_if.sv b/common/local/util/instr_tracer_if.sv
+similarity index 100%
+rename from src/util/instr_tracer_if.sv
+rename to common/local/util/instr_tracer_if.sv
+diff --git a/src/util/sram.sv b/common/local/util/sram.sv
+similarity index 100%
+rename from src/util/sram.sv
+rename to common/local/util/sram.sv
+diff --git a/src/alu.sv b/core/alu.sv
+similarity index 100%
+rename from src/alu.sv
+rename to core/alu.sv
+diff --git a/src/amo_buffer.sv b/core/amo_buffer.sv
+similarity index 100%
+rename from src/amo_buffer.sv
+rename to core/amo_buffer.sv
+diff --git a/src/ariane.sv b/core/ariane.sv
+similarity index 94%
+rename from src/ariane.sv
+rename to core/ariane.sv
+index c0e4e5ac..ff398e61 100644
+--- a/src/ariane.sv
++++ b/core/ariane.sv
+@@ -42,6 +42,11 @@ module ariane import ariane_pkg::*; #(
+   // firesim trace port
+   output traced_instr_pkg::trace_port_t trace_o,
+ `endif
++`ifdef RVFI_TRACE
++  // RISC-V formal interface port (`rvfi`):
++  // Can be left open when formal tracing is not needed.
++  output ariane_rvfi_pkg::rvfi_port_t  rvfi_o,
++`endif
+ `ifdef PITON_ARIANE
+   // L15 (memory side)
+   output wt_cache_pkg::l15_req_t       l15_req_o,
+@@ -894,4 +899,38 @@ module ariane import ariane_pkg::*; #(
+ `endif // VERILATOR
+ //pragma translate_on
+ 
++`ifdef RVFI_TRACE
++  always_comb
++    for (int i = 0; i < NR_COMMIT_PORTS; i++) begin
++      logic exception, mem_exception;
++      exception = commit_instr_id_commit[i].valid && commit_instr_id_commit[i].ex.valid && ex_commit.valid;
++      mem_exception = exception &&
++        (commit_instr_id_commit[i].ex.cause == riscv::INSTR_ADDR_MISALIGNED ||
++         commit_instr_id_commit[i].ex.cause == riscv::INSTR_ACCESS_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::ILLEGAL_INSTR ||
++         commit_instr_id_commit[i].ex.cause == riscv::LD_ADDR_MISALIGNED ||
++         commit_instr_id_commit[i].ex.cause == riscv::LD_ACCESS_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::ST_ADDR_MISALIGNED ||
++         commit_instr_id_commit[i].ex.cause == riscv::ST_ACCESS_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::INSTR_PAGE_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::LOAD_PAGE_FAULT ||
++         commit_instr_id_commit[i].ex.cause == riscv::STORE_PAGE_FAULT);
++      // when rvfi_valid, the instruction is executed
++      rvfi_o[i].valid    = (commit_ack[i] && !commit_instr_id_commit[i].ex.valid) ||
++        (exception && (commit_instr_id_commit[i].ex.cause == riscv::ENV_CALL_MMODE ||
++                  commit_instr_id_commit[i].ex.cause == riscv::ENV_CALL_SMODE ||
++                  commit_instr_id_commit[i].ex.cause == riscv::ENV_CALL_UMODE));
++      rvfi_o[i].insn     = commit_instr_id_commit[i].ex.tval[31:0];
++      // when trap, the instruction is not executed
++      rvfi_o[i].trap     = mem_exception;
++      rvfi_o[i].mode     = debug_mode ? 2'b10 : priv_lvl;
++      rvfi_o[i].ixl      = riscv::XLEN == 64 ? 2 : 1;
++      rvfi_o[i].rs1_addr = commit_instr_id_commit[i].rs1;
++      rvfi_o[i].rs2_addr = commit_instr_id_commit[i].rs2;
++      rvfi_o[i].rd_addr  = commit_instr_id_commit[i].rd;
++      rvfi_o[i].rd_wdata = ariane_pkg::is_rd_fpr(commit_instr_id_commit[i].op) == 0 ? wdata_commit_id[i] : commit_instr_id_commit[i].result;
++      rvfi_o[i].pc_rdata = commit_instr_id_commit[i].pc;
++    end
++`endif
++
+ endmodule // ariane
+diff --git a/src/ariane_regfile.sv b/core/ariane_regfile.sv
+similarity index 100%
+rename from src/ariane_regfile.sv
+rename to core/ariane_regfile.sv
+diff --git a/src/ariane_regfile_ff.sv b/core/ariane_regfile_ff.sv
+similarity index 100%
+rename from src/ariane_regfile_ff.sv
+rename to core/ariane_regfile_ff.sv
+diff --git a/core/ariane_wrapper.sv b/core/ariane_wrapper.sv
+new file mode 100644
+index 00000000..a430cb64
+--- /dev/null
++++ b/core/ariane_wrapper.sv
+@@ -0,0 +1,237 @@
++// Copyright 2021 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++module ariane_wrapper import ariane_pkg::*; #(
++  parameter ariane_pkg::ariane_cfg_t ArianeCfg     = ariane_pkg::ArianeDefaultConfig
++) (
++  input  logic                         clk_i,
++  input  logic                         rst_ni,
++  // Core ID, Cluster ID and boot address are considered more or less static
++  input  logic [63:0]                  boot_addr_i,  // reset boot address
++  input  logic [63:0]                  hart_id_i,    // hart id in a multicore environment (reflected in a CSR)
++
++  // Interrupt inputs
++  input  logic [1:0]                   irq_i,        // level sensitive IR lines, mip & sip (async)
++  input  logic                         ipi_i,        // inter-processor interrupts (async)
++  // Timer facilities
++  input  logic                         time_irq_i,   // timer interrupt in (async)
++  input  logic                         debug_req_i,  // debug request (async)
++`ifdef FIRESIM_TRACE
++  // firesim trace port
++  output traced_instr_pkg::trace_port_t trace_o,
++`endif
++  // RISC-V formal interface port (`rvfi`):
++  // Can be left open when formal tracing is not needed.
++  output logic                         rvfi_valid_1,
++  output logic[63:0]                   rvfi_order_1,
++  output logic[31:0]                   rvfi_insn_1,
++  output logic                         rvfi_trap_1,
++  output logic                         rvfi_halt_1,
++  output logic                         rvfi_intr_1,
++  output logic[2:0]                    rvfi_mode_1,
++  output logic[2:0]                    rvfi_ixl_1,
++  output logic[4:0]                    rvfi_rs1_addr_1,
++  output logic[4:0]                    rvfi_rs2_addr_1,
++  output logic[riscv::XLEN-1:0]        rvfi_rs1_rdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_rs2_rdata_1,
++  output logic[4:0]                    rvfi_rd_addr_1,
++  output logic[riscv::XLEN-1:0]        rvfi_rd_wdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_rdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_wdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_addr_1,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_rmask_1,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_wmask_1,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_rdata_1,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_wdata_1,
++  output logic                         rvfi_valid_0,
++  output logic[63:0]                   rvfi_order_0,
++  output logic[31:0]                   rvfi_insn_0,
++  output logic                         rvfi_trap_0,
++  output logic                         rvfi_halt_0,
++  output logic                         rvfi_intr_0,
++  output logic[2:0]                    rvfi_mode_0,
++  output logic[2:0]                    rvfi_ixl_0,
++  output logic[4:0]                    rvfi_rs1_addr_0,
++  output logic[4:0]                    rvfi_rs2_addr_0,
++  output logic[riscv::XLEN-1:0]        rvfi_rs1_rdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_rs2_rdata_0,
++  output logic[4:0]                    rvfi_rd_addr_0,
++  output logic[riscv::XLEN-1:0]        rvfi_rd_wdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_rdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_pc_wdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_addr_0,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_rmask_0,
++  output logic[(riscv::XLEN)/8-1:0]    rvfi_mem_wmask_0,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_rdata_0,
++  output logic[riscv::XLEN-1:0]        rvfi_mem_wdata_0,
++`ifdef PITON_ARIANE
++  // L15 (memory side)
++  output wt_cache_pkg::l15_req_t       l15_req_o,
++  input  wt_cache_pkg::l15_rtrn_t      l15_rtrn_i
++`else
++  // memory side, AXI Master
++  output ariane_axi::id_t              aw_id_o,
++  output ariane_axi::addr_t            aw_addr_o,
++  output axi_pkg::len_t                aw_len_o,
++  output axi_pkg::size_t               aw_size_o,
++  output axi_pkg::burst_t              aw_burst_o,
++  output logic                         aw_lock_o,
++  output axi_pkg::cache_t              aw_cache_o,
++  output axi_pkg::prot_t               aw_prot_o,
++  output axi_pkg::qos_t                aw_qos_o,
++  output axi_pkg::region_t             aw_region_o,
++  output axi_pkg::atop_t               aw_atop_o,
++  output ariane_axi::user_t            aw_user_o,
++  output logic                         aw_valid_o,
++  output ariane_axi::data_t            w_data_o,
++  output ariane_axi::strb_t            w_strb_o,
++  output logic                         w_last_o,
++  output ariane_axi::user_t            w_user_o,
++  output logic                         w_valid_o,
++  output logic                         b_ready_o,
++  output ariane_axi::id_t              ar_id_o,
++  output ariane_axi::addr_t            ar_addr_o,
++  output axi_pkg::len_t                ar_len_o,
++  output axi_pkg::size_t               ar_size_o,
++  output axi_pkg::burst_t              ar_burst_o,
++  output logic                         ar_lock_o,
++  output axi_pkg::cache_t              ar_cache_o,
++  output axi_pkg::prot_t               ar_prot_o,
++  output axi_pkg::qos_t                ar_qos_o,
++  output axi_pkg::region_t             ar_region_o,
++  output ariane_axi::user_t            ar_user_o,
++  output logic                         ar_valid_o,
++  output logic                         r_ready_o,
++  input  logic                         aw_ready_i,
++  input  logic                         ar_ready_i,
++  input  logic                         w_ready_i,
++  input  logic                         b_valid_i,
++  input  ariane_axi::id_t              b_id_i,
++  input  axi_pkg::resp_t               b_resp_i,
++  input  ariane_axi::user_t            b_user_i,
++  input  logic                         r_valid_i,
++  input  ariane_axi::id_t              r_id_i,
++  input  ariane_axi::data_t            r_data_i,
++  input  axi_pkg::resp_t               r_resp_i,
++  input  logic                         r_last_i,
++  input  ariane_axi::user_t            r_user_i
++`endif
++);
++
++  ariane_axi::req_t               axi_ariane_req;
++  ariane_axi::resp_t              axi_ariane_resp;
++  ariane_rvfi_pkg::rvfi_port_t    rvfi;
++
++  assign aw_id_o                  = axi_ariane_req.aw.id;
++  assign aw_addr_o                = axi_ariane_req.aw.addr;
++  assign aw_len_o                 = axi_ariane_req.aw.len;
++  assign aw_size_o                = axi_ariane_req.aw.size;
++  assign aw_burst_o               = axi_ariane_req.aw.burst;
++  assign aw_lock_o                = axi_ariane_req.aw.lock;
++  assign aw_cache_o               = axi_ariane_req.aw.cache;
++  assign aw_prot_o                = axi_ariane_req.aw.prot;
++  assign aw_qos_o                 = axi_ariane_req.aw.qos;
++  assign aw_region_o              = axi_ariane_req.aw.region;
++  assign aw_atop_o                = axi_ariane_req.aw.atop;
++  assign aw_user_o                = axi_ariane_req.aw.user;
++  assign aw_valid_o               = axi_ariane_req.aw_valid;
++  assign w_data_o                 = axi_ariane_req.w.data;
++  assign w_strb_o                 = axi_ariane_req.w.strb;
++  assign w_last_o                 = axi_ariane_req.w.last;
++  assign w_user_o                 = axi_ariane_req.w.user;
++  assign w_valid_o                = axi_ariane_req.w_valid;
++  assign b_ready_o                = axi_ariane_req.b_ready;
++  assign ar_id_o                  = axi_ariane_req.ar.id;
++  assign ar_addr_o                = axi_ariane_req.ar.addr;
++  assign ar_len_o                 = axi_ariane_req.ar.len;
++  assign ar_size_o                = axi_ariane_req.ar.size;
++  assign ar_burst_o               = axi_ariane_req.ar.burst;
++  assign ar_lock_o                = axi_ariane_req.ar.lock;
++  assign ar_cache_o               = axi_ariane_req.ar.cache;
++  assign ar_prot_o                = axi_ariane_req.ar.prot;
++  assign ar_qos_o                 = axi_ariane_req.ar.qos;
++  assign ar_region_o              = axi_ariane_req.ar.region;
++  assign ar_user_o                = axi_ariane_req.ar.user;
++  assign ar_valid_o               = axi_ariane_req.ar_valid;
++  assign r_ready_o                = axi_ariane_req.r_ready;
++
++  assign axi_ariane_resp.aw_ready = aw_ready_i;
++  assign axi_ariane_resp.ar_ready = ar_ready_i;
++  assign axi_ariane_resp.w_ready  = w_ready_i;
++  assign axi_ariane_resp.b_valid  = b_valid_i;
++  assign axi_ariane_resp.b.id     = b_id_i;
++  assign axi_ariane_resp.b.resp   = b_resp_i;
++  assign axi_ariane_resp.b.user   = b_user_i;
++  assign axi_ariane_resp.r_valid  = r_valid_i;
++  assign axi_ariane_resp.r.id     = r_id_i;
++  assign axi_ariane_resp.r.data   = r_data_i;
++  assign axi_ariane_resp.r.resp   = r_resp_i;
++  assign axi_ariane_resp.r.last   = r_last_i;
++  assign axi_ariane_resp.r.user   = r_user_i;
++
++  assign rvfi_valid_1             = rvfi[1].valid;
++  assign rvfi_order_1             = rvfi[1].order;
++  assign rvfi_insn_1              = rvfi[1].insn;
++  assign rvfi_trap_1              = rvfi[1].trap;
++  assign rvfi_halt_1              = rvfi[1].halt;
++  assign rvfi_intr_1              = rvfi[1].intr;
++  assign rvfi_mode_1              = rvfi[1].mode;
++  assign rvfi_ixl_1               = rvfi[1].ixl;
++  assign rvfi_rs1_addr_1          = rvfi[1].rs1_addr;
++  assign rvfi_rs2_addr_1          = rvfi[1].rs2_addr;
++  assign rvfi_rs1_rdata_1         = rvfi[1].rs1_rdata;
++  assign rvfi_rs2_rdata_1         = rvfi[1].rs2_rdata;
++  assign rvfi_rd_addr_1           = rvfi[1].rd_addr;
++  assign rvfi_rd_wdata_1          = rvfi[1].rd_wdata;
++  assign rvfi_pc_rdata_1          = rvfi[1].pc_rdata;
++  assign rvfi_pc_wdata_1          = rvfi[1].pc_wdata;
++  assign rvfi_mem_addr_1          = rvfi[1].mem_addr;
++  assign rvfi_mem_rmask_1         = rvfi[1].mem_rmask;
++  assign rvfi_mem_wmask_1         = rvfi[1].mem_wmask;
++  assign rvfi_mem_rdata_1         = rvfi[1].mem_rdata;
++  assign rvfi_mem_wdata_1         = rvfi[1].mem_wdata;
++  assign rvfi_valid_0             = rvfi[0].valid;
++  assign rvfi_order_0             = rvfi[0].order;
++  assign rvfi_insn_0              = rvfi[0].insn;
++  assign rvfi_trap_0              = rvfi[0].trap;
++  assign rvfi_halt_0              = rvfi[0].halt;
++  assign rvfi_intr_0              = rvfi[0].intr;
++  assign rvfi_mode_0              = rvfi[0].mode;
++  assign rvfi_ixl_0               = rvfi[0].ixl;
++  assign rvfi_rs1_addr_0          = rvfi[0].rs1_addr;
++  assign rvfi_rs2_addr_0          = rvfi[0].rs2_addr;
++  assign rvfi_rs1_rdata_0         = rvfi[0].rs1_rdata;
++  assign rvfi_rs2_rdata_0         = rvfi[0].rs2_rdata;
++  assign rvfi_rd_addr_0           = rvfi[0].rd_addr;
++  assign rvfi_rd_wdata_0          = rvfi[0].rd_wdata;
++  assign rvfi_pc_rdata_0          = rvfi[0].pc_rdata;
++  assign rvfi_pc_wdata_0          = rvfi[0].pc_wdata;
++  assign rvfi_mem_addr_0          = rvfi[0].mem_addr;
++  assign rvfi_mem_rmask_0         = rvfi[0].mem_rmask;
++  assign rvfi_mem_wmask_0         = rvfi[0].mem_wmask;
++  assign rvfi_mem_rdata_0         = rvfi[0].mem_rdata;
++  assign rvfi_mem_wdata_0         = rvfi[0].mem_wdata;
++
++  ariane #(
++    .ArianeCfg  ( ariane_soc::ArianeSocCfg )
++  ) i_ariane (
++    .clk_i                ( clk_i           ),
++    .rst_ni               ( rst_ni          ),
++    .boot_addr_i          ( boot_addr_i     ),
++    .hart_id_i            ( hart_id_i       ),
++    .irq_i                ( irq_i           ),
++    .ipi_i                ( ipi_i           ),
++    .time_irq_i           ( time_irq_i      ),
++    .rvfi_o               ( rvfi            ),
++    .debug_req_i          ( debug_req_i     ),
++    .axi_req_o            ( axi_ariane_req  ),
++    .axi_resp_i           ( axi_ariane_resp )
++  );
++
++endmodule // ariane_wrapper
+diff --git a/src/axi_adapter.sv b/core/axi_adapter.sv
+similarity index 100%
+rename from src/axi_adapter.sv
+rename to core/axi_adapter.sv
+diff --git a/src/axi_shim.sv b/core/axi_shim.sv
+similarity index 100%
+rename from src/axi_shim.sv
+rename to core/axi_shim.sv
+diff --git a/src/branch_unit.sv b/core/branch_unit.sv
+similarity index 100%
+rename from src/branch_unit.sv
+rename to core/branch_unit.sv
+diff --git a/src/cache_subsystem/amo_alu.sv b/core/cache_subsystem/amo_alu.sv
+similarity index 100%
+rename from src/cache_subsystem/amo_alu.sv
+rename to core/cache_subsystem/amo_alu.sv
+diff --git a/src/cache_subsystem/cache_ctrl.sv b/core/cache_subsystem/cache_ctrl.sv
+similarity index 100%
+rename from src/cache_subsystem/cache_ctrl.sv
+rename to core/cache_subsystem/cache_ctrl.sv
+diff --git a/src/cache_subsystem/cva6_icache.sv b/core/cache_subsystem/cva6_icache.sv
+similarity index 100%
+rename from src/cache_subsystem/cva6_icache.sv
+rename to core/cache_subsystem/cva6_icache.sv
+diff --git a/src/cache_subsystem/cva6_icache_axi_wrapper.sv b/core/cache_subsystem/cva6_icache_axi_wrapper.sv
+similarity index 100%
+rename from src/cache_subsystem/cva6_icache_axi_wrapper.sv
+rename to core/cache_subsystem/cva6_icache_axi_wrapper.sv
+diff --git a/src/cache_subsystem/miss_handler.sv b/core/cache_subsystem/miss_handler.sv
+similarity index 100%
+rename from src/cache_subsystem/miss_handler.sv
+rename to core/cache_subsystem/miss_handler.sv
+diff --git a/src/cache_subsystem/std_cache_subsystem.sv b/core/cache_subsystem/std_cache_subsystem.sv
+similarity index 100%
+rename from src/cache_subsystem/std_cache_subsystem.sv
+rename to core/cache_subsystem/std_cache_subsystem.sv
+diff --git a/src/cache_subsystem/std_nbdcache.sv b/core/cache_subsystem/std_nbdcache.sv
+similarity index 100%
+rename from src/cache_subsystem/std_nbdcache.sv
+rename to core/cache_subsystem/std_nbdcache.sv
+diff --git a/src/cache_subsystem/std_no_dcache.sv b/core/cache_subsystem/std_no_dcache.sv
+similarity index 100%
+rename from src/cache_subsystem/std_no_dcache.sv
+rename to core/cache_subsystem/std_no_dcache.sv
+diff --git a/src/cache_subsystem/tag_cmp.sv b/core/cache_subsystem/tag_cmp.sv
+similarity index 100%
+rename from src/cache_subsystem/tag_cmp.sv
+rename to core/cache_subsystem/tag_cmp.sv
+diff --git a/src/cache_subsystem/wt_axi_adapter.sv b/core/cache_subsystem/wt_axi_adapter.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_axi_adapter.sv
+rename to core/cache_subsystem/wt_axi_adapter.sv
+diff --git a/src/cache_subsystem/wt_cache_subsystem.sv b/core/cache_subsystem/wt_cache_subsystem.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_cache_subsystem.sv
+rename to core/cache_subsystem/wt_cache_subsystem.sv
+diff --git a/src/cache_subsystem/wt_dcache.sv b/core/cache_subsystem/wt_dcache.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache.sv
+rename to core/cache_subsystem/wt_dcache.sv
+diff --git a/src/cache_subsystem/wt_dcache_ctrl.sv b/core/cache_subsystem/wt_dcache_ctrl.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache_ctrl.sv
+rename to core/cache_subsystem/wt_dcache_ctrl.sv
+diff --git a/src/cache_subsystem/wt_dcache_mem.sv b/core/cache_subsystem/wt_dcache_mem.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache_mem.sv
+rename to core/cache_subsystem/wt_dcache_mem.sv
+diff --git a/src/cache_subsystem/wt_dcache_missunit.sv b/core/cache_subsystem/wt_dcache_missunit.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache_missunit.sv
+rename to core/cache_subsystem/wt_dcache_missunit.sv
+diff --git a/src/cache_subsystem/wt_dcache_wbuffer.sv b/core/cache_subsystem/wt_dcache_wbuffer.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_dcache_wbuffer.sv
+rename to core/cache_subsystem/wt_dcache_wbuffer.sv
+diff --git a/src/cache_subsystem/wt_l15_adapter.sv b/core/cache_subsystem/wt_l15_adapter.sv
+similarity index 100%
+rename from src/cache_subsystem/wt_l15_adapter.sv
+rename to core/cache_subsystem/wt_l15_adapter.sv
+diff --git a/src/commit_stage.sv b/core/commit_stage.sv
+similarity index 100%
+rename from src/commit_stage.sv
+rename to core/commit_stage.sv
+diff --git a/src/compressed_decoder.sv b/core/compressed_decoder.sv
+similarity index 100%
+rename from src/compressed_decoder.sv
+rename to core/compressed_decoder.sv
+diff --git a/src/controller.sv b/core/controller.sv
+similarity index 100%
+rename from src/controller.sv
+rename to core/controller.sv
+diff --git a/src/csr_buffer.sv b/core/csr_buffer.sv
+similarity index 100%
+rename from src/csr_buffer.sv
+rename to core/csr_buffer.sv
+diff --git a/src/csr_regfile.sv b/core/csr_regfile.sv
+similarity index 100%
+rename from src/csr_regfile.sv
+rename to core/csr_regfile.sv
+diff --git a/src/decoder.sv b/core/decoder.sv
+similarity index 100%
+rename from src/decoder.sv
+rename to core/decoder.sv
+diff --git a/src/dromajo_ram.sv b/core/dromajo_ram.sv
+similarity index 100%
+rename from src/dromajo_ram.sv
+rename to core/dromajo_ram.sv
+diff --git a/src/ex_stage.sv b/core/ex_stage.sv
+similarity index 100%
+rename from src/ex_stage.sv
+rename to core/ex_stage.sv
+diff --git a/src/fpu_wrap.sv b/core/fpu_wrap.sv
+similarity index 100%
+rename from src/fpu_wrap.sv
+rename to core/fpu_wrap.sv
+diff --git a/src/frontend/bht.sv b/core/frontend/bht.sv
+similarity index 100%
+rename from src/frontend/bht.sv
+rename to core/frontend/bht.sv
+diff --git a/src/frontend/btb.sv b/core/frontend/btb.sv
+similarity index 100%
+rename from src/frontend/btb.sv
+rename to core/frontend/btb.sv
+diff --git a/src/frontend/frontend.sv b/core/frontend/frontend.sv
+similarity index 100%
+rename from src/frontend/frontend.sv
+rename to core/frontend/frontend.sv
+diff --git a/src/frontend/instr_queue.sv b/core/frontend/instr_queue.sv
+similarity index 100%
+rename from src/frontend/instr_queue.sv
+rename to core/frontend/instr_queue.sv
+diff --git a/src/frontend/instr_scan.sv b/core/frontend/instr_scan.sv
+similarity index 100%
+rename from src/frontend/instr_scan.sv
+rename to core/frontend/instr_scan.sv
+diff --git a/src/frontend/ras.sv b/core/frontend/ras.sv
+similarity index 100%
+rename from src/frontend/ras.sv
+rename to core/frontend/ras.sv
+diff --git a/src/id_stage.sv b/core/id_stage.sv
+similarity index 100%
+rename from src/id_stage.sv
+rename to core/id_stage.sv
+diff --git a/include/ariane_axi_pkg.sv b/core/include/ariane_axi_pkg.sv
+similarity index 100%
+rename from include/ariane_axi_pkg.sv
+rename to core/include/ariane_axi_pkg.sv
+diff --git a/include/ariane_pkg.sv b/core/include/ariane_pkg.sv
+similarity index 100%
+rename from include/ariane_pkg.sv
+rename to core/include/ariane_pkg.sv
+diff --git a/core/include/ariane_rvfi_pkg.sv b/core/include/ariane_rvfi_pkg.sv
+new file mode 100644
+index 00000000..18a2eed0
+--- /dev/null
++++ b/core/include/ariane_rvfi_pkg.sv
+@@ -0,0 +1,43 @@
++// Copyright 2020 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++package ariane_rvfi_pkg;
++
++  localparam NRET = 1;
++  localparam ILEN = 32;
++
++  typedef struct packed {
++    logic [NRET-1:0]                 valid;
++    logic [NRET*63:0]                order;
++    logic [NRET*ILEN-1:0]            insn;
++    logic [NRET-1:0]                 trap;
++    logic [NRET-1:0]                 halt;
++    logic [NRET-1:0]                 intr;
++    logic [NRET*2-1:0]               mode;
++    logic [NRET*2-1:0]               ixl;
++    logic [NRET*5-1:0]               rs1_addr;
++    logic [NRET*5-1:0]               rs2_addr;
++    logic [NRET*riscv::XLEN-1:0]     rs1_rdata;
++    logic [NRET*riscv::XLEN-1:0]     rs2_rdata;
++    logic [NRET*5-1:0]               rd_addr;
++    logic [NRET*riscv::XLEN-1:0]     rd_wdata;
++
++    logic [NRET*riscv::XLEN-1:0]     pc_rdata;
++    logic [NRET*riscv::XLEN-1:0]     pc_wdata;
++
++    logic [NRET*riscv::XLEN-1:0]     mem_addr;
++    logic [NRET*(riscv::XLEN/8)-1:0] mem_rmask;
++    logic [NRET*(riscv::XLEN/8)-1:0] mem_wmask;
++    logic [NRET*riscv::XLEN-1:0]     mem_rdata;
++    logic [NRET*riscv::XLEN-1:0]     mem_wdata;
++  } rvfi_instr_t;
++
++  typedef rvfi_instr_t [ariane_pkg::NR_COMMIT_PORTS-1:0] rvfi_port_t;
++
++endpackage
+diff --git a/include/axi_intf.sv b/core/include/axi_intf.sv
+similarity index 100%
+rename from include/axi_intf.sv
+rename to core/include/axi_intf.sv
+diff --git a/core/include/cv32a6_imac_sv0_config_pkg.sv b/core/include/cv32a6_imac_sv0_config_pkg.sv
+new file mode 100644
+index 00000000..54f7c5c8
+--- /dev/null
++++ b/core/include/cv32a6_imac_sv0_config_pkg.sv
+@@ -0,0 +1,15 @@
++// Copyright 2021 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++
++package cva6_config_pkg;
++
++    localparam CVA6ConfigXlen = 32;
++
++endpackage
+diff --git a/core/include/cv64a6_imacfd_sv39_config_pkg.sv b/core/include/cv64a6_imacfd_sv39_config_pkg.sv
+new file mode 100644
+index 00000000..2ce3898f
+--- /dev/null
++++ b/core/include/cv64a6_imacfd_sv39_config_pkg.sv
+@@ -0,0 +1,15 @@
++// Copyright 2021 Thales DIS design services SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Jean-Roch COULON (jean-roch.coulon@thalesgroup.com)
++
++
++package cva6_config_pkg;
++
++    localparam CVA6ConfigXlen = 64;
++
++endpackage
+diff --git a/include/instr_tracer_pkg.sv b/core/include/instr_tracer_pkg.sv
+similarity index 100%
+rename from include/instr_tracer_pkg.sv
+rename to core/include/instr_tracer_pkg.sv
+diff --git a/include/riscv_pkg.sv b/core/include/riscv_pkg.sv
+similarity index 99%
+rename from include/riscv_pkg.sv
+rename to core/include/riscv_pkg.sv
+index d34a40ea..65bf94ab 100644
+--- a/include/riscv_pkg.sv
++++ b/core/include/riscv_pkg.sv
+@@ -14,8 +14,14 @@
+  *
+  * Description: Common RISC-V definitions.
+  */
++
+ package riscv;
+ 
++    // ----------------------
++    // Import cva6 config from cva6_config_pkg
++    // ----------------------
++    localparam XLEN = cva6_config_pkg::CVA6ConfigXlen;
++
+     // ----------------------
+     // Data and Address length
+     // ----------------------
+@@ -28,8 +34,6 @@ package riscv;
+        ModeSv64 = 11
+     } vm_mode_t;
+ 
+-    localparam XLEN = 64;
+-
+     // Warning: When using STD_CACHE, configuration must be PLEN=56 and VLEN=64
+     // Warning: VLEN must be superior or equal to PLEN
+     localparam VLEN       = (XLEN == 32) ? 32 : 64;    // virtual address length
+diff --git a/include/std_cache_pkg.sv b/core/include/std_cache_pkg.sv
+similarity index 100%
+rename from include/std_cache_pkg.sv
+rename to core/include/std_cache_pkg.sv
+diff --git a/include/wt_cache_pkg.sv b/core/include/wt_cache_pkg.sv
+similarity index 100%
+rename from include/wt_cache_pkg.sv
+rename to core/include/wt_cache_pkg.sv
+diff --git a/src/instr_realign.sv b/core/instr_realign.sv
+similarity index 100%
+rename from src/instr_realign.sv
+rename to core/instr_realign.sv
+diff --git a/src/issue_read_operands.sv b/core/issue_read_operands.sv
+similarity index 100%
+rename from src/issue_read_operands.sv
+rename to core/issue_read_operands.sv
+diff --git a/src/issue_stage.sv b/core/issue_stage.sv
+similarity index 100%
+rename from src/issue_stage.sv
+rename to core/issue_stage.sv
+diff --git a/src/load_store_unit.sv b/core/load_store_unit.sv
+similarity index 100%
+rename from src/load_store_unit.sv
+rename to core/load_store_unit.sv
+diff --git a/src/load_unit.sv b/core/load_unit.sv
+similarity index 100%
+rename from src/load_unit.sv
+rename to core/load_unit.sv
+diff --git a/src/mmu_sv32/cva6_mmu_sv32.sv b/core/mmu_sv32/cva6_mmu_sv32.sv
+similarity index 100%
+rename from src/mmu_sv32/cva6_mmu_sv32.sv
+rename to core/mmu_sv32/cva6_mmu_sv32.sv
+diff --git a/src/mmu_sv32/cva6_ptw_sv32.sv b/core/mmu_sv32/cva6_ptw_sv32.sv
+similarity index 100%
+rename from src/mmu_sv32/cva6_ptw_sv32.sv
+rename to core/mmu_sv32/cva6_ptw_sv32.sv
+diff --git a/src/mmu_sv32/cva6_tlb_sv32.sv b/core/mmu_sv32/cva6_tlb_sv32.sv
+similarity index 100%
+rename from src/mmu_sv32/cva6_tlb_sv32.sv
+rename to core/mmu_sv32/cva6_tlb_sv32.sv
+diff --git a/src/mmu_sv39/mmu.sv b/core/mmu_sv39/mmu.sv
+similarity index 100%
+rename from src/mmu_sv39/mmu.sv
+rename to core/mmu_sv39/mmu.sv
+diff --git a/src/mmu_sv39/ptw.sv b/core/mmu_sv39/ptw.sv
+similarity index 100%
+rename from src/mmu_sv39/ptw.sv
+rename to core/mmu_sv39/ptw.sv
+diff --git a/src/mmu_sv39/tlb.sv b/core/mmu_sv39/tlb.sv
+similarity index 100%
+rename from src/mmu_sv39/tlb.sv
+rename to core/mmu_sv39/tlb.sv
+diff --git a/src/mult.sv b/core/mult.sv
+similarity index 100%
+rename from src/mult.sv
+rename to core/mult.sv
+diff --git a/src/multiplier.sv b/core/multiplier.sv
+similarity index 100%
+rename from src/multiplier.sv
+rename to core/multiplier.sv
+diff --git a/src/perf_counters.sv b/core/perf_counters.sv
+similarity index 100%
+rename from src/perf_counters.sv
+rename to core/perf_counters.sv
+diff --git a/src/pmp/include/riscv.sv b/core/pmp/include/riscv.sv
+similarity index 100%
+rename from src/pmp/include/riscv.sv
+rename to core/pmp/include/riscv.sv
+diff --git a/src/pmp/src/pmp.sv b/core/pmp/src/pmp.sv
+similarity index 100%
+rename from src/pmp/src/pmp.sv
+rename to core/pmp/src/pmp.sv
+diff --git a/src/pmp/src/pmp_entry.sv b/core/pmp/src/pmp_entry.sv
+similarity index 100%
+rename from src/pmp/src/pmp_entry.sv
+rename to core/pmp/src/pmp_entry.sv
+diff --git a/src/re_name.sv b/core/re_name.sv
+similarity index 100%
+rename from src/re_name.sv
+rename to core/re_name.sv
+diff --git a/src/scoreboard.sv b/core/scoreboard.sv
+similarity index 100%
+rename from src/scoreboard.sv
+rename to core/scoreboard.sv
+diff --git a/src/serdiv.sv b/core/serdiv.sv
+similarity index 100%
+rename from src/serdiv.sv
+rename to core/serdiv.sv
+diff --git a/src/store_buffer.sv b/core/store_buffer.sv
+similarity index 100%
+rename from src/store_buffer.sv
+rename to core/store_buffer.sv
+diff --git a/src/store_unit.sv b/core/store_unit.sv
+similarity index 100%
+rename from src/store_unit.sv
+rename to core/store_unit.sv
+diff --git a/bootrom/bootrom.sv b/corev_apu/bootrom/bootrom.sv
+similarity index 100%
+rename from bootrom/bootrom.sv
+rename to corev_apu/bootrom/bootrom.sv
+diff --git a/bootrom/dromajo_bootrom.sv b/corev_apu/bootrom/dromajo_bootrom.sv
+similarity index 100%
+rename from bootrom/dromajo_bootrom.sv
+rename to corev_apu/bootrom/dromajo_bootrom.sv
+diff --git a/src/clint/axi_lite_interface.sv b/corev_apu/clint/axi_lite_interface.sv
+similarity index 100%
+rename from src/clint/axi_lite_interface.sv
+rename to corev_apu/clint/axi_lite_interface.sv
+diff --git a/src/clint/clint.sv b/corev_apu/clint/clint.sv
+similarity index 100%
+rename from src/clint/clint.sv
+rename to corev_apu/clint/clint.sv
+diff --git a/include/traced_instr_pkg.sv b/corev_apu/include/traced_instr_pkg.sv
+similarity index 100%
+rename from include/traced_instr_pkg.sv
+rename to corev_apu/include/traced_instr_pkg.sv
+diff --git a/openpiton/ariane_verilog_wrap.sv b/corev_apu/openpiton/ariane_verilog_wrap.sv
+similarity index 100%
+rename from openpiton/ariane_verilog_wrap.sv
+rename to corev_apu/openpiton/ariane_verilog_wrap.sv
+diff --git a/openpiton/riscv_peripherals.sv b/corev_apu/openpiton/riscv_peripherals.sv
+similarity index 100%
+rename from openpiton/riscv_peripherals.sv
+rename to corev_apu/openpiton/riscv_peripherals.sv

@@ -1,0 +1,44 @@
+diff --git a/src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala b/src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala
+index c0965274..558f0aa7 100644
+--- a/src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala
++++ b/src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala
+@@ -476,7 +476,7 @@ class DBusCachedPlugin(val config : DataCacheConfig,
+       cache.io.cpu.memory.mmuRsp.isIoAccess setWhen(pipeline(DEBUG_BYPASS_CACHE) && !cache.io.cpu.memory.isWrite)
+ 
+       if(tightlyGen){
+-        when(input(MEMORY_TIGHTLY).orR){
++        when(input(MEMORY_ENABLE) && input(MEMORY_TIGHTLY).orR){
+           cache.io.cpu.memory.isValid := False
+           input(HAS_SIDE_EFFECT) := False
+         }
+@@ -603,7 +603,7 @@ class DBusCachedPlugin(val config : DataCacheConfig,
+       insert(MEMORY_LOAD_DATA) := rspShifted
+ 
+       if(tightlyGen){
+-        when(input(MEMORY_TIGHTLY).orR){
++        when(input(MEMORY_ENABLE) && input(MEMORY_TIGHTLY).orR){
+           cache.io.cpu.writeBack.isValid := False
+           exceptionBus.valid := False
+           redoBranch.valid := False
+diff --git a/src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala b/src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala
+index ef59b490..16bb7e7b 100644
+--- a/src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala
++++ b/src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala
+@@ -473,7 +473,7 @@ class DBusCachedPlugin(val config : DataCacheConfig,
+       cache.io.cpu.memory.mmuRsp.isIoAccess setWhen(pipeline(DEBUG_BYPASS_CACHE) && !cache.io.cpu.memory.isWrite)
+ 
+       if(tightlyGen){
+-        when(input(MEMORY_TIGHTLY).orR){
++        when(input(MEMORY_ENABLE) && input(MEMORY_TIGHTLY).orR){
+           cache.io.cpu.memory.isValid := False
+           input(HAS_SIDE_EFFECT) := False
+         }
+@@ -585,7 +585,7 @@ class DBusCachedPlugin(val config : DataCacheConfig,
+       insert(MEMORY_LOAD_DATA) := rspShifted
+ 
+       if(tightlyGen){
+-        when(input(MEMORY_TIGHTLY).orR){
++        when(input(MEMORY_ENABLE) && input(MEMORY_TIGHTLY).orR){
+           cache.io.cpu.writeBack.isValid := False
+           exceptionBus.valid := False
+           redoBranch.valid := False

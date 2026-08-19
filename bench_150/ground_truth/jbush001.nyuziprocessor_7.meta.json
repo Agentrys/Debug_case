@@ -1,0 +1,30 @@
+{
+  "case_id": "jbush001.nyuziprocessor#7",
+  "issue_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_oid": "6642d1280612902122bdccc175125810ca2c1f6f",
+  "buggy_commit_sha": "ca1901326a5040c1da17d87c2112b840ab2c98a7",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/jbush001.nyuziprocessor_7.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "6642d1280612902122bdccc175125810ca2c1f6f"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "tools/emulator/core.c"
+  ],
+  "raw_diff_path": "ground_truth/jbush001.nyuziprocessor_7.raw.diff"
+}

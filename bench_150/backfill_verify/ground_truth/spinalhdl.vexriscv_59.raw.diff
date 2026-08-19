@@ -1,0 +1,16 @@
+diff --git a/src/main/scala/vexriscv/demo/GenSmallAndPerformant.scala b/src/main/scala/vexriscv/demo/GenSmallAndProductive.scala
+similarity index 100%
+rename from src/main/scala/vexriscv/demo/GenSmallAndPerformant.scala
+rename to src/main/scala/vexriscv/demo/GenSmallAndProductive.scala
+diff --git a/src/main/scala/vexriscv/demo/GenSmallAndPerformantICache.scala b/src/main/scala/vexriscv/demo/GenSmallAndProductiveICache.scala
+similarity index 100%
+rename from src/main/scala/vexriscv/demo/GenSmallAndPerformantICache.scala
+rename to src/main/scala/vexriscv/demo/GenSmallAndProductiveICache.scala
+diff --git a/src/main/scala/vexriscv/demo/GenSmallAndPerformant.scala b/src/main/scala/vexriscv/demo/GenSmallAndProductive.scala
+similarity index 100%
+rename from src/main/scala/vexriscv/demo/GenSmallAndPerformant.scala
+rename to src/main/scala/vexriscv/demo/GenSmallAndProductive.scala
+diff --git a/src/main/scala/vexriscv/demo/GenSmallAndPerformantICache.scala b/src/main/scala/vexriscv/demo/GenSmallAndProductiveICache.scala
+similarity index 100%
+rename from src/main/scala/vexriscv/demo/GenSmallAndPerformantICache.scala
+rename to src/main/scala/vexriscv/demo/GenSmallAndProductiveICache.scala

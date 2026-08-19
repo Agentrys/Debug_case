@@ -1,0 +1,83 @@
+diff --git a/tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala b/tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala
+index a003abf8..d5e887c6 100644
+--- a/tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala
++++ b/tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala
+@@ -21,7 +21,7 @@ class ClkSrcTransform extends Transform with SimpleRun {
+           InferTypes,
+           new CreateClkConstraints(clkModAnnos, clkPortAnnos, targetDir)
+         )
+-        CircuitState(runPasses(state.circuit, passSeq), LowForm)
++        state.copy(state = runPasses(state.circuit, passSeq), outputForm = outputForm)
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/boom b/boom
+index ea0ef4e1..fa2c2c57 160000
+--- a/boom
++++ b/boom
+@@ -1 +1 @@
+-Subproject commit ea0ef4e135452f22bbe6abf5d98351bd22c846bc
++Subproject commit fa2c2c570346df10f55080260da94e5285072f36
+diff --git a/build.sbt b/build.sbt
+index 59a9f8ab..25d8f87f 100644
+--- a/build.sbt
++++ b/build.sbt
+@@ -21,6 +21,6 @@ lazy val testchipip = project.settings(commonSettings).dependsOn(rocketchip)
+ 
+ lazy val icenet = project.settings(commonSettings).dependsOn(rocketchip, testchipip)
+ 
+-//lazy val boom = project.settings(commonSettings).dependsOn(rocketchip)
++lazy val boom = project.settings(commonSettings).dependsOn(rocketchip)
+ 
+-lazy val example = (project in file(".")).settings(commonSettings).dependsOn(/*boom, */icenet, testchipip, sifive_blocks)
++lazy val example = (project in file(".")).settings(commonSettings).dependsOn(boom, icenet, testchipip, sifive_blocks)
+diff --git a/src/main/scala/boomexample/Configs.scala b/src/main/scala/boomexample/Configs.scala
+index f6d3991d..2e516aaa 100644
+--- a/src/main/scala/boomexample/Configs.scala
++++ b/src/main/scala/boomexample/Configs.scala
+@@ -1,5 +1,4 @@
+-
+-/*package boomexample
++package boomexample
+ 
+ import boom.system.BoomConfig
+ import chisel3._
+@@ -71,4 +70,4 @@ class LoopbackNICConfig extends Config(
+   new WithLoopbackNIC ++ new BaseExampleConfig)
+ 
+ class SimNetworkConfig extends Config(
+-  new WithSimNetwork ++ new BaseExampleConfig)*/
++  new WithSimNetwork ++ new BaseExampleConfig)
+diff --git a/src/main/scala/boomexample/TestHarness.scala b/src/main/scala/boomexample/TestHarness.scala
+index a36cfacf..524cef00 100644
+--- a/src/main/scala/boomexample/TestHarness.scala
++++ b/src/main/scala/boomexample/TestHarness.scala
+@@ -1,4 +1,4 @@
+-/*package boomexample
++package boomexample
+ 
+ import chisel3._
+ import freechips.rocketchip.diplomacy.LazyModule
+@@ -22,4 +22,4 @@ class TestHarness(implicit val p: Parameters) extends Module {
+ 
+ object Generator extends GeneratorApp {
+   generateFirrtl
+-}*/
++}
+diff --git a/src/main/scala/boomexample/Top.scala b/src/main/scala/boomexample/Top.scala
+index e7b817b4..f48b9add 100644
+--- a/src/main/scala/boomexample/Top.scala
++++ b/src/main/scala/boomexample/Top.scala
+@@ -1,5 +1,3 @@
+-
+-/*
+ package boomexample
+ 
+ import boom.system.{BoomSubsystem, BoomSubsystemModule}
+@@ -46,4 +44,3 @@ class BoomExampleTopWithIceNIC(implicit p: Parameters) extends BoomExampleTop
+ class BoomExampleTopWithIceNICModule(outer: BoomExampleTopWithIceNIC)
+   extends BoomExampleTopModule(outer)
+   with HasPeripheryIceNICModuleImp
+-  */

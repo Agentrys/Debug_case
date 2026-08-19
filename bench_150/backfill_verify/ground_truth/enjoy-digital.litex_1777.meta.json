@@ -1,0 +1,32 @@
+{
+  "case_id": "enjoy-digital.litex#1777",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "zeldin",
+    "name": "litex"
+  },
+  "fix_oid": "6da148233696a4168cb8f120dc5d950a85d09129",
+  "buggy_commit_sha": "a2c2c211c56c5d7a6a57e5248e3216c37446bdd3",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1777.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "6da148233696a4168cb8f120dc5d950a85d09129",
+    "639462ce465540fd9ce84e3c7a77621da2ee1a53",
+    "848a65c1682683f8cad794c3802e1c1a6f4c61fd"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/gen/fhdl/verilog.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1777.raw.diff"
+}

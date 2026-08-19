@@ -1,0 +1,62 @@
+diff --git a/src/main/scala/huancun/Common.scala b/src/main/scala/huancun/Common.scala
+index eb1df616..bd9f030f 100644
+--- a/src/main/scala/huancun/Common.scala
++++ b/src/main/scala/huancun/Common.scala
+@@ -76,6 +76,7 @@ class SourceAReq(implicit p: Parameters) extends HuanCunBundle {
+   val param = UInt(3.W)
+   val source = UInt(mshrBits.W)
+   val bufIdx = UInt(bufIdxBits.W)
++  val size = UInt(msgSizeBits.W)
+   val needData = Bool()
+   val putData = Bool()
+ }
+diff --git a/src/main/scala/huancun/SourceA.scala b/src/main/scala/huancun/SourceA.scala
+index 1b6bc401..c4ea42d5 100644
+--- a/src/main/scala/huancun/SourceA.scala
++++ b/src/main/scala/huancun/SourceA.scala
+@@ -94,7 +94,7 @@ class SourceA(edge: TLEdgeOut)(implicit p: Parameters) extends HuanCunModule {
+ 
+   a_put.bits.opcode := s1_task.opcode
+   a_put.bits.param := s1_task.param
+-  a_put.bits.size := offsetBits.U
++  a_put.bits.size := s1_task.size
+   a_put.bits.source := s1_task.source
+   a_put.bits.address := Cat(s1_task.tag, s1_task.set, 0.U(offsetBits.W))
+   a_put.bits.mask := s1_pb_latch.mask
+diff --git a/src/main/scala/huancun/inclusive/MSHR.scala b/src/main/scala/huancun/inclusive/MSHR.scala
+index aa2d7035..28f81553 100644
+--- a/src/main/scala/huancun/inclusive/MSHR.scala
++++ b/src/main/scala/huancun/inclusive/MSHR.scala
+@@ -376,6 +376,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, DirWrite, TagWr
+   oa.needData := !(req.opcode === AcquirePerm) || req.size =/= offsetBits.U
+   oa.bufIdx := req.bufIdx
+   oa.putData := req.opcode(2,1) === 0.U
++  oa.size := req.size
+ 
+   ob.tag := Mux(!s_rprobe, meta.tag, req.tag)
+   ob.set := req.set
+diff --git a/src/main/scala/huancun/noninclusive/MSHR.scala b/src/main/scala/huancun/noninclusive/MSHR.scala
+index 812b66ca..4f421e40 100644
+--- a/src/main/scala/huancun/noninclusive/MSHR.scala
++++ b/src/main/scala/huancun/noninclusive/MSHR.scala
+@@ -914,6 +914,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
+   oa.needData := !(req.opcode === AcquirePerm) || req.size =/= offsetBits.U // TODO: this is deprecated?
+   oa.putData := req_put
+   oa.bufIdx := req.bufIdx
++  oa.size := req.size
+ 
+   ob.tag := req.tag
+   ob.set := req.set
+@@ -1302,9 +1303,9 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
+   val nest_c_tag_match = io_c_status.tag === req.tag
+   val nest_c_way_match = io_c_status.way === self_meta.way
+ 
+-  val a_c_through = req.fromA && !acquirePermMiss && (
+-    nest_c_tag_match && !self_meta.hit && !nest_c_way_match ||
+-    !nest_c_tag_match && nest_c_way_match && (preferCache || cache_alias || self_meta.hit || transmit_from_other_client)
++  val a_c_through = req.fromA && (
++      nest_c_tag_match && !self_meta.hit && !nest_c_way_match ||
++      !nest_c_tag_match && nest_c_way_match && (cache_alias || !acquirePermMiss && (preferCache || self_meta.hit || transmit_from_other_client))
+     )
+ 
+   // TODO: fix this

@@ -1,0 +1,54 @@
+diff --git a/hw/rtl/raster_unit/VX_raster_mem.sv b/hw/rtl/raster_unit/VX_raster_mem.sv
+index 384017334..8ea273638 100644
+--- a/hw/rtl/raster_unit/VX_raster_mem.sv
++++ b/hw/rtl/raster_unit/VX_raster_mem.sv
+@@ -273,6 +273,8 @@ module VX_raster_mem #(
+         assign cache_req_if.addr[i] = cache_mem_req_addr[i][`RCACHE_ADDR_WIDTH-1:0]; 
+     end
+ 
++    wire mem_fire;
++    assign mem_fire = mem_req_ready && mem_req_valid && |raster_rs_empty;
+     VX_mem_streamer #(
+         .NUM_REQS(NUM_REQS), // 3 edges and 3 coeffs in each edge
+         .ADDRW(`RASTER_DCR_DATA_BITS),
+@@ -283,7 +285,7 @@ module VX_raster_mem #(
+         .clk(clk),
+         .reset(reset),
+ 
+-        .req_valid(mem_req_valid && |raster_rs_empty), // NOTE: This should ensure stalls
++        .req_valid(mem_fire), // NOTE: This should ensure stalls
+         .req_rw(0),
+         .req_mask(mem_req_mask),
+         `UNUSED_PIN (req_byteen),   /// TODO: USE THIS PIN
+diff --git a/hw/rtl/raster_unit/VX_raster_te_arbiter.sv b/hw/rtl/raster_unit/VX_raster_te_arbiter.sv
+index 2c482a554..d5f1f5873 100644
+--- a/hw/rtl/raster_unit/VX_raster_te_arbiter.sv
++++ b/hw/rtl/raster_unit/VX_raster_te_arbiter.sv
+@@ -54,12 +54,12 @@ module VX_raster_te_arbiter #(
+     assign fifo_full =  &full_flag;
+ 
+     // Arbitrate over the available entries to pop and generate index to pop for sub=tile
+-    VX_fair_arbiter #(
++    VX_rr_arbiter #(
+         .NUM_REQS   (4),
+     ) tile_fifo_arbiter (
+         .clk            (clk),
+         .reset          (reset),
+-        .unlock         (!fifo_empty),
++        `UNUSED_PIN     (unlock),
+         .requests       (~empty_flag),
+         .grant_index    (fifo_index),
+         .grant_onehot   (fifo_index_onehot),
+diff --git a/hw/rtl/raster_unit/VX_raster_unit.sv b/hw/rtl/raster_unit/VX_raster_unit.sv
+index 7915b64bf..dd454d6e5 100644
+--- a/hw/rtl/raster_unit/VX_raster_unit.sv
++++ b/hw/rtl/raster_unit/VX_raster_unit.sv
+@@ -165,7 +165,7 @@ module VX_raster_unit #(
+             ) tile_fifo_arbiter (
+                 .clk            (clk),
+                 .reset          (reset),
+-                .unlock         (!(&quad_queue_empty)),
++                `UNUSED_PIN     (unlock),
+                 .requests       (~quad_queue_empty),
+                 .grant_index    (quad_index),
+                 .grant_onehot   (quad_pop),

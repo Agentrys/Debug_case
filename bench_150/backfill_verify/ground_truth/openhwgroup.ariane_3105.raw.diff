@@ -1,0 +1,44 @@
+diff --git a/core/cva6_iti/iti.sv b/core/cva6_iti/iti.sv
+index ce45c619..bfbf5b00 100644
+--- a/core/cva6_iti/iti.sv
++++ b/core/cva6_iti/iti.sv
+@@ -139,6 +139,10 @@ module cva6_iti #(
+       iti_to_encoder_o.ilastsize[i] = '0;
+       iti_to_encoder_o.itype[i] = '0;
+       iti_to_encoder_o.iaddr[i] = '0;
++      
++      // Initialize valid_o[i] to prevent inferred latch in combinational logic
++      valid_o[i] = 1'b0;
++      
+       if (itt_out[i].valid) begin
+         valid_o[i] = itt_out[i].valid;
+         iti_to_encoder_o.valid[i] = itt_out[i].valid;
+diff --git a/core/cva6_iti/iti.sv b/core/cva6_iti/iti.sv
+index ce45c619..bfbf5b00 100644
+--- a/core/cva6_iti/iti.sv
++++ b/core/cva6_iti/iti.sv
+@@ -139,6 +139,10 @@ module cva6_iti #(
+       iti_to_encoder_o.ilastsize[i] = '0;
+       iti_to_encoder_o.itype[i] = '0;
+       iti_to_encoder_o.iaddr[i] = '0;
++      
++      // Initialize valid_o[i] to prevent inferred latch in combinational logic
++      valid_o[i] = 1'b0;
++      
+       if (itt_out[i].valid) begin
+         valid_o[i] = itt_out[i].valid;
+         iti_to_encoder_o.valid[i] = itt_out[i].valid;
+diff --git a/core/cva6_iti/iti.sv b/core/cva6_iti/iti.sv
+index ce45c619..50acfc09 100644
+--- a/core/cva6_iti/iti.sv
++++ b/core/cva6_iti/iti.sv
+@@ -139,6 +139,9 @@ module cva6_iti #(
+       iti_to_encoder_o.ilastsize[i] = '0;
+       iti_to_encoder_o.itype[i] = '0;
+       iti_to_encoder_o.iaddr[i] = '0;
++
++      valid_o[i] = 1'b0;
++
+       if (itt_out[i].valid) begin
+         valid_o[i] = itt_out[i].valid;
+         iti_to_encoder_o.valid[i] = itt_out[i].valid;

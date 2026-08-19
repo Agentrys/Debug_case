@@ -1,0 +1,32 @@
+{
+  "case_id": "ucb-bar.chipyard#989",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "HaFred",
+    "name": "chipyard"
+  },
+  "fix_oid": "88a9b48b870e5d7168a7ba02356d073484f27df4",
+  "buggy_commit_sha": "9d055fdac638ab90735cbde42fd2d86355eb260b",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_989.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "88a9b48b870e5d7168a7ba02356d073484f27df4",
+    "9a0e6ec4c1dc6c16119ce6b0567d4c9752411ca5",
+    "c0a3c7ab10c96986d633d4598293943e6a3f6b85"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "docs/Chipyard-Basics/Initial-Repo-Setup.rst"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_989.raw.diff"
+}

@@ -1,0 +1,122 @@
+diff --git a/sw/applications/example_dma/main.c b/sw/applications/example_dma/main.c
+index 94b1576f..f481871f 100644
+--- a/sw/applications/example_dma/main.c
++++ b/sw/applications/example_dma/main.c
+@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
+     while( ! dma_is_ready()) {
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         if ( dma_is_ready() == 0 ) {
+             wait_for_interrupt();
+             //from here we wake up even if we did not jump to the ISR
+@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
+     while( ! dma_is_ready()) {
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         if ( dma_is_ready() == 0 ) {
+             wait_for_interrupt();
+             //from here we wake up even if we did not jump to the ISR
+@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
+     while( ! dma_is_ready()) {
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         if ( dma_is_ready() == 0 ) {
+             wait_for_interrupt();
+             //from here we wake up even if we did not jump to the ISR
+diff --git a/sw/applications/example_dma_external/main.c b/sw/applications/example_dma_external/main.c
+index e692df9c..298ed76d 100644
+--- a/sw/applications/example_dma_external/main.c
++++ b/sw/applications/example_dma_external/main.c
+@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
+     while( ! dma_is_ready() ){
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         if ( dma_is_ready() == 0 ) {
+             wait_for_interrupt();
+             //from here we wake up even if we did not jump to the ISR
+diff --git a/sw/applications/example_gpio_intr/main.c b/sw/applications/example_gpio_intr/main.c
+index b16cdb81..b1306c3a 100644
+--- a/sw/applications/example_gpio_intr/main.c
++++ b/sw/applications/example_gpio_intr/main.c
+@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
+ 
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         gpio_write(&gpio, GPIO_TB_OUT, true);
+         wait_for_interrupt();
+         CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);
+diff --git a/sw/applications/example_dma/main.c b/sw/applications/example_dma/main.c
+index 94b1576f..f481871f 100644
+--- a/sw/applications/example_dma/main.c
++++ b/sw/applications/example_dma/main.c
+@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
+     while( ! dma_is_ready()) {
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         if ( dma_is_ready() == 0 ) {
+             wait_for_interrupt();
+             //from here we wake up even if we did not jump to the ISR
+@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
+     while( ! dma_is_ready()) {
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         if ( dma_is_ready() == 0 ) {
+             wait_for_interrupt();
+             //from here we wake up even if we did not jump to the ISR
+@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
+     while( ! dma_is_ready()) {
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         if ( dma_is_ready() == 0 ) {
+             wait_for_interrupt();
+             //from here we wake up even if we did not jump to the ISR
+diff --git a/sw/applications/example_dma_external/main.c b/sw/applications/example_dma_external/main.c
+index e692df9c..298ed76d 100644
+--- a/sw/applications/example_dma_external/main.c
++++ b/sw/applications/example_dma_external/main.c
+@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
+     while( ! dma_is_ready() ){
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         if ( dma_is_ready() == 0 ) {
+             wait_for_interrupt();
+             //from here we wake up even if we did not jump to the ISR
+diff --git a/sw/applications/example_gpio_intr/main.c b/sw/applications/example_gpio_intr/main.c
+index b16cdb81..ee617cbb 100644
+--- a/sw/applications/example_gpio_intr/main.c
++++ b/sw/applications/example_gpio_intr/main.c
+@@ -8,7 +8,6 @@
+ #include "hart.h"
+ #include "handler.h"
+ #include "core_v_mini_mcu.h"
+-// #include "rv_plic_old.h"
+ #include "rv_plic.h"
+ #include "rv_plic_regs.h"
+ #include "gpio.h"
+@@ -137,7 +136,7 @@ int main(int argc, char *argv[])
+ 
+         // disable_interrupts
+         // this does not prevent waking up the core as this is controlled by the MIP register
+-        CSR_SET_BITS(CSR_REG_MSTATUS, 0x0);
++        CSR_CLEAR_BITS(CSR_REG_MSTATUS, 0x8);
+         gpio_write(&gpio, GPIO_TB_OUT, true);
+         wait_for_interrupt();
+         CSR_SET_BITS(CSR_REG_MSTATUS, 0x8);

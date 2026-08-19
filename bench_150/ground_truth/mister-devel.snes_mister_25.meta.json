@@ -1,0 +1,258 @@
+{
+  "case_id": "mister-devel.snes_mister#25",
+  "issue_repo": {
+    "owner": "MiSTer-devel",
+    "name": "SNES_MiSTer"
+  },
+  "fix_repo": {
+    "owner": "MiSTer-devel",
+    "name": "SNES_MiSTer"
+  },
+  "fix_oid": "c535f36c77afaba9241a78758a9662b34b3d1482",
+  "buggy_commit_sha": "4d3c4239146b09f565ac755d3679e7e5e6fda939",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/mister-devel.snes_mister_25.diff",
+  "diff_sha256": "22d3861c56cf46826f97cad2a8a5efd615bd0ac2cfa9d276467c03a3d35f9834",
+  "fix_oids_sorted": [
+    "c535f36c77afaba9241a78758a9662b34b3d1482"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "SNES.sv",
+    "lightgun.sv",
+    "src/PPU.vhd",
+    "src/SNES.vhd",
+    "src/chip/DSP/DSP_LHRomMap.vhd",
+    "src/chip/DSP/OBC1.vhd",
+    "src/main.v",
+    "sys/hdmi_config.sv",
+    "sys/hps_io.v",
+    "sys/ltc2308.sv",
+    "sys/osd.v",
+    "sys/sys_top.v"
+  ],
+  "ground_truth_hunks": {
+    "SNES.sv": [
+      [
+        62,
+        68
+      ],
+      [
+        115,
+        120
+      ],
+      [
+        154,
+        188
+      ],
+      [
+        193,
+        205
+      ],
+      [
+        221,
+        236
+      ],
+      [
+        239,
+        244
+      ],
+      [
+        260,
+        265
+      ],
+      [
+        404,
+        415
+      ],
+      [
+        575,
+        580
+      ],
+      [
+        588,
+        593
+      ],
+      [
+        599,
+        610
+      ],
+      [
+        619,
+        627
+      ],
+      [
+        669,
+        674
+      ]
+    ],
+    "lightgun.sv": [
+      [
+        0,
+        0
+      ]
+    ],
+    "src/PPU.vhd": [
+      [
+        887,
+        893
+      ]
+    ],
+    "src/SNES.vhd": [
+      [
+        78,
+        84
+      ],
+      [
+        320,
+        326
+      ]
+    ],
+    "src/chip/DSP/DSP_LHRomMap.vhd": [
+      [
+        59,
+        80
+      ],
+      [
+        91,
+        96
+      ],
+      [
+        99,
+        124
+      ],
+      [
+        127,
+        139
+      ],
+      [
+        141,
+        148
+      ],
+      [
+        162,
+        177
+      ],
+      [
+        180,
+        186
+      ],
+      [
+        201,
+        206
+      ],
+      [
+        208,
+        218
+      ],
+      [
+        226,
+        232
+      ]
+    ],
+    "src/chip/DSP/OBC1.vhd": [
+      [
+        0,
+        0
+      ]
+    ],
+    "src/main.v": [
+      [
+        77,
+        82
+      ],
+      [
+        163,
+        168
+      ]
+    ],
+    "sys/hdmi_config.sv": [
+      [
+        1,
+        202
+      ]
+    ],
+    "sys/hps_io.v": [
+      [
+        57,
+        62
+      ],
+      [
+        458,
+        463
+      ]
+    ],
+    "sys/ltc2308.sv": [
+      [
+        0,
+        0
+      ]
+    ],
+    "sys/osd.v": [
+      [
+        84,
+        90
+      ],
+      [
+        105,
+        112
+      ],
+      [
+        114,
+        120
+      ],
+      [
+        141,
+        170
+      ],
+      [
+        173,
+        179
+      ],
+      [
+        185,
+        195
+      ]
+    ],
+    "sys/sys_top.v": [
+      [
+        83,
+        88
+      ],
+      [
+        195,
+        201
+      ],
+      [
+        604,
+        610
+      ],
+      [
+        860,
+        866
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "README.md",
+    "SNES.qpf",
+    "SNES.qsf",
+    "SNES_Q13.qpf",
+    "SNES_Q13.qsf",
+    "files.qip",
+    "releases/SNES_20190510.rbf",
+    "releases/SNES_20190513.rbf",
+    "releases/SNES_20190515.rbf",
+    "src/chip/chip.qip",
+    "sys/pll_q13.qip",
+    "sys/pll_q17.qip",
+    "sys/sys.qip",
+    "sys/sys.tcl",
+    "sys/sys_q13.qip"
+  ],
+  "raw_diff_path": "ground_truth/mister-devel.snes_mister_25.raw.diff"
+}

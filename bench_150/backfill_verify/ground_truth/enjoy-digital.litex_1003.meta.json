@@ -1,0 +1,30 @@
+{
+  "case_id": "enjoy-digital.litex#1003",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_oid": "fd354c575982ec0b5ebf0f5120d8352897c867fb",
+  "buggy_commit_sha": "8fbd1b84a4778472384f92cc1a85c7543042b8c7",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1003.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "fd354c575982ec0b5ebf0f5120d8352897c867fb"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/gen/fhdl/memory.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1003.raw.diff"
+}

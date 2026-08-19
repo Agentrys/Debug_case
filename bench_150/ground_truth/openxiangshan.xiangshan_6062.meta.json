@@ -1,0 +1,37 @@
+{
+  "case_id": "openxiangshan.xiangshan#6062",
+  "issue_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_oid": "fe7eaf7fef0104bfb26d9d94d6acdb906b0e6bdf",
+  "buggy_commit_sha": "0d824af343633dda5820cd100a5c1b70a37ab425",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openxiangshan.xiangshan_6062.diff",
+  "diff_sha256": "c15e5f94f515d4b03b9fb23cad0961f3adea3617fe48bab20473d362a689efa7",
+  "fix_oids_sorted": [
+    "fe7eaf7fef0104bfb26d9d94d6acdb906b0e6bdf"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/xiangshan/mem/lsqueue/NewStoreQueue.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/xiangshan/mem/lsqueue/NewStoreQueue.scala": [
+      [
+        893,
+        899
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/openxiangshan.xiangshan_6062.raw.diff"
+}

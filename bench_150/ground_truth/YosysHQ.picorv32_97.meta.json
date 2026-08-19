@@ -1,0 +1,31 @@
+{
+  "case_id": "YosysHQ.picorv32#97",
+  "issue_repo": {
+    "owner": "YosysHQ",
+    "name": "picorv32"
+  },
+  "fix_repo": {
+    "owner": "mmicko",
+    "name": "picorv32"
+  },
+  "fix_oid": "2f16c46918fd10328ac5361da2e10a22de64f833",
+  "buggy_commit_sha": "3a6ac16259af8ae6bc6abf8ef1713152fa67f771",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/YosysHQ.picorv32_97.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "2f16c46918fd10328ac5361da2e10a22de64f833",
+    "de479b09055ac8dec74558209a9abff3957da81f"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "range",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "picosoc/sections.lds"
+  ],
+  "raw_diff_path": "ground_truth/YosysHQ.picorv32_97.raw.diff"
+}

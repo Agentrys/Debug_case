@@ -1,0 +1,58 @@
+{
+  "case_id": "chipsalliance.rocket-chip#517",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "42ae5d202dcda65b8f8abb89a7a30490dda50daa",
+  "buggy_commit_sha": "9a6634cd40085f2721a14950b5fe2ec464553f52",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_517.diff",
+  "diff_sha256": "6488b29567b034ec3fdc6b67dee2087962703cf61e22cfdf8b38c1f67c3785d2",
+  "fix_oids_sorted": [
+    "42ae5d202dcda65b8f8abb89a7a30490dda50daa",
+    "53eaefcf26eb84e7a5261d239e4fd79e6d020f95",
+    "307f938b882f56469ffdaea8bb57e2cdeeb595c9"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/rocket/Tile.scala",
+    "src/main/scala/coreplex/RocketTiles.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/rocket/Tile.scala": [
+      [
+        61,
+        67
+      ],
+      [
+        61,
+        67
+      ],
+      [
+        61,
+        67
+      ]
+    ],
+    "src/main/scala/coreplex/RocketTiles.scala": [
+      [
+        49,
+        54
+      ],
+      [
+        49,
+        54
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_517.raw.diff"
+}

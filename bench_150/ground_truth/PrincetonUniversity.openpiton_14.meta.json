@@ -1,0 +1,32 @@
+{
+  "case_id": "PrincetonUniversity.openpiton#14",
+  "issue_repo": {
+    "owner": "PrincetonUniversity",
+    "name": "openpiton"
+  },
+  "fix_repo": {
+    "owner": "MEEPproject",
+    "name": "openpiton"
+  },
+  "fix_oid": "af70b0f4d820d3bfcc859a8e63afcee0930acc71",
+  "buggy_commit_sha": "0c50fafb54894d914bdb7f7d285fa219d2201c02",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/PrincetonUniversity.openpiton_14.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "af70b0f4d820d3bfcc859a8e63afcee0930acc71",
+    "e6f3af583a6fb9fb4b17f348afb5de78603a0555"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "piton/design/chipset/meep-memtile",
+    "piton/design/chip/tile/sargantana"
+  ],
+  "raw_diff_path": "ground_truth/PrincetonUniversity.openpiton_14.raw.diff"
+}

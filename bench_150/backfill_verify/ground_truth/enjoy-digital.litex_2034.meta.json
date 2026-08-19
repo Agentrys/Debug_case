@@ -1,0 +1,32 @@
+{
+  "case_id": "enjoy-digital.litex#2034",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "Mai-Lapyst",
+    "name": "litex"
+  },
+  "fix_oid": "053fe97a444f1ffae4f902393817f4cf23188b68",
+  "buggy_commit_sha": "6309f30e0b3ff807249a6003730d3920bc88d0c0",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_2034.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "053fe97a444f1ffae4f902393817f4cf23188b68",
+    "3d0fe4ebca0e26fb4429647bb5b65f8ff06fd9bf",
+    "b279fc9fb3186e216b163cf442bf1ca7958fe410"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/build/gowin/__init__.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_2034.raw.diff"
+}

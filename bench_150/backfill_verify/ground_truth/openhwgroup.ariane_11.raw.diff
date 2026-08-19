@@ -1,0 +1,804 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+new file mode 100644
+index 00000000..e20f7109
+--- /dev/null
++++ b/CHANGELOG.md
+@@ -0,0 +1,27 @@
++# Changelog
++All notable changes to this project will be documented in this file.
++
++The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
++
++## [Unreleased]
++
++### Release 11
++
++### Added
++
++- Support for Verilator simulation
++
++For Ariane:
++- Support for Pitonstream
++- Support for RISC-V compliant debug
++- Device tree generator
++- RISC-V compliant interrupt controllers (PLIC, CLINT)
++- Support for SMP Linux
++- Support for Ariane builds on the Genesys2, Nexys Video and VC707 FPGA boards
++
++### Changed
++
++For Ariane:
++- Updated to Ariane v4.1.1
++- Bugfixes in write-through cache system of Ariane
++
+diff --git a/README.md b/README.md
+index e970e8b1..0365fa70 100644
+--- a/README.md
++++ b/README.md
+@@ -170,8 +170,11 @@ The RISC-V ISA tests, benchmarks and some additonal simple example programs have
+ - RISC-V ISA tests are grouped into the following four batches, where the last two are the regressions for atomic memory operations (AMOs):
+ 
+ ```sims -group=ariane_tile1_asm_tests_p -sim_type=msm```
++
+ ```sims -group=ariane_tile1_asm_tests_v -sim_type=msm```
++
+ ```sims -group=ariane_tile1_amo_tests_p -sim_type=msm```
++
+ ```sims -group=ariane_tile1_amo_tests_v -sim_type=msm```
+ 
+ - RISC-V benchmarks can be run with:
+@@ -282,30 +285,38 @@ In order to compile programs that you can load with GDB, use the following comma
+ 
+ Note that the tile configuration needs to correspond to your actual platform configuration if your program is a multi-hart program. Otherwise you can omit these switches (the additional cores will not execute the program in that case).
+ 
+-##### Booting Linux on Genesys2, VC707 and VCU118
++##### Booting SMP Linux on Genesys2 and VC707
+ 
+-We currently support single core and SMP Linux on the Genesys2, VC707 and VCU118 FPGA development boards. The single-core configurations are relatively stable, however the SMP versions can sometimes crash as we have not fully validated/verified the cache coherency mechanisms yet.
++We currently support single core and SMP Linux on the Genesys2, VC707 and VCU118 FPGA development boards. The single-core configurations are relatively stable, however the SMP versions can sometimes crash during boot. This is a known issue and will be addressed in a future release.
+ 
+ In order to build an FPGA image for these boards, use either of the following commands:
+ 
+ ```protosyn -b genesys2 -d system --core=ariane --uart-dmw ddr```
++
+ ```protosyn -b vc707 -d system --core=ariane --uart-dmw ddr```
+-```protosyn -b vcu118 -d system --core=ariane --uart-dmw ddr```
+ 
+ The default parameters are 1 core for all boards, but you can override this with command line arguments. The commands below represent the maximum configurations that can be mapped onto the corresponding board:
+ 
+ ```protosyn -b genesys2 -d system --core=ariane --uart-dmw ddr --x_tiles=2```
++
+ ```protosyn -b vc707 -d system --core=ariane --uart-dmw ddr --x_tiles=2 --y_tiles=2```
+-```protosyn -b vcu118 -d system --core=ariane --uart-dmw ddr --x_tiles=4 --x_tiles=4```
+ 
+-Once you generated the FPGA bitfile, go and grab the [ariane-sdk](https://github.com/pulp-platform/ariane-sdk) and follow the steps in that readme to build the Linux image and prepare the SD card. 
++Once you generated the FPGA bitfile, go and grab the [ariane-sdk](https://github.com/pulp-platform/ariane-sdk) and follow the steps in that readme to build the Linux image and prepare the SD card (make sure you use the `openpiton` branch in that repository). If you do not want to go through the hassle of building your own image, you can download a pre-built linux image from [here](https://github.com/pulp-platform/ariane-sdk/releases/tag/v0.2.0-op).
+ 
+ > Note that the board specific settings are encoded in the device tree that is automatically generated and compiled into the FPGA bitfile, so no specific configuration of the Linux kernel is needed.
+ 
+-> For the VCU118 board you need the [PMOD SD adapter](https://store.digilentinc.com/pmod-sd-full-sized-sd-card-slot/) from Digilent to be able to boot Linux.
+-
+ Insert the SD card into the corresponding slot of the FPGA board, connect a terminal to the UART using e.g. `screen /dev/ttyUSB0 115200`, and program the FPGA. Once the device comes out of reset, the zero-stage bootloader copies the Linux image (including the first stage bootloader) into DRAM, and executes it. Be patient, copying from SD takes a couple of seconds.
+ 
++
++<!-- ##### Booting Linux on Genesys2, VC707 and VCU118
++
++```protosyn -b vcu118 -d system --core=ariane --uart-dmw ddr```
++
++```protosyn -b vcu118 -d system --core=ariane --uart-dmw ddr --x_tiles=4 --x_tiles=4```
++
++> For the VCU118 board you need the [PMOD SD adapter](https://store.digilentinc.com/pmod-sd-full-sized-sd-card-slot/) from Digilent to be able to use an SD card (the slot on the VCU118 board is not directly connected to the FPGA). As the PMOD0 port has open-drain level-shifters, you also have to replace the R1-R4 and R7-8 resistors with 470 Ohm 0201 SMD resistors on the Digilent PMOD SD adapter to make sure that signal rise times are short enough. 
++ -->
++
+ ##### Planned Improvements
+ 
+ The following items are currently under development and will be released soon.
+diff --git a/piton/design/chip/tile/ariane b/piton/design/chip/tile/ariane
+index 42610e84..1affb20d 160000
+--- a/piton/design/chip/tile/ariane
++++ b/piton/design/chip/tile/ariane
+@@ -1 +1 @@
+-Subproject commit 42610e84847fb053235bd190ea97cb92a2b5e939
++Subproject commit 1affb20d3340d7a038f5c1726b2362d5fd27d100
+diff --git a/piton/tools/src/proto/common/rtl_setup.tcl b/piton/tools/src/proto/common/rtl_setup.tcl
+index 27a8334e..8a55e1ce 100644
+--- a/piton/tools/src/proto/common/rtl_setup.tcl
++++ b/piton/tools/src/proto/common/rtl_setup.tcl
+@@ -394,13 +394,15 @@ set CHIP_RTL_IMPL_FILES [list \
+     "${DV_ROOT}/design/chip/tile/sparc/srams/rtl/sram_wrappers/sram_l1d_tag.v" \
+     "${DV_ROOT}/design/chip/tile/sparc/srams/rtl/sram_wrappers/sram_l1i_data.v" \
+     "${DV_ROOT}/design/chip/tile/sparc/srams/rtl/sram_wrappers/sram_l1i_tag.v" \
++    "${DV_ROOT}/design/chip/tile/ariane/tb/ariane_soc_pkg.sv"                                 \
+     "${DV_ROOT}/design/chip/tile/ariane/src/axi/src/axi_pkg.sv"                               \
+     "${DV_ROOT}/design/chip/tile/ariane/src/riscv-dbg/src/dm_pkg.sv"                          \
+     "${DV_ROOT}/design/chip/tile/ariane/include/riscv_pkg.sv"                                 \
+     "${DV_ROOT}/design/chip/tile/ariane/include/ariane_pkg.sv"                                \
+     "${DV_ROOT}/design/chip/tile/ariane/include/ariane_axi_pkg.sv"                            \
+-    "${DV_ROOT}/design/chip/tile/ariane/include/serpent_cache_pkg.sv"                         \
++    "${DV_ROOT}/design/chip/tile/ariane/include/wt_cache_pkg.sv"                              \
+     "${DV_ROOT}/design/chip/tile/ariane/include/axi_intf.sv"                                  \
++    "${DV_ROOT}/design/chip/tile/ariane/src/fpu/src/fpnew_pkg.sv"                             \
+     "${DV_ROOT}/design/chip/tile/ariane/src/util/instruction_tracer_pkg.sv"                   \
+     "${DV_ROOT}/design/chip/tile/ariane/src/util/instruction_tracer_if.sv"                    \
+     "${DV_ROOT}/design/chip/tile/ariane/src/util/sram.sv"                                     \
+@@ -459,14 +461,14 @@ set CHIP_RTL_IMPL_FILES [list \
+     "${DV_ROOT}/design/chip/tile/ariane/src/store_unit.sv"                                    \
+     "${DV_ROOT}/design/chip/tile/ariane/src/tlb.sv"                                           \
+     "${DV_ROOT}/design/chip/tile/ariane/src/commit_stage.sv"                                  \
+-    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/serpent_dcache_ctrl.sv"           \
+-    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/serpent_dcache_mem.sv"            \
+-    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/serpent_dcache_missunit.sv"       \
+-    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/serpent_dcache_wbuffer.sv"        \
+-    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/serpent_dcache.sv"                \
+-    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/serpent_icache.sv"                \
+-    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/serpent_l15_adapter.sv"           \
+-    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/serpent_cache_subsystem.sv"       \
++    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/wt_dcache_ctrl.sv"                \
++    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/wt_dcache_mem.sv"                 \
++    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/wt_dcache_missunit.sv"            \
++    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/wt_dcache_wbuffer.sv"             \
++    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/wt_dcache.sv"                     \
++    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/wt_icache.sv"                     \
++    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/wt_l15_adapter.sv"                \
++    "${DV_ROOT}/design/chip/tile/ariane/src/cache_subsystem/wt_cache_subsystem.sv"            \
+     "${DV_ROOT}/design/chip/tile/ariane/src/clint/clint.sv"                                   \
+     "${DV_ROOT}/design/chip/tile/ariane/src/clint/axi_lite_interface.sv"                      \
+     "${DV_ROOT}/design/chip/tile/ariane/src/riscv-dbg/debug_rom/debug_rom.sv"                 \
+@@ -524,7 +526,6 @@ set CHIP_RTL_IMPL_FILES [list \
+     "${DV_ROOT}/design/chip/tile/ariane/src/fpu/src/fpnew_opgroup_multifmt_slice.sv"                \
+     "${DV_ROOT}/design/chip/tile/ariane/src/fpu/src/fpnew_pipe_in.sv"                               \
+     "${DV_ROOT}/design/chip/tile/ariane/src/fpu/src/fpnew_pipe_out.sv"                              \
+-    "${DV_ROOT}/design/chip/tile/ariane/src/fpu/src/fpnew_pkg.sv"                                   \
+     "${DV_ROOT}/design/chip/tile/ariane/src/fpu/src/fpnew_rounding.sv"                              \
+     "${DV_ROOT}/design/chip/tile/ariane/src/fpu/src/fpnew_top.sv"                                   \
+ ]
+@@ -734,6 +735,7 @@ set CHIPSET_IP_FILE_PREFIXES [list \
+     "${DV_ROOT}/design/chipset/io_ctrl/xilinx/${BOARD}/ip_cores/bram_16384x512/bram_16384x512" \
+     "${DV_ROOT}/design/chipset/io_ctrl/xilinx/${BOARD}/ip_cores/bram_8192x512/bram_8192x512" \
+     "${DV_ROOT}/design/chipset/mc/xilinx/${BOARD}/ip_cores/mig_7series_0/mig_7series_0" \
++    "${DV_ROOT}/design/chipset/mc/xilinx/${BOARD}/ip_cores/ddr4_0/ddr4_0" \
+     "${DV_ROOT}/design/chipset/noc_sd_bridge/xilinx/${BOARD}/ip_cores/sd_fifo/sd_fifo" \
+     "${DV_ROOT}/design/chipset/noc_sd_bridge/xilinx/${BOARD}/ip_cores/sd_cache_bram/sd_cache_bram" \
+     "${DV_ROOT}/design/common/fpga_bridge/common/xilinx/${BOARD}/ip_cores/afifo_w64/afifo_w64" \
+diff --git a/piton/tools/src/proto/common/setup.tcl b/piton/tools/src/proto/common/setup.tcl
+index 115868ea..b177dab7 100644
+--- a/piton/tools/src/proto/common/setup.tcl
++++ b/piton/tools/src/proto/common/setup.tcl
+@@ -88,7 +88,7 @@ if {[info exists ::env(PITON_PICO_HET)]} {
+ }
+ 
+ if {[info exists ::env(PITON_ARIANE)]} {
+-  append ALL_DEFAULT_VERILOG_MACROS " PITON_ARIANE"
++  append ALL_DEFAULT_VERILOG_MACROS " PITON_ARIANE WT_DCACHE"
+ }
+ 
+ 
+diff --git a/piton/tools/src/proto/protosyn,2.5 b/piton/tools/src/proto/protosyn,2.5
+index e76dce21..0c7b1e46 100755
+--- a/piton/tools/src/proto/protosyn,2.5
++++ b/piton/tools/src/proto/protosyn,2.5
+@@ -654,6 +654,7 @@ def main():
+ 
+     elif options.core == 'ariane':
+         os.environ['PITON_ARIANE'] = "1"
++        os.environ['WT_DCACHE']    = "1"
+         os.environ['L2_CAM_MSHR']  = "1"
+ 
+         for i in range(int(options.num_tiles)):
+diff --git a/piton/tools/src/sims/sims,2.0 b/piton/tools/src/sims/sims,2.0
+index 87469dfb..0341ec6d 100755
+--- a/piton/tools/src/sims/sims,2.0
++++ b/piton/tools/src/sims/sims,2.0
+@@ -2603,6 +2603,7 @@ sub parse_args
+   push (@{$opt{config_rtl}}, "PITON_PICO")     if ($opt{pico});
+   push (@{$opt{config_rtl}}, "PITON_PICO_HET") if ($opt{pico_het});
+   push (@{$opt{config_rtl}}, "PITON_ARIANE")   if ($opt{ariane});
++  push (@{$opt{config_rtl}}, "WT_DCACHE")      if ($opt{ariane});
+   push (@{$opt{config_rtl}}, "L2_CAM_MSHR")    if ($opt{ariane});
+ 
+ 
+diff --git a/piton/verif/env/manycore/pc_cmp.v.pyv b/piton/verif/env/manycore/pc_cmp.v.pyv
+index 34845fdf..2d1d4f1c 100644
+--- a/piton/verif/env/manycore/pc_cmp.v.pyv
++++ b/piton/verif/env/manycore/pc_cmp.v.pyv
+@@ -445,12 +445,12 @@ always @(posedge clk)begin
+                 check_bad_string = """
+                         if(bad_trap_exists[{0}] & (bad_trap[{0}] == {2}))begin
+                             hit_bad     = 1'b1;
+-                            good[{0}]     = 1;
++                            good[{3}]     = 1;
+                             local_diag_done = 1;
+                             $display("%0d: Info - > Hit Bad trap. spc(%0d) thread(%0d)", $time, {1}, {0} % 4);
+                             `MONITOR_PATH.fail("HIT BAD TRAP");
+                         end"""
+-                print(check_bad_string.format(l, i, pc))
++                print(check_bad_string.format(l, i, pc, j))
+             outputStr = """
+                     end
+                 if (active_thread[{0}]) begin
+diff --git a/.gitignore b/.gitignore
+index 89a5432b..d34515dd 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -16,7 +16,6 @@ src/moore.sv
+ build/*
+ /tmp*
+ *.dasm
+-/Bender.lock
+ /Bender.local
+ build/
+ *.vcd
+@@ -43,3 +42,4 @@ xrun_results/
+ /core/include/gen32_config_pkg.sv
+ /core/include/gen64_config_pkg.sv
+ __pycache__
++.bender/
+diff --git a/Bender.lock b/Bender.lock
+new file mode 100644
+index 00000000..fb9a717a
+--- /dev/null
++++ b/Bender.lock
+@@ -0,0 +1,45 @@
++packages:
++  axi:
++    revision: 9251564ed67e3e71adf46dbeba62ef4435d2524c
++    version: 0.31.1
++    source:
++      Git: https://github.com/pulp-platform/axi.git
++    dependencies:
++    - common_cells
++    - common_verification
++  common_cells:
++    revision: 4dc9413990622dcbf4b37a19f792834c800da5c7
++    version: 1.28.0
++    source:
++      Git: https://github.com/pulp-platform/common_cells
++    dependencies:
++    - common_verification
++    - tech_cells_generic
++  common_verification:
++    revision: 9c07fa860593b2caabd9b5681740c25fac04b878
++    version: 0.2.3
++    source:
++      Git: https://github.com/pulp-platform/common_verification.git
++    dependencies: []
++  fpnew:
++    revision: 8dc44406b1ccbc4487121710c1883e805f893965
++    version: 0.6.6
++    source:
++      Git: https://github.com/pulp-platform/fpnew.git
++    dependencies:
++    - common_cells
++    - fpu_div_sqrt_mvp
++  fpu_div_sqrt_mvp:
++    revision: 86e1f558b3c95e91577c41b2fc452c86b04e85ac
++    version: 1.0.4
++    source:
++      Git: https://github.com/pulp-platform/fpu_div_sqrt_mvp.git
++    dependencies:
++    - common_cells
++  tech_cells_generic:
++    revision: b2a68114302af1d8191ddf34ea0e07b471911866
++    version: null
++    source:
++      Git: https://github.com/pulp-platform/tech_cells_generic.git
++    dependencies:
++    - common_verification
+diff --git a/Bender.yml b/Bender.yml
+index a3e30c31..4c38020d 100644
+--- a/Bender.yml
++++ b/Bender.yml
+@@ -6,243 +6,253 @@ package:
+     - "Andreas Kuster <kustera@ethz.ch>"
+ 
+ # WT_DCACHE
++dependencies:
++  axi: { git: "https://github.com/pulp-platform/axi.git", version: 0.31.0 }
++  common_cells:
++    { git: "https://github.com/pulp-platform/common_cells", version: 1.23.0 }
++  fpnew: { git: "https://github.com/pulp-platform/fpnew.git", version: 0.6.2 }
++  tech_cells_generic:
++    {
++      git: "https://github.com/pulp-platform/tech_cells_generic.git",
++      rev: b2a68114302af1d8191ddf34ea0e07b471911866,
++    }
+ 
+-export_include_dirs:
+-  - vendor/pulp-platform/common_cells/include/
+-  - corev_apu/axi/include/
++frozen: true
+ 
+ sources:
+   - defines:
+       WT_DCACHE: 1
+     files:
+-    # Packages
+-    - core/include/riscv_pkg.sv
+-    - corev_apu/riscv-dbg/src/dm_pkg.sv
+-    - core/include/ariane_pkg.sv
+-    - core/include/wt_cache_pkg.sv
+-    - corev_apu/axi/src/axi_pkg.sv
+-    - corev_apu/register_interface/src/reg_intf.sv
+-    - corev_apu/register_interface/src/reg_intf_pkg.sv
+-    - core/include/axi_intf.sv
+-    - corev_apu/tb/ariane_soc_pkg.sv
+-    - corev_apu/tb/ariane_axi_soc_pkg.sv
+-    - core/include/ariane_axi_pkg.sv
+-    - core/include/std_cache_pkg.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_pkg.sv
+-    - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/defs_div_sqrt_mvp.sv
+-    # Stand-alone source files
+-    - core/ariane.sv
+-    - core/serdiv.sv
+-    - core/ariane_regfile_ff.sv
+-    - core/amo_buffer.sv
+-    - core/id_stage.sv
+-    - core/branch_unit.sv
+-    - core/instr_realign.sv
+-    - core/load_store_unit.sv
+-    - core/controller.sv
+-    - core/issue_stage.sv
+-    - core/re_name.sv
+-    - core/csr_buffer.sv
+-    - core/mmu_sv32/cva6_tlb_sv32.sv
+-    - core/mmu_sv39/tlb.sv
+-    - core/decoder.sv
+-    - core/scoreboard.sv
+-    - core/perf_counters.sv
+-    - core/store_unit.sv
+-    - core/axi_adapter.sv
+-    - core/fpu_wrap.sv
+-    - core/csr_regfile.sv
+-    - core/commit_stage.sv
+-    - core/alu.sv
+-    - core/multiplier.sv
+-    - core/store_buffer.sv
+-    - core/compressed_decoder.sv
+-    - core/axi_shim.sv
+-    - core/ex_stage.sv
+-    - core/mmu_sv39/mmu.sv
+-    - core/mmu_sv39/ptw.sv
+-    - core/mult.sv
+-    - core/mmu_sv32/cva6_mmu_sv32.sv
+-    - core/mmu_sv32/cva6_ptw_sv32.sv
+-    - core/load_unit.sv
+-    - core/issue_read_operands.sv
+-    - core/pmp/src/pmp_entry.sv
+-    - core/pmp/src/pmp.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_fma.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_opgroup_fmt_slice.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_divsqrt_multi.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_fma_multi.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_opgroup_multifmt_slice.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_classifier.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_noncomp.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_cast_multi.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_opgroup_block.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_rounding.sv
+-    - vendor/pulp-platform/fpnew/src/fpnew_top.sv
+-    - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/iteration_div_sqrt_mvp.sv
+-    - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/nrbd_nrsc_mvp.sv
+-    - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/div_sqrt_top_mvp.sv
+-    - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/preprocess_mvp.sv
+-    - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/control_mvp.sv
+-    - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/norm_div_sqrt_mvp.sv
+-    - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/div_sqrt_mvp_wrapper.sv
+-    - core/frontend/frontend.sv
+-    - core/frontend/instr_scan.sv
+-    - core/frontend/instr_queue.sv
+-    - core/frontend/bht.sv
+-    - core/frontend/btb.sv
+-    - core/frontend/ras.sv
+-    - core/cache_subsystem/tag_cmp.sv
+-    - core/cache_subsystem/cache_ctrl.sv
+-    - core/cache_subsystem/amo_alu.sv
+-    - core/cache_subsystem/wt_axi_adapter.sv
+-    - core/cache_subsystem/wt_dcache_ctrl.sv
+-    - core/cache_subsystem/wt_cache_subsystem.sv
+-    - core/cache_subsystem/wt_dcache_missunit.sv
+-    - core/cache_subsystem/cva6_icache.sv
+-    - core/cache_subsystem/wt_dcache_wbuffer.sv
+-    - core/cache_subsystem/wt_l15_adapter.sv
+-    - core/cache_subsystem/wt_dcache_mem.sv
+-    - core/cache_subsystem/cva6_icache_axi_wrapper.sv
+-    - core/cache_subsystem/std_cache_subsystem.sv
+-    - core/cache_subsystem/wt_dcache.sv
+-    - corev_apu/clint/axi_lite_interface.sv
+-    - corev_apu/clint/clint.sv
+-    - corev_apu/fpga/src/axi2apb/src/axi2apb_wrap.sv
+-    - corev_apu/fpga/src/axi2apb/src/axi2apb.sv
+-    - corev_apu/fpga/src/axi2apb/src/axi2apb_64_32.sv
+-    - corev_apu/fpga/src/axi_slice/src/axi_w_buffer.sv
+-    - corev_apu/fpga/src/axi_slice/src/axi_b_buffer.sv
+-    - corev_apu/fpga/src/axi_slice/src/axi_slice_wrap.sv
+-    - corev_apu/fpga/src/axi_slice/src/axi_slice.sv
+-    - corev_apu/fpga/src/axi_slice/src/axi_single_slice.sv
+-    - corev_apu/fpga/src/axi_slice/src/axi_ar_buffer.sv
+-    - corev_apu/fpga/src/axi_slice/src/axi_r_buffer.sv
+-    - corev_apu/fpga/src/axi_slice/src/axi_aw_buffer.sv
+-    - corev_apu/fpga/src/apb_timer/apb_timer.sv
+-    - corev_apu/fpga/src/apb_timer/timer.sv
+-    - corev_apu/src/axi_riscv_atomics/src/axi_riscv_amos.sv
+-    - corev_apu/src/axi_riscv_atomics/src/axi_riscv_atomics.sv
+-    - corev_apu/src/axi_riscv_atomics/src/axi_res_tbl.sv
+-    - corev_apu/src/axi_riscv_atomics/src/axi_riscv_lrsc_wrap.sv
+-    - corev_apu/src/axi_riscv_atomics/src/axi_riscv_amos_alu.sv
+-    - corev_apu/src/axi_riscv_atomics/src/axi_riscv_lrsc.sv
+-    - corev_apu/src/axi_riscv_atomics/src/axi_riscv_atomics_wrap.sv
+-    - corev_apu/axi_mem_if/src/axi2mem.sv
+-    - corev_apu/rv_plic/rtl/rv_plic_target.sv
+-    - corev_apu/rv_plic/rtl/rv_plic_gateway.sv
+-    - corev_apu/rv_plic/rtl/plic_regmap.sv
+-    - corev_apu/rv_plic/rtl/plic_top.sv
+-    - corev_apu/riscv-dbg/src/dmi_cdc.sv
+-    - corev_apu/riscv-dbg/src/dmi_jtag.sv
+-    - corev_apu/riscv-dbg/src/dmi_jtag_tap.sv
+-    - corev_apu/riscv-dbg/src/dm_csrs.sv
+-    - corev_apu/riscv-dbg/src/dm_mem.sv
+-    - corev_apu/riscv-dbg/src/dm_sba.sv
+-    - corev_apu/riscv-dbg/src/dm_top.sv
+-    - corev_apu/riscv-dbg/debug_rom/debug_rom.sv
+-    - corev_apu/register_interface/src/apb_to_reg.sv
+-    - corev_apu/axi/src/axi_multicut.sv
+-    - vendor/pulp-platform/common_cells/src/cf_math_pkg.sv
+-    - vendor/pulp-platform/common_cells/src/deprecated/generic_fifo.sv
+-    - vendor/pulp-platform/common_cells/src/deprecated/pulp_sync.sv
+-    - vendor/pulp-platform/common_cells/src/deprecated/find_first_one.sv
+-    - vendor/pulp-platform/common_cells/src/rstgen_bypass.sv
+-    - vendor/pulp-platform/common_cells/src/rstgen.sv
+-    - vendor/pulp-platform/common_cells/src/stream_mux.sv
+-    - vendor/pulp-platform/common_cells/src/stream_demux.sv
+-    - vendor/pulp-platform/common_cells/src/stream_arbiter.sv
+-    - vendor/pulp-platform/common_cells/src/stream_arbiter_flushable.sv
+-    - corev_apu/axi/src/axi_cut.sv
+-    - corev_apu/axi/src/axi_join.sv
+-    - corev_apu/axi/src/axi_delayer.sv
+-    - corev_apu/axi/src/axi_to_axi_lite.sv
+-    - corev_apu/axi/src/axi_id_prepend.sv
+-    - corev_apu/axi/src/axi_atop_filter.sv
+-    - corev_apu/axi/src/axi_err_slv.sv
+-    - corev_apu/axi/src/axi_mux.sv
+-    - corev_apu/axi/src/axi_demux.sv
+-    - corev_apu/axi/src/axi_xbar.sv
+-    - common/local/techlib/fpga/rtl/SyncSpRamBeNx64.sv
+-    - vendor/pulp-platform/common_cells/src/sync.sv
+-    - vendor/pulp-platform/common_cells/src/popcount.sv
+-    - vendor/pulp-platform/common_cells/src/unread.sv
+-    - vendor/pulp-platform/common_cells/src/cdc_2phase.sv
+-    - vendor/pulp-platform/common_cells/src/spill_register_flushable.sv
+-    - vendor/pulp-platform/common_cells/src/spill_register.sv
+-    - vendor/pulp-platform/common_cells/src/edge_detect.sv
+-    - vendor/pulp-platform/common_cells/src/fifo_v3.sv
+-    - vendor/pulp-platform/common_cells/src/deprecated/fifo_v2.sv
+-    - vendor/pulp-platform/common_cells/src/deprecated/fifo_v1.sv
+-    - vendor/pulp-platform/common_cells/src/lzc.sv
+-    - vendor/pulp-platform/common_cells/src/rr_arb_tree.sv
+-    - vendor/pulp-platform/common_cells/src/deprecated/rrarbiter.sv
+-    - vendor/pulp-platform/common_cells/src/stream_delay.sv
+-    - vendor/pulp-platform/common_cells/src/lfsr.sv
+-    - vendor/pulp-platform/common_cells/src/lfsr_8bit.sv
+-    - vendor/pulp-platform/common_cells/src/lfsr_16bit.sv
+-    - vendor/pulp-platform/common_cells/src/counter.sv
+-    - vendor/pulp-platform/common_cells/src/shift_reg.sv
+-    - vendor/pulp-platform/common_cells/src/exp_backoff.sv
+-    - vendor/pulp-platform/common_cells/src/addr_decode.sv
+-    - vendor/pulp-platform/common_cells/src/stream_register.sv
+-    - corev_apu/src/tech_cells_generic/src/cluster_clock_inverter.sv
+-    - corev_apu/src/tech_cells_generic/src/pulp_clock_mux2.sv
+-    - target: not(cv32a6)
+-      files:
+-      - core/include/cv64a6_imafdc_sv39_config_pkg.sv
+-    - target: cv32a6
+-      files:
+-      - core/include/cv32a6_imac_sv0_config_pkg.sv
+-    - target: test
+-      files:
+-      - corev_apu/tb/ariane_soc_pkg.sv
+-      - corev_apu/tb/ariane_axi_soc_pkg.sv
+-      - corev_apu/tb/ariane_testharness.sv
+-      - corev_apu/tb/ariane_peripherals.sv
+-      - corev_apu/tb/common/uart.sv
+-      - corev_apu/tb/common/SimDTM.sv
+-      - corev_apu/tb/common/SimJTAG.sv
+-      - corev_apu/bootrom/bootrom.sv
+-      - corev_apu/tb/common/mock_uart.sv
+-      - common/local/util/sram.sv
+-    - target: not(synthesis)
+-      files:
+-        - common/local/util/instr_tracer.sv
+-        - common/local/util/instr_tracer_if.sv
+-        - common/local/util/instr_trace_item.svh
+-        - common/local/util/ex_trace_item.svh
+-    - target: all(fpga, xilinx)
+-      files:
+-      - corev_apu/fpga/src/ariane_peripherals_xilinx.sv
+-      - corev_apu/fpga/src/ariane_xilinx.sv
+-      - corev_apu/fpga/src/fan_ctrl.sv
+-      - corev_apu/fpga/src/bootrom/bootrom.sv
+-      - corev_apu/fpga/src/ariane-ethernet/ssio_ddr_in.sv
+-      - corev_apu/fpga/src/ariane-ethernet/rgmii_soc.sv
+-      - corev_apu/fpga/src/ariane-ethernet/axis_gmii_rx.sv
+-      - corev_apu/fpga/src/ariane-ethernet/oddr.sv
+-      - corev_apu/fpga/src/ariane-ethernet/axis_gmii_tx.sv
+-      - corev_apu/fpga/src/ariane-ethernet/dualmem_widen8.sv
+-      - corev_apu/fpga/src/ariane-ethernet/rgmii_phy_if.sv
+-      - corev_apu/fpga/src/ariane-ethernet/dualmem_widen.sv
+-      - corev_apu/fpga/src/ariane-ethernet/rgmii_lfsr.sv
+-      - corev_apu/fpga/src/ariane-ethernet/rgmii_core.sv
+-      - corev_apu/fpga/src/ariane-ethernet/eth_mac_1g.sv
+-      - corev_apu/fpga/src/ariane-ethernet/eth_mac_1g_rgmii.sv
+-      - corev_apu/fpga/src/ariane-ethernet/eth_mac_1g_rgmii_fifo.sv
+-      - corev_apu/fpga/src/ariane-ethernet/iddr.sv
+-      - corev_apu/fpga/src/ariane-ethernet/framing_top.sv
+-      - corev_apu/fpga/src/apb_uart/src/apb_uart.vhd
+-      - corev_apu/fpga/src/apb_uart/src/uart_transmitter.vhd
+-      - corev_apu/fpga/src/apb_uart/src/uart_interrupt.vhd
+-      - corev_apu/fpga/src/apb_uart/src/slib_mv_filter.vhd
+-      - corev_apu/fpga/src/apb_uart/src/slib_input_filter.vhd
+-      - corev_apu/fpga/src/apb_uart/src/slib_counter.vhd
+-      - corev_apu/fpga/src/apb_uart/src/uart_receiver.vhd
+-      - corev_apu/fpga/src/apb_uart/src/slib_input_sync.vhd
+-      - corev_apu/fpga/src/apb_uart/src/slib_edge_detect.vhd
+-      - corev_apu/fpga/src/apb_uart/src/slib_clock_div.vhd
+-      - corev_apu/fpga/src/apb_uart/src/slib_fifo.vhd
+-      - corev_apu/fpga/src/apb_uart/src/uart_baudgen.vhd
++      - target: cv64a6_imafdc_sv39
++        files:
++          - core/include/cv64a6_imafdc_sv39_config_pkg.sv
++          - core/include/riscv_pkg.sv
++          - core/include/ariane_dm_pkg.sv
++          - core/include/ariane_pkg.sv
++          - core/mmu_sv39/tlb.sv
++          - core/mmu_sv39/mmu.sv
++          - core/mmu_sv39/ptw.sv
+ 
++      - target: cv32a6_imac_sv0
++        files:
++          - core/include/cv32a6_imac_sv0_config_pkg.sv
++          - core/include/riscv_pkg.sv
++          - core/include/ariane_dm_pkg.sv
++          - core/include/ariane_pkg.sv
++          - core/mmu_sv32/cva6_tlb_sv32.sv
++          - core/mmu_sv32/cva6_mmu_sv32.sv
++          - core/mmu_sv32/cva6_ptw_sv32.sv
++
++      - target: cv32a6_imac_sv32
++        files:
++          - core/include/cv32a6_imac_sv32_config_pkg.sv
++          - core/include/riscv_pkg.sv
++          - core/include/ariane_dm_pkg.sv
++          - core/include/ariane_pkg.sv
++          - core/mmu_sv32/cva6_tlb_sv32.sv
++          - core/mmu_sv32/cva6_mmu_sv32.sv
++          - core/mmu_sv32/cva6_ptw_sv32.sv
++
++      - target: cv32a6_imafc_sv32
++        files:
++          - core/include/cv32a6_imafc_sv32_config_pkg.sv
++          - core/include/riscv_pkg.sv
++          - core/include/ariane_dm_pkg.sv
++          - core/include/ariane_pkg.sv
++          - core/mmu_sv32/cva6_tlb_sv32.sv
++          - core/mmu_sv32/cva6_mmu_sv32.sv
++          - core/mmu_sv32/cva6_ptw_sv32.sv
++
++      # included via target core/include/${TARGET_CFG}_config_pkg.sv
++      # ariane_axi_pkg is dependent on this.
++      # - vendor/pulp-platform/axi/src/axi_pkg.sv
++      - core/include/ariane_rvfi_pkg.sv
++
++      # Packages
++      - core/include/ariane_axi_pkg.sv
++      - core/include/wt_cache_pkg.sv
++      - core/include/std_cache_pkg.sv
++      - core/include/axi_intf.sv
++
++      # for all the below files use Flist.cva6 as baseline and also look at Makefile pd/synth
++
++      # FPGA support keep vendoring here because too old
++      - vendor/pulp-platform/fpga-support/rtl/SyncDpRam.sv
++      - vendor/pulp-platform/fpga-support/rtl/AsyncDpRam.sv
++      - vendor/pulp-platform/fpga-support/rtl/AsyncThreePortRam.sv
++
++      # CVXIF
++      - core/include/cvxif_pkg.sv
++      - core/cvxif_example/include/cvxif_instr_pkg.sv
++      - core/cvxif_fu.sv
++      - core/cvxif_example/cvxif_example_coprocessor.sv
++      - core/cvxif_example/instr_decoder.sv
++
++      # vendored deps
++      # - include_dirs: [vendor/pulp-platform/common_cells/include/, vendor/pulp-platform/common_cells/src/]
++      #   files:
++      #     - vendor/pulp-platform/common_cells/src/cf_math_pkg.sv
++      #     - vendor/pulp-platform/common_cells/src/fifo_v3.sv
++      #     - vendor/pulp-platform/common_cells/src/lfsr.sv
++      #     - vendor/pulp-platform/common_cells/src/lzc.sv
++      #     - vendor/pulp-platform/common_cells/src/rr_arb_tree.sv
++      #     - vendor/pulp-platform/common_cells/src/shift_reg.sv
++      #     - vendor/pulp-platform/common_cells/src/unread.sv
++      #     - vendor/pulp-platform/common_cells/src/popcount.sv
++      #     - vendor/pulp-platform/common_cells/src/exp_backoff.sv
++      #     # Common Cells for example coprocessor
++      #     - vendor/pulp-platform/common_cells/src/counter.sv
++      #     - vendor/pulp-platform/common_cells/src/delta_counter.sv
++
++      # Floating point unit
++      #     - vendor/pulp-platform/fpnew/src/fpnew_pkg.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_cast_multi.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_classifier.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_divsqrt_multi.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_fma_multi.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_fma.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_noncomp.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_opgroup_block.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_opgroup_fmt_slice.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_opgroup_multifmt_slice.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_rounding.sv
++      #     - vendor/pulp-platform/fpnew/src/fpnew_top.sv
++      #     - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/defs_div_sqrt_mvp.sv
++      #     - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/control_mvp.sv
++      #     - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/div_sqrt_top_mvp.sv
++      #     - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/iteration_div_sqrt_mvp.sv
++      #     - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/norm_div_sqrt_mvp.sv
++      #     - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/nrbd_nrsc_mvp.sv
++      #     - vendor/pulp-platform/fpnew/src/fpu_div_sqrt_mvp/hdl/preprocess_mvp.sv
++
++      # Top-level source files (not necessarily instantiated at the top of the cva6).
++      - core/ariane.sv
++      - core/cva6.sv
++      - core/alu.sv
++      # Note: depends on fpnew_pkg, above
++      - core/fpu_wrap.sv
++      - core/branch_unit.sv
++      - core/compressed_decoder.sv
++      - core/controller.sv
++      - core/csr_buffer.sv
++      - core/csr_regfile.sv
++      - core/decoder.sv
++      - core/ex_stage.sv
++      - core/instr_realign.sv
++      - core/id_stage.sv
++      - core/issue_read_operands.sv
++      - core/issue_stage.sv
++      - core/load_unit.sv
++      - core/load_store_unit.sv
++      - core/lsu_bypass.sv
++      - core/mult.sv
++      - core/multiplier.sv
++      - core/serdiv.sv
++      - core/perf_counters.sv
++      - core/ariane_regfile_ff.sv
++      - core/ariane_regfile_fpga.sv
++      - core/re_name.sv
++      # NOTE: scoreboard.sv modified for DSIM (unchanged for other simulators)
++      - core/scoreboard.sv
++      - core/store_buffer.sv
++      - core/amo_buffer.sv
++      - core/store_unit.sv
++      - core/commit_stage.sv
++      - core/axi_shim.sv
++
++      # What is "frontend"?
++      - core/frontend/btb.sv
++      - core/frontend/bht.sv
++      - core/frontend/ras.sv
++      - core/frontend/instr_scan.sv
++      - core/frontend/instr_queue.sv
++      - core/frontend/frontend.sv
++
++      # Cache subsystem
++      - core/cache_subsystem/wt_dcache_ctrl.sv
++      - core/cache_subsystem/wt_dcache_mem.sv
++      - core/cache_subsystem/wt_dcache_missunit.sv
++      - core/cache_subsystem/wt_dcache_wbuffer.sv
++      - core/cache_subsystem/wt_dcache.sv
++      - core/cache_subsystem/cva6_icache.sv
++      - core/cache_subsystem/wt_cache_subsystem.sv
++      - core/cache_subsystem/wt_axi_adapter.sv
++
++      # Physical Memory Protection
++      # NOTE: pmp.sv modified for DSIM (unchanged for other simulators)
++      - core/pmp/src/pmp.sv
++      - core/pmp/src/pmp_entry.sv
++
++      - include_dirs:
++        - common/local/util
++        files:
++          - common/local/util/sram.sv
++
++      - target: not(all(fpga, xilinx))
++        include_dirs:
++          - common/local/util
++        files:
++          - common/local/util/tc_sram_wrapper.sv
++          # - vendor/pulp-platform/tech_cells_generic/src/rtl/tc_sram.sv
++
++      - target: all(fpga, xilinx)
++        include_dirs:
++          - common/local/util
++        files:
++          - common/local/util/tc_sram_fpga_wrapper.sv
++
++      - target: not(synthesis)
++        include_dirs:
++          - core/include
++        files:
++          # Tracer (behavioral code, not RTL)
++          - common/local/util/instr_tracer.sv
++          - common/local/util/instr_tracer_if.sv
++          - common/local/util/instr_trace_item.svh
++          - common/local/util/ex_trace_item.svh
++
++    # TODO target define FPGA target + verification etc
++    #   - target: test
++    #     files:
++    #       - corev_apu/riscv-dbg/src/dm_pkg.sv
++    #       - corev_apu/tb/ariane_soc_pkg.sv
++    #       - corev_apu/tb/ariane_axi_soc_pkg.sv
++    #       - corev_apu/tb/ariane_testharness.sv
++    #       - corev_apu/tb/ariane_peripherals.sv
++    #       - corev_apu/tb/common/uart.sv
++    #       - corev_apu/tb/common/SimDTM.sv
++    #       - corev_apu/tb/common/SimJTAG.sv
++
++    # - target: all(fpga, xilinx)
++    #   files:
++    #   - corev_apu/fpga/src/ariane_peripherals_xilinx.sv
++    #   - corev_apu/fpga/src/ariane_xilinx.sv
++    #   - corev_apu/fpga/src/fan_ctrl.sv
++    #   - corev_apu/fpga/src/bootrom/bootrom.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/ssio_ddr_in.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/rgmii_soc.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/axis_gmii_rx.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/oddr.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/axis_gmii_tx.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/dualmem_widen8.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/rgmii_phy_if.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/dualmem_widen.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/rgmii_lfsr.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/rgmii_core.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/eth_mac_1g.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/eth_mac_1g_rgmii.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/eth_mac_1g_rgmii_fifo.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/iddr.sv
++    #   - corev_apu/fpga/src/ariane-ethernet/framing_top.sv
++    #   - corev_apu/fpga/src/apb_uart/src/apb_uart.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/uart_transmitter.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/uart_interrupt.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/slib_mv_filter.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/slib_input_filter.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/slib_counter.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/uart_receiver.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/slib_input_sync.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/slib_edge_detect.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/slib_clock_div.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/slib_fifo.vhd
++    #   - corev_apu/fpga/src/apb_uart/src/uart_baudgen.vhd
+diff --git a/core/cache_subsystem/miss_handler.sv b/core/cache_subsystem/miss_handler.sv
+index f0a49165..2dda9659 100644
+--- a/core/cache_subsystem/miss_handler.sv
++++ b/core/cache_subsystem/miss_handler.sv
+@@ -377,7 +377,8 @@ module miss_handler import ariane_pkg::*; import std_cache_pkg::*; #(
+                 req_fsm_miss_be     = '1;
+                 req_fsm_miss_we     = 1'b1;
+                 req_fsm_miss_wdata  = evict_cl_q.data;
+-                req_fsm_miss_type = ariane_ace::WRITEBACK;
++                req_fsm_miss_type   = ariane_ace::WRITEBACK;
++                flushing_o          = state_q == WB_CACHELINE_FLUSH;
+ 
+                 // we've got a grant --> this is timing critical, think about it
+                 if (gnt_miss_fsm) begin
+diff --git a/core/cache_subsystem/std_nbdcache.sv b/core/cache_subsystem/std_nbdcache.sv
+index 81597b71..1e2fb04d 100644
+--- a/core/cache_subsystem/std_nbdcache.sv
++++ b/core/cache_subsystem/std_nbdcache.sv
+@@ -136,7 +136,7 @@ import std_cache_pkg::*;
+ 
+         .readshared_done_o (readshared_done),
+         .updating_cache_i (|updating_cache),
+-        .flushing_i (serve_amo),
++        .flushing_i (serve_amo | flushing),
+         .*
+     );
+ 

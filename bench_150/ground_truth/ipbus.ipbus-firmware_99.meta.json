@@ -1,0 +1,37 @@
+{
+  "case_id": "ipbus.ipbus-firmware#99",
+  "issue_repo": {
+    "owner": "ipbus",
+    "name": "ipbus-firmware"
+  },
+  "fix_repo": {
+    "owner": "ipbus",
+    "name": "ipbus-firmware"
+  },
+  "fix_oid": "729e93334fc6b2c60746e412f43f2e44af1217b3",
+  "buggy_commit_sha": "c1a942e4814e1cbccc36b352059ffab9ebf7e6b5",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/ipbus.ipbus-firmware_99.diff",
+  "diff_sha256": "5cc7c3482d4d362fa7e7419814f45bc75c960e2444bf26086477ce48e2179889",
+  "fix_oids_sorted": [
+    "729e93334fc6b2c60746e412f43f2e44af1217b3"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "components/ipbus_core/firmware/hdl/ipbus_pipeline.vhd"
+  ],
+  "ground_truth_hunks": {
+    "components/ipbus_core/firmware/hdl/ipbus_pipeline.vhd": [
+      [
+        87,
+        92
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/ipbus.ipbus-firmware_99.raw.diff"
+}

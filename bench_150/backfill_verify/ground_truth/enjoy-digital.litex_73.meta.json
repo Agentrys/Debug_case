@@ -1,0 +1,38 @@
+{
+  "case_id": "enjoy-digital.litex#73",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "pentoo",
+    "name": "pentoo-overlay"
+  },
+  "fix_oid": "2a787c1085ad552e128ad1b2ff94f3ac33b21c05",
+  "buggy_commit_sha": "5f26ecf3359a8dd2ebc8c4b213a9e441e4a95ef0",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_73.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "2a787c1085ad552e128ad1b2ff94f3ac33b21c05",
+    "c838124857a6d17ef4c50f3e98ce44646a0835cb"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "sci-electronics/litedram/litedram-20180514.ebuild",
+    "sci-electronics/liteeth/liteeth-20180301.ebuild",
+    "sci-electronics/litepcie/litepcie-20180530.ebuild",
+    "sci-electronics/litescope/litescope-20180531.ebuild",
+    "sci-electronics/liteusb/liteusb-20180301.ebuild",
+    "sci-electronics/litex/litex-20180531.ebuild",
+    "sci-electronics/litex/Manifest",
+    "sci-electronics/litex/litex-20180718.ebuild"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_73.raw.diff"
+}

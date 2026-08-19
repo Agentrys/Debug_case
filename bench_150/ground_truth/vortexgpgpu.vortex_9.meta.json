@@ -1,0 +1,49 @@
+{
+  "case_id": "vortexgpgpu.vortex#9",
+  "issue_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_oid": "aa0bf6aae6761933df1d3bc798018747b40b7e25",
+  "buggy_commit_sha": "e40d9d446b60b9647c4cbe6d17ad8ebce1390cef",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/vortexgpgpu.vortex_9.diff",
+  "diff_sha256": "9461792d3a34a9f217710c6bf6ad450de7099e8ba0a360010bedea531550e891",
+  "fix_oids_sorted": [
+    "aa0bf6aae6761933df1d3bc798018747b40b7e25"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "hw/rtl/rop_unit/VX_rop_mem.sv"
+  ],
+  "ground_truth_hunks": {
+    "hw/rtl/rop_unit/VX_rop_mem.sv": [
+      [
+        42,
+        91
+      ],
+      [
+        93,
+        107
+      ],
+      [
+        109,
+        115
+      ],
+      [
+        130,
+        139
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/vortexgpgpu.vortex_9.raw.diff"
+}

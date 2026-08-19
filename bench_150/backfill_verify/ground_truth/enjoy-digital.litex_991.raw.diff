@@ -1,0 +1,13 @@
+diff --git a/litex/soc/cores/uart.py b/litex/soc/cores/uart.py
+index eff637ca..65067427 100644
+--- a/litex/soc/cores/uart.py
++++ b/litex/soc/cores/uart.py
+@@ -57,6 +57,8 @@ class RS232PHYTX(Module):
+ 
+         # # #
+ 
++        pads.tx.reset = 1
++
+         data  = Signal(8, reset_less=True)
+         count = Signal(4, reset_less=True)
+ 

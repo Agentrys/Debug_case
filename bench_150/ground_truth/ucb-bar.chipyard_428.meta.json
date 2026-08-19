@@ -1,0 +1,31 @@
+{
+  "case_id": "ucb-bar.chipyard#428",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_oid": "6bd40aa0b33399ab60cc1026fbe6efa37c7f13df",
+  "buggy_commit_sha": "499f23997d522b4d5c2cd044aea5dbcdc6d3ff55",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/ucb-bar.chipyard_428.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "6bd40aa0b33399ab60cc1026fbe6efa37c7f13df",
+    "b6faed283a55b4f2acd484bdc90a102210b56c30"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "tools/barstools"
+  ],
+  "raw_diff_path": "ground_truth/ucb-bar.chipyard_428.raw.diff"
+}

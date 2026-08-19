@@ -1,0 +1,74 @@
+{
+  "case_id": "ucb-bar.chipyard#13",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_oid": "4745d299120fbd66529f8098d4a46d1f8b12a206",
+  "buggy_commit_sha": "e8dc1035bf6e11b036ded0a77d4220a354319d74",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/ucb-bar.chipyard_13.diff",
+  "diff_sha256": "ed9cc86f2b9a3c8d89442a7e09903548f724339e9bbf0d8361856900b5adfff7",
+  "fix_oids_sorted": [
+    "4745d299120fbd66529f8098d4a46d1f8b12a206",
+    "169f5c9c0868d9d36c63bcbd685775c249b99786"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala",
+    "src/main/scala/boomexample/Configs.scala",
+    "src/main/scala/boomexample/TestHarness.scala",
+    "src/main/scala/boomexample/Top.scala"
+  ],
+  "ground_truth_hunks": {
+    "tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala": [
+      [
+        21,
+        27
+      ]
+    ],
+    "src/main/scala/boomexample/Configs.scala": [
+      [
+        1,
+        5
+      ],
+      [
+        71,
+        74
+      ]
+    ],
+    "src/main/scala/boomexample/TestHarness.scala": [
+      [
+        1,
+        4
+      ],
+      [
+        22,
+        25
+      ]
+    ],
+    "src/main/scala/boomexample/Top.scala": [
+      [
+        1,
+        5
+      ],
+      [
+        46,
+        49
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "boom",
+    "build.sbt"
+  ],
+  "raw_diff_path": "ground_truth/ucb-bar.chipyard_13.raw.diff"
+}

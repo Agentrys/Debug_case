@@ -1,0 +1,69 @@
+{
+  "case_id": "jbush001.nyuziprocessor#43",
+  "issue_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_oid": "db96e0c052c118610188380fa54494ac403f4c3a",
+  "buggy_commit_sha": "bf9a6ace0dceb84d69ae11505e872f36a132760d",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/jbush001.nyuziprocessor_43.diff",
+  "diff_sha256": "bcd5c38e360f0412cebfe9e27d5a12aaf669c153a01e13de71d46d1c053bf31b",
+  "fix_oids_sorted": [
+    "db96e0c052c118610188380fa54494ac403f4c3a",
+    "bc21a9f628e167b958ae3625ec9c4bfde808fbf0"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "hardware/core/core.sv",
+    "hardware/core/instruction_decode_stage.sv",
+    "hardware/core/l1_l2_interface.sv",
+    "hardware/core/l1_store_queue.sv"
+  ],
+  "ground_truth_hunks": {
+    "hardware/core/core.sv": [
+      [
+        295,
+        300
+      ]
+    ],
+    "hardware/core/instruction_decode_stage.sv": [
+      [
+        57,
+        62
+      ],
+      [
+        245,
+        257
+      ]
+    ],
+    "hardware/core/l1_l2_interface.sv": [
+      [
+        62,
+        67
+      ]
+    ],
+    "hardware/core/l1_store_queue.sv": [
+      [
+        29,
+        34
+      ],
+      [
+        139,
+        144
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "tests/misc/trap/io_interrupt.c"
+  ],
+  "raw_diff_path": "ground_truth/jbush001.nyuziprocessor_43.raw.diff"
+}

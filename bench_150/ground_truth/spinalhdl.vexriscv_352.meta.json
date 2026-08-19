@@ -1,0 +1,41 @@
+{
+  "case_id": "spinalhdl.vexriscv#352",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_repo": {
+    "owner": "cherrypiejam",
+    "name": "VexRiscv"
+  },
+  "fix_oid": "1746af1cfe11d0f75b6d3b4460c7d4a0ff8cf98f",
+  "buggy_commit_sha": "5860dc2321a9b41737fb094270c067b8acede46c",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.vexriscv_352.diff",
+  "diff_sha256": "5dd87f8be2aeccb33b636f21354f8c087f2a2c151b42d2964456484d0b45efb1",
+  "fix_oids_sorted": [
+    "1746af1cfe11d0f75b6d3b4460c7d4a0ff8cf98f"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/vexriscv/demo/GenCustomInterrupt.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/vexriscv/demo/GenCustomInterrupt.scala": [
+      [
+        11,
+        16
+      ],
+      [
+        19,
+        30
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.vexriscv_352.raw.diff"
+}

@@ -1,0 +1,65 @@
+diff --git a/steps/mentor-calibre-lvs/configure.yml b/steps/mentor-calibre-lvs/configure.yml
+index be48582..410f7a4 100644
+--- a/steps/mentor-calibre-lvs/configure.yml
++++ b/steps/mentor-calibre-lvs/configure.yml
+@@ -71,6 +71,8 @@ parameters:
+   #
+   lvs_verify_netlist: 1
+ 
++  lvs_adk: "inputs/adk"
++
+ #-------------------------------------------------------------------------
+ # Debug
+ #-------------------------------------------------------------------------
+diff --git a/steps/mentor-calibre-lvs/lvs.runset.template b/steps/mentor-calibre-lvs/lvs.runset.template
+index a6ffb95..27cf9ea 100644
+--- a/steps/mentor-calibre-lvs/lvs.runset.template
++++ b/steps/mentor-calibre-lvs/lvs.runset.template
+@@ -27,5 +27,5 @@
+ *cmnTranscriptEchoToFile: 1
+ *cmnRunMT: 1
+ *cmnRunHyper: 1
+-*cmnV2LVS_SPICEIncFiles: inputs/adk/*.cdl inputs/*.spi inputs/*.sp
++*cmnV2LVS_SPICEIncFiles: ${adk}/*.cdl inputs/*.spi inputs/*.sp
+ *cmnV2LVS_UseRangeMode: 1
+diff --git a/steps/mentor-calibre-lvs/lvs.runset.template b/steps/mentor-calibre-lvs/lvs.runset.template
+index 27cf9ea..4a231fc 100644
+--- a/steps/mentor-calibre-lvs/lvs.runset.template
++++ b/steps/mentor-calibre-lvs/lvs.runset.template
+@@ -27,5 +27,5 @@
+ *cmnTranscriptEchoToFile: 1
+ *cmnRunMT: 1
+ *cmnRunHyper: 1
+-*cmnV2LVS_SPICEIncFiles: ${adk}/*.cdl inputs/*.spi inputs/*.sp
++*cmnV2LVS_SPICEIncFiles: ${lvs_adk}/*.cdl inputs/*.spi inputs/*.sp
+ *cmnV2LVS_UseRangeMode: 1
+diff --git a/steps/mentor-calibre-lvs/configure.yml b/steps/mentor-calibre-lvs/configure.yml
+index be48582..3775e8e 100644
+--- a/steps/mentor-calibre-lvs/configure.yml
++++ b/steps/mentor-calibre-lvs/configure.yml
+@@ -70,6 +70,14 @@ parameters:
+   #   present, such as when using LVS BOX.
+   #
+   lvs_verify_netlist: 1
++  #
++  # lvs_extra_spice_include:
++  #
++  # - [steveri 01/2021] Added lvs_extra_spice_include to support where
++  # e.g.  most of the chip uses stdview but one IP block (dragonphy in
++  # our case) needs a different view b/c it uses LVT cells etc.
++  #
++  lvs_extra_spice_include: ""
+ 
+ #-------------------------------------------------------------------------
+ # Debug
+diff --git a/steps/mentor-calibre-lvs/lvs.runset.template b/steps/mentor-calibre-lvs/lvs.runset.template
+index a6ffb95..ece0246 100644
+--- a/steps/mentor-calibre-lvs/lvs.runset.template
++++ b/steps/mentor-calibre-lvs/lvs.runset.template
+@@ -27,5 +27,5 @@
+ *cmnTranscriptEchoToFile: 1
+ *cmnRunMT: 1
+ *cmnRunHyper: 1
+-*cmnV2LVS_SPICEIncFiles: inputs/adk/*.cdl inputs/*.spi inputs/*.sp
++*cmnV2LVS_SPICEIncFiles: inputs/adk/*.cdl ${lvs_extra_spice_include} inputs/*.spi inputs/*.sp
+ *cmnV2LVS_UseRangeMode: 1

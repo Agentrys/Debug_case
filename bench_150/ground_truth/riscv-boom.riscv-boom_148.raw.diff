@@ -1,0 +1,118 @@
+diff --git a/common.mk b/common.mk
+index 5f9d04cb..68a7e632 100644
+--- a/common.mk
++++ b/common.mk
+@@ -76,7 +76,19 @@ verilog: $(sim_vsrcs)
+ # helper rules to run simulator
+ #########################################################################################
+ run-binary: $(sim)
+-	(set -o pipefail && $(sim) $(PERMISSIVE_ON) $(SIM_FLAGS) $(PERMISSIVE_OFF) $(BINARY) 3>&1 1>&2 2>&3 | spike-dasm > $(sim_out_name).out)
++	(set -o pipefail && $(sim) $(PERMISSIVE_ON) +max-cycles=$(timeout_cycles) $(SIM_FLAGS) $(VERBOSE_FLAGS) $(PERMISSIVE_OFF) $(BINARY) 3>&1 1>&2 2>&3 | spike-dasm > $(sim_out_name).out)
++
++#########################################################################################
++# helper rules to run simulator as fast as possible
++#########################################################################################
++run-binary-fast: $(sim)
++	(set -o pipefail && $(sim) $(PERMISSIVE_ON) +max-cycles=$(timeout_cycles) $(SIM_FLAGS) $(PERMISSIVE_OFF) $(BINARY) 3>&1 1>&2 2>&3 | spike-dasm > $(sim_out_name).out)
++
++#########################################################################################
++# helper rules to run simulator with as much debug info as possible
++#########################################################################################
++run-binary-debug: $(sim_debug)
++	(set -o pipefail && $(sim_debug) $(PERMISSIVE_ON) +max-cycles=$(timeout_cycles) $(SIM_FLAGS) $(VERBOSE_FLAG) $(WAVEFORM_FLAG) $(PERMISSIVE_OFF) $(BINARY) 3>&1 1>&2 2>&3 | spike-dasm > $(sim_out_name).out)
+ 
+ #########################################################################################
+ # run assembly/benchmarks rules
+@@ -86,10 +98,10 @@ $(output_dir)/%: $(RISCV)/riscv64-unknown-elf/share/riscv-tests/isa/%
+ 	ln -sf $< $@
+ 
+ $(output_dir)/%.run: $(output_dir)/% $(sim)
+-	$(sim) $(PERMISSIVE_ON) +max-cycles=$(timeout_cycles) $(PERMISSIVE_OFF) $< && touch $@
++	$(sim) $(PERMISSIVE_ON) +max-cycles=$(timeout_cycles) $(SIM_FLAGS) $(PERMISSIVE_OFF) $< && touch $@
+ 
+ $(output_dir)/%.out: $(output_dir)/% $(sim)
+-	(set -o pipefail && $(sim) $(PERMISSIVE_ON) +verbose +max-cycles=$(timeout_cycles) $(PERMISSIVE_OFF) $< 3>&1 1>&2 2>&3 | spike-dasm > $@)
++	(set -o pipefail && $(sim) $(PERMISSIVE_ON) +max-cycles=$(timeout_cycles) $(VERBOSE_FLAGS) $(PERMISSIVE_OFF) $< 3>&1 1>&2 2>&3 | spike-dasm > $@)
+ 
+ #########################################################################################
+ # include build/project specific makefrags made from the generator
+diff --git a/sims/verisim/Makefile b/sims/verisim/Makefile
+index 629373c8..801a521c 100644
+--- a/sims/verisim/Makefile
++++ b/sims/verisim/Makefile
+@@ -28,6 +28,8 @@ sim_debug = $(sim_dir)/$(sim_prefix)-$(MODEL_PACKAGE)-$(CONFIG)-debug
+ PERMISSIVE_ON=
+ PERMISSIVE_OFF=
+ 
++WAVEFORM_FLAG=-v$(sim_out_name).vcd
++
+ .PHONY: default debug
+ default: $(sim)
+ debug: $(sim_debug)
+@@ -80,19 +82,13 @@ $(sim): $(model_mk)
+ $(sim_debug): $(model_mk_debug)
+ 	$(MAKE) VM_PARALLEL_BUILDS=1 -C $(build_dir)/$(long_name).debug -f V$(VLOG_MODEL).mk
+ 
+-#########################################################################################
+-# helper rules to run simulator with debug
+-#########################################################################################
+-run-binary-debug: $(sim_debug)
+-	(set -o pipefail && $(sim_debug) $(SIM_FLAGS) -v$(sim_out_name).vcd $(BINARY) 3>&1 1>&2 2>&3 | spike-dasm > $(sim_out_name).out)
+-
+ #########################################################################################
+ # create a verisim vpd rule
+ #########################################################################################
+ $(output_dir)/%.vpd: $(output_dir)/% $(sim_debug)
+ 	rm -f $@.vcd && mkfifo $@.vcd
+ 	vcd2vpd $@.vcd $@ > /dev/null &
+-	$(sim_debug) -v$@.vcd +max-cycles=$(timeout_cycles) $<
++	$(sim_debug) $(PERMISSIVE_ON) +max-cycles=$(timeout_cycles) $(SIM_FLAGS) $(VERBOSE_FLAGS) -v$@.vcd $(PERMISSIVE_OFF) $<
+ 
+ #########################################################################################
+ # general cleanup rule
+diff --git a/sims/vsim/Makefile b/sims/vsim/Makefile
+index 88aaed1e..6364d2f8 100644
+--- a/sims/vsim/Makefile
++++ b/sims/vsim/Makefile
+@@ -28,6 +28,8 @@ sim_debug = $(sim_dir)/$(sim_prefix)-$(MODEL_PACKAGE)-$(CONFIG)-debug
+ PERMISSIVE_ON=+permissive
+ PERMISSIVE_OFF=+permissive-off
+ 
++WAVEFORM_FLAG=+vcdplusfile=$(sim_out_name).vpd
++
+ .PHONY: default debug
+ default: $(sim)
+ debug: $(sim_debug)
+@@ -93,17 +95,11 @@ $(sim_debug) : $(sim_vsrcs) $(sim_dotf) $(sim_vcs_blackboxes)
+ 	rm -rf csrc && $(VCS) $(VCS_OPTS) -o $@ \
+ 	+define+DEBUG -debug_pp
+ 
+-#########################################################################################
+-# helper rules to run simulator with debug
+-#########################################################################################
+-run-binary-debug: $(sim_debug)
+-	(set -o pipefail && $(sim_debug) $(PERMISSIVE_ON) $(SIM_FLAGS) +vcdplusfile=$(sim_out_name).vpd $(PERMISSIVE_OFF) $(BINARY) 3>&1 1>&2 2>&3 | spike-dasm > $(sim_out_name).out)
+-
+ #########################################################################################
+ # create a vcs vpd rule
+ #########################################################################################
+ $(output_dir)/%.vpd: $(output_dir)/% $(sim_debug)
+-	$(sim_debug) $(PERMISSIVE_ON) +vcdplusfile=$@ +max-cycles=$(timeout_cycles) $(PERMISSIVE_OFF) $<
++	$(sim_debug) $(PERMISSIVE_ON) +max-cycles=$(timeout_cycles) $(SIM_FLAGS) $(VERBOSE_FLAGS) +vcdplusfile=$@ $(PERMISSIVE_OFF) $<
+ 
+ #########################################################################################
+ # general cleanup rule
+diff --git a/variables.mk b/variables.mk
+index d9ce7781..7aefdd18 100644
+--- a/variables.mk
++++ b/variables.mk
+@@ -148,7 +148,8 @@ output_dir=$(sim_dir)/output/$(long_name)
+ # helper variables to run binaries
+ #########################################################################################
+ BINARY ?=
+-SIM_FLAGS ?= +max-cycles=$(timeout_cycles)
++SIM_FLAGS ?=
++VERBOSE_FLAGS ?= +verbose
+ sim_out_name = $(notdir $(basename $(BINARY))).$(long_name)
+ 
+ #########################################################################################

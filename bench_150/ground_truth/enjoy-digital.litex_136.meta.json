@@ -1,0 +1,31 @@
+{
+  "case_id": "enjoy-digital.litex#136",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "mithro",
+    "name": "litex"
+  },
+  "fix_oid": "22d454efcd94a321e557f3bc76463a8057d7d196",
+  "buggy_commit_sha": "fa6fef1e15615e183a863cb6869636677fa2dbe4",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/enjoy-digital.litex_136.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "22d454efcd94a321e557f3bc76463a8057d7d196",
+    "0ade06c0f0b3ba747ceee5e35ea0abc7bc20df77"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "range",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/soc/software/bios/sdram.c"
+  ],
+  "raw_diff_path": "ground_truth/enjoy-digital.litex_136.raw.diff"
+}

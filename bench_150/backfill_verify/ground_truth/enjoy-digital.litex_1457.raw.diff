@@ -1,0 +1,7 @@
+diff --git a/pythondata_software_picolibc/data b/pythondata_software_picolibc/data
+index 2508101..580d4f1 160000
+--- a/pythondata_software_picolibc/data
++++ b/pythondata_software_picolibc/data
+@@ -1 +1 @@
+-Subproject commit 2508101bf38b09c5255798107b59ee2bc7474f69
++Subproject commit 580d4f13de47a3eaf66f10cfc8537721b21dfc31

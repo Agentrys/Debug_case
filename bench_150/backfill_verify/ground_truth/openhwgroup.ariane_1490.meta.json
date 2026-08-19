@@ -1,0 +1,58 @@
+{
+  "case_id": "openhwgroup.ariane#1490",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "MaistoV",
+    "name": "cva6_fork"
+  },
+  "fix_oid": "4fca305edafe16cd1fe7e82a3708d308239bb550",
+  "buggy_commit_sha": "e26b4b7200097254b9da2644d724e8ff0babdaf1",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_1490.diff",
+  "diff_sha256": "aabc3c84749d8ee7ef811a7e529c36e304ecf1d83233f41b340e4c6b11d2b2d4",
+  "fix_oids_sorted": [
+    "4fca305edafe16cd1fe7e82a3708d308239bb550",
+    "9046ef6d5a6db9910103c123c8aa6b5648af2478"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/mmu_sv39/mmu.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/mmu_sv39/mmu.sv": [
+      [
+        257,
+        264
+      ],
+      [
+        366,
+        372
+      ],
+      [
+        376,
+        382
+      ],
+      [
+        257,
+        264
+      ],
+      [
+        366,
+        372
+      ],
+      [
+        376,
+        382
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_1490.raw.diff"
+}

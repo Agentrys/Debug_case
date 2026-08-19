@@ -1,0 +1,37 @@
+{
+  "case_id": "spinalhdl.naxriscv#148",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "NaxRiscv"
+  },
+  "fix_repo": {
+    "owner": "rgruden",
+    "name": "NaxRiscv"
+  },
+  "fix_oid": "698aefc85facd81d8209d745156a807dca86cd91",
+  "buggy_commit_sha": "9d673556da41f1873738bcf8c7cf18744f3829b0",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.naxriscv_148.diff",
+  "diff_sha256": "b23fdbc22caf44180c0a42a8731ab3f1278390124e183f356cf3a875da3f5423",
+  "fix_oids_sorted": [
+    "698aefc85facd81d8209d745156a807dca86cd91"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala": [
+      [
+        182,
+        188
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.naxriscv_148.raw.diff"
+}

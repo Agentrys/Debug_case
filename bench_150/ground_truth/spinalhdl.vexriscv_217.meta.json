@@ -1,0 +1,37 @@
+{
+  "case_id": "spinalhdl.vexriscv#217",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_repo": {
+    "owner": "SpinalHDL",
+    "name": "SpinalHDL"
+  },
+  "fix_oid": "75a11d5aa9a746468bd672421166a72b9d325262",
+  "buggy_commit_sha": "00eb05eb898bc4b0822b4239a9be078886e13fad",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.vexriscv_217.diff",
+  "diff_sha256": "519ab16fa98e105c251622727aae8221d5362a1c75e2ff8c1a0bc12d99c861d2",
+  "fix_oids_sorted": [
+    "75a11d5aa9a746468bd672421166a72b9d325262"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/src/main/scala/spinal/core/internals/PhaseVhdl.scala"
+  ],
+  "ground_truth_hunks": {
+    "core/src/main/scala/spinal/core/internals/PhaseVhdl.scala": [
+      [
+        267,
+        274
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.vexriscv_217.raw.diff"
+}

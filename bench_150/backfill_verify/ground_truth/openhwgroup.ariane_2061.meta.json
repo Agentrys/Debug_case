@@ -1,0 +1,32 @@
+{
+  "case_id": "openhwgroup.ariane#2061",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "ASintzoff",
+    "name": "cva6"
+  },
+  "fix_oid": "055a29ea008e0836c9ed988d1f079eaeea60eec8",
+  "buggy_commit_sha": "17e0f4caf464bec19fab2c5fdb58a3bb6a9b39da",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_2061.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "055a29ea008e0836c9ed988d1f079eaeea60eec8"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    ".gitlab-ci/cva6.yml",
+    "cva6/regress/smoke-gen_tests.sh",
+    "cva6/sim/cva6.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_2061.raw.diff"
+}

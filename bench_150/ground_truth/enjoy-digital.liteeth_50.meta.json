@@ -1,0 +1,30 @@
+{
+  "case_id": "enjoy-digital.liteeth#50",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "liteeth"
+  },
+  "fix_repo": {
+    "owner": "gregdavill",
+    "name": "liteeth"
+  },
+  "fix_oid": "6ee11edb87223019d63e8204888782f3fbc28a22",
+  "buggy_commit_sha": "54acf9fd76c226d7760294ffde86418e52e0951b",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/enjoy-digital.liteeth_50.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "6ee11edb87223019d63e8204888782f3fbc28a22"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "liteeth/phy/ecp5rgmii.py"
+  ],
+  "raw_diff_path": "ground_truth/enjoy-digital.liteeth_50.raw.diff"
+}

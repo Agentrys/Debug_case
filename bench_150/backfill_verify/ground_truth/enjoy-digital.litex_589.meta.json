@@ -1,0 +1,30 @@
+{
+  "case_id": "enjoy-digital.litex#589",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_oid": "6671eb6218ce35a4b79f3c6dbbb2092bcaa3b41f",
+  "buggy_commit_sha": "ae3c78f6d16dcbb6250ea61acaddd1a4c1f876e1",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_589.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "6671eb6218ce35a4b79f3c6dbbb2092bcaa3b41f"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/build/lattice/trellis.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_589.raw.diff"
+}

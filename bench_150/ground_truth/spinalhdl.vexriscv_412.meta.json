@@ -1,0 +1,50 @@
+{
+  "case_id": "spinalhdl.vexriscv#412",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_oid": "ee95e562f135d2d890338cca84bab04296d72e17",
+  "buggy_commit_sha": "625fc8437952ca00d474f0547faef72cbe68a32c",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.vexriscv_412.diff",
+  "diff_sha256": "3fae130c87adbedc2a764049b85fe0250ab8b045c83222fb615f142c236c8a9b",
+  "fix_oids_sorted": [
+    "ee95e562f135d2d890338cca84bab04296d72e17",
+    "8c191a282458c09bcff48e67caff5a7c5661abd0"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/vexriscv/plugin/DBusCachedPlugin.scala": [
+      [
+        476,
+        482
+      ],
+      [
+        603,
+        609
+      ],
+      [
+        473,
+        479
+      ],
+      [
+        585,
+        591
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.vexriscv_412.raw.diff"
+}

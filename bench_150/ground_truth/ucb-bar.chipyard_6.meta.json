@@ -1,0 +1,48 @@
+{
+  "case_id": "ucb-bar.chipyard#6",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_oid": "5a4cad01722cf82a7250babbed598f7ca99545e4",
+  "buggy_commit_sha": "a9b90541200ec854fe853433941eb18a4e703661",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/ucb-bar.chipyard_6.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "5a4cad01722cf82a7250babbed598f7ca99545e4",
+    "83e33110472c47aaa762257ed7c053ff1278834c"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "docs/Chipyard-Basics/Chipyard-Components.rst",
+    "docs/Simulation/FPGA-Prototyping.rst",
+    "docs/Simulation/index.rst",
+    "fpga/src/main/scala/arty/Configs.scala",
+    "fpga/src/main/scala/vcu118/Configs.scala",
+    "fpga/src/main/scala/vcu118/TestHarness.scala",
+    "Makefile",
+    "README.md",
+    "compare_results.py",
+    "handle-results.py",
+    "marshal-configs/spec17-intrate-test-500.json",
+    "marshal-configs/spec17-intrate-test.json",
+    "marshal-configs/spec17-intrate.json",
+    "marshal-configs/spec17-intspeed-test-600.json",
+    "marshal-configs/spec17-intspeed-test.json",
+    "marshal-configs/spec17-intspeed.json",
+    "python_requirements.txt",
+    "speckle"
+  ],
+  "raw_diff_path": "ground_truth/ucb-bar.chipyard_6.raw.diff"
+}

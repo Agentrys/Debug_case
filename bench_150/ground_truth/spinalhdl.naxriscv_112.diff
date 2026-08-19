@@ -1,0 +1,26 @@
+diff --git a/src/main/scala/naxriscv/execute/EnvCallPlugin.scala b/src/main/scala/naxriscv/execute/EnvCallPlugin.scala
+index 97e9ed6..dc3ffc3 100644
+--- a/src/main/scala/naxriscv/execute/EnvCallPlugin.scala
++++ b/src/main/scala/naxriscv/execute/EnvCallPlugin.scala
+@@ -81,7 +81,10 @@ class EnvCallPlugin(val euId : String)(var rescheduleAt : Int = 0) extends Plugi
+     import stage._
+     import s._
+ 
+-    setup.reschedule.valid      := isValid && (EBREAK || ECALL || XRET || FENCE_I || FLUSH_DATA || FENCE_VMA)
++    setup.reschedule.valid      := isValid && (
++      EBREAK || ECALL || XRET || FENCE_I || FLUSH_DATA || FENCE_VMA ||
++        WFI && !(priv.isMachine() || !priv.logic.machine.mstatus.tw && (Bool(!priv.p.withSupervisor) || priv.isSupervisor()))
++    )
+     setup.reschedule.robId      := ROB.ID
+     setup.reschedule.tval       := B(PC).andMask(EBREAK) //That's what spike do
+     setup.reschedule.skipCommit := EBREAK || ECALL
+@@ -109,6 +112,9 @@ class EnvCallPlugin(val euId : String)(var rescheduleAt : Int = 0) extends Plugi
+       trap setWhen(priv.getPrivilege() === 1 && priv.logic.machine.mstatus.tvm)
+       trap setWhen(priv.getPrivilege() === 0)
+     }
++    if (priv.p.withUser) when(WFI) {
++      trap := True
++    }
+ 
+     when(trap){
+       setup.reschedule.cause := CSR.MCAUSE_ENUM.ILLEGAL_INSTRUCTION

@@ -1,0 +1,31 @@
+{
+  "case_id": "esl-epfl.x-heep#291",
+  "issue_repo": {
+    "owner": "x-heep",
+    "name": "x-heep"
+  },
+  "fix_repo": {
+    "owner": "davideschiavone",
+    "name": "x-heep"
+  },
+  "fix_oid": "e8d6fc1e4f76dbc3f919a496e7d7f9992add58c2",
+  "buggy_commit_sha": "a7443b052d99985fd98fe998cfbf30cc73ddd37a",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/esl-epfl.x-heep_291.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "e8d6fc1e4f76dbc3f919a496e7d7f9992add58c2",
+    "a22056c135460b3eb5193caf2fce7e431230393f"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "tb/testharness.sv"
+  ],
+  "raw_diff_path": "ground_truth/esl-epfl.x-heep_291.raw.diff"
+}

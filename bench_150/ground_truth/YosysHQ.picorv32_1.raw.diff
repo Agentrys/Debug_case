@@ -1,0 +1,656 @@
+diff --git a/Makefile b/Makefile
+index c585588..eb3aa8a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -19,9 +19,13 @@ testbench.vcd: testbench.vvp firmware/firmware.hex
+ view: testbench.vcd
+ 	gtkwave $< testbench.gtkw
+ 
+-check: check.smt2
+-	yosys-smtbmc -t 30 --dump-vcd check.vcd check.smt2
+-	yosys-smtbmc -t 30 --dump-vcd check.vcd -i check.smt2
++check-z3: check.smt2
++	yosys-smtbmc -s z3 -t 30 --dump-vcd check.vcd check.smt2
++	yosys-smtbmc -s z3 -t 30 --dump-vcd check.vcd -i check.smt2
++
++check-yices: check.smt2
++	yosys-smtbmc -s yices -t 30 --dump-vcd check.vcd check.smt2
++	yosys-smtbmc -s yices -t 30 --dump-vcd check.vcd -i check.smt2
+ 
+ check.smt2: picorv32.v
+ 	yosys -v2 -p 'read_verilog -formal picorv32.v' \
+@@ -133,5 +137,5 @@ clean:
+ 		firmware/firmware.elf firmware/firmware.bin firmware/firmware.hex firmware/firmware.map \
+ 		testbench.vvp testbench_sp.vvp testbench_synth.vvp testbench.vcd testbench.trace
+ 
+-.PHONY: test view test_sp test_axi test_synth download-tools toc clean
++.PHONY: test view test_sp test_axi test_synth check-z3 check-yices download-tools build-tools toc clean
+ 
+diff --git a/README.md b/README.md
+index 2ebf19a..79c12be 100644
+--- a/README.md
++++ b/README.md
+@@ -85,13 +85,14 @@ You are reading it right now.
+ 
+ This Verilog file contains the following Verilog modules:
+ 
+-| Module                  | Description                                                   |
+-| ----------------------- | ------------------------------------------------------------- |
+-| `picorv32`              | The PicoRV32 CPU                                              |
+-| `picorv32_axi`          | The version of the CPU with AXI4-Lite interface               |
+-| `picorv32_axi_adapter`  | Adapter from PicoRV32 Memory Interface to AXI4-Lite           |
+-| `picorv32_pcpi_mul`     | A PCPI core that implements the `MUL[H[SU|U]]` instructions   |
+-| `picorv32_pcpi_div`     | A PCPI core that implements the `DIV[U]/REM[U]` instructions  |
++| Module                   | Description                                                           |
++| ------------------------ | --------------------------------------------------------------------- |
++| `picorv32`               | The PicoRV32 CPU                                                      |
++| `picorv32_axi`           | The version of the CPU with AXI4-Lite interface                       |
++| `picorv32_axi_adapter`   | Adapter from PicoRV32 Memory Interface to AXI4-Lite                   |
++| `picorv32_pcpi_mul`      | A PCPI core that implements the `MUL[H[SU|U]]` instructions           |
++| `picorv32_pcpi_fast_mul` | A version of `picorv32_pcpi_fast_mul` using a single cycle multiplier |
++| `picorv32_pcpi_div`      | A PCPI core that implements the `DIV[U]/REM[U]` instructions          |
+ 
+ Simply copy this file into your project.
+ 
+@@ -229,6 +230,15 @@ This parameter internally enables PCPI and instantiates the `picorv32_pcpi_mul`
+ core that implements the `MUL[H[SU|U]]` instructions. The external PCPI
+ interface only becomes functional when ENABLE_PCPI is set as well.
+ 
++#### ENABLE_FAST_MUL (default = 0)
++
++This parameter internally enables PCPI and instantiates the `picorv32_pcpi_fast_mul`
++core that implements the `MUL[H[SU|U]]` instructions. The external PCPI
++interface only becomes functional when ENABLE_PCPI is set as well.
++
++If both ENABLE_MUL and ENABLE_FAST_MUL are set then the ENABLE_MUL setting
++will be ignored and the fast multiplier core will be instantiated.
++
+ #### ENABLE_DIV (default = 0)
+ 
+ This parameter internally enables PCPI and instantiates the `picorv32_pcpi_div`
+diff --git a/firmware/irq.c b/firmware/irq.c
+index 13dcb57..9fc1735 100644
+--- a/firmware/irq.c
++++ b/firmware/irq.c
+@@ -14,7 +14,7 @@ uint32_t *irq(uint32_t *regs, uint32_t irqs)
+ 	static unsigned int timer_irq_count = 0;
+ 
+ 	// checking compressed isa q0 reg handling
+-	{
++	if ((irqs & 6) != 0) {
+ 		uint32_t pc = (regs[0] & 1) ? regs[0] - 3 : regs[0] - 4;
+ 		uint32_t instr = *(uint16_t*)pc;
+ 
+diff --git a/picorv32.v b/picorv32.v
+index f6c6fc3..d4fb656 100644
+--- a/picorv32.v
++++ b/picorv32.v
+@@ -31,8 +31,10 @@
+ 
+ `ifdef FORMAL
+   `define FORMAL_KEEP (* keep *)
++  `define assert(assert_expr) assert(assert_expr)
+ `else
+   `define FORMAL_KEEP
++  `define assert(assert_expr)
+ `endif
+ 
+ /***************************************************************
+@@ -54,6 +56,7 @@ module picorv32 #(
+ 	parameter [ 0:0] CATCH_ILLINSN = 1,
+ 	parameter [ 0:0] ENABLE_PCPI = 0,
+ 	parameter [ 0:0] ENABLE_MUL = 0,
++	parameter [ 0:0] ENABLE_FAST_MUL = 0,
+ 	parameter [ 0:0] ENABLE_DIV = 0,
+ 	parameter [ 0:0] ENABLE_IRQ = 0,
+ 	parameter [ 0:0] ENABLE_IRQ_QREGS = 1,
+@@ -111,7 +114,7 @@ module picorv32 #(
+ 	localparam integer regfile_size = (ENABLE_REGS_16_31 ? 32 : 16) + 4*ENABLE_IRQ*ENABLE_IRQ_QREGS;
+ 	localparam integer regindex_bits = (ENABLE_REGS_16_31 ? 5 : 4) + ENABLE_IRQ*ENABLE_IRQ_QREGS;
+ 
+-	localparam WITH_PCPI = ENABLE_PCPI || ENABLE_MUL || ENABLE_DIV;
++	localparam WITH_PCPI = ENABLE_PCPI || ENABLE_MUL || ENABLE_FAST_MUL || ENABLE_DIV;
+ 
+ 	localparam [35:0] TRACE_BRANCH = {4'b 0001, 32'b 0};
+ 	localparam [35:0] TRACE_ADDR   = {4'b 0010, 32'b 0};
+@@ -205,7 +208,20 @@ module picorv32 #(
+ 	reg        pcpi_int_wait;
+ 	reg        pcpi_int_ready;
+ 
+-	generate if (ENABLE_MUL) begin
++	generate if (ENABLE_FAST_MUL) begin
++		picorv32_pcpi_fast_mul pcpi_mul (
++			.clk       (clk            ),
++			.resetn    (resetn         ),
++			.pcpi_valid(pcpi_valid     ),
++			.pcpi_insn (pcpi_insn      ),
++			.pcpi_rs1  (pcpi_rs1       ),
++			.pcpi_rs2  (pcpi_rs2       ),
++			.pcpi_wr   (pcpi_mul_wr    ),
++			.pcpi_rd   (pcpi_mul_rd    ),
++			.pcpi_wait (pcpi_mul_wait  ),
++			.pcpi_ready(pcpi_mul_ready )
++		);
++	end else if (ENABLE_MUL) begin
+ 		picorv32_pcpi_mul pcpi_mul (
+ 			.clk       (clk            ),
+ 			.resetn    (resetn         ),
+@@ -248,8 +264,8 @@ module picorv32 #(
+ 	always @* begin
+ 		pcpi_int_wr = 0;
+ 		pcpi_int_rd = 1'bx;
+-		pcpi_int_wait  = |{ENABLE_PCPI && pcpi_wait,  ENABLE_MUL && pcpi_mul_wait,  ENABLE_DIV && pcpi_div_wait};
+-		pcpi_int_ready = |{ENABLE_PCPI && pcpi_ready, ENABLE_MUL && pcpi_mul_ready, ENABLE_DIV && pcpi_div_ready};
++		pcpi_int_wait  = |{ENABLE_PCPI && pcpi_wait,  (ENABLE_MUL || ENABLE_FAST_MUL) && pcpi_mul_wait,  ENABLE_DIV && pcpi_div_wait};
++		pcpi_int_ready = |{ENABLE_PCPI && pcpi_ready, (ENABLE_MUL || ENABLE_FAST_MUL) && pcpi_mul_ready, ENABLE_DIV && pcpi_div_ready};
+ 
+ 		(* parallel_case *)
+ 		case (1'b1)
+@@ -257,7 +273,7 @@ module picorv32 #(
+ 				pcpi_int_wr = pcpi_wr;
+ 				pcpi_int_rd = pcpi_rd;
+ 			end
+-			ENABLE_MUL && pcpi_mul_ready: begin
++			(ENABLE_MUL || ENABLE_FAST_MUL) && pcpi_mul_ready: begin
+ 				pcpi_int_wr = pcpi_mul_wr;
+ 				pcpi_int_rd = pcpi_mul_rd;
+ 			end
+@@ -454,64 +470,94 @@ module picorv32 #(
+ 	end
+ 
+ 	always @(posedge clk) begin
+-		if (mem_la_read || mem_la_write) begin
+-			mem_addr <= mem_la_addr;
+-			mem_wdata <= mem_la_wdata;
+-			mem_wstrb <= mem_la_wstrb & {4{mem_la_write}};
++		if (resetn) begin
++			if (mem_do_prefetch || mem_do_rinst || mem_do_rdata)
++				`assert(!mem_do_wdata);
++
++			if (mem_do_prefetch || mem_do_rinst)
++				`assert(!mem_do_rdata);
++
++			if (mem_do_rdata)
++				`assert(!mem_do_prefetch && !mem_do_rinst);
++
++			if (mem_do_wdata)
++				`assert(!(mem_do_prefetch || mem_do_rinst || mem_do_rdata));
++
++			if (mem_state == 2 || mem_state == 3)
++				`assert(mem_valid || mem_do_prefetch);
+ 		end
+-		if (!resetn) begin
++	end
++
++	always @(posedge clk) begin
++		if (!resetn || trap) begin
+ 			mem_state <= 0;
+-			mem_valid <= 0;
++			if (!resetn || mem_ready)
++				mem_valid <= 0;
+ 			mem_la_secondword <= 0;
+ 			prefetched_high_word <= 0;
+-		end else case (mem_state)
+-			0: begin
+-				if (mem_do_prefetch || mem_do_rinst || mem_do_rdata) begin
+-					mem_valid <= !mem_la_use_prefetched_high_word;
+-					mem_instr <= mem_do_prefetch || mem_do_rinst;
+-					mem_wstrb <= 0;
+-					mem_state <= 1;
+-				end
+-				if (mem_do_wdata) begin
+-					mem_valid <= 1;
+-					mem_instr <= 0;
+-					mem_state <= 2;
+-				end
++		end else begin
++			if (mem_la_read || mem_la_write) begin
++				mem_addr <= mem_la_addr;
++				mem_wdata <= mem_la_wdata;
++				mem_wstrb <= mem_la_wstrb & {4{mem_la_write}};
+ 			end
+-			1: begin
+-				if (mem_xfer) begin
+-					if (COMPRESSED_ISA && mem_la_read) begin
++			case (mem_state)
++				0: begin
++					if (mem_do_prefetch || mem_do_rinst || mem_do_rdata) begin
++						mem_valid <= !mem_la_use_prefetched_high_word;
++						mem_instr <= mem_do_prefetch || mem_do_rinst;
++						mem_wstrb <= 0;
++						mem_state <= 1;
++					end
++					if (mem_do_wdata) begin
+ 						mem_valid <= 1;
+-						mem_la_secondword <= 1;
+-						if (!mem_la_use_prefetched_high_word)
+-							mem_16bit_buffer <= mem_rdata[31:16];
+-					end else begin
+-						mem_valid <= 0;
+-						mem_la_secondword <= 0;
+-						if (COMPRESSED_ISA && !mem_do_rdata) begin
+-							if (~&mem_rdata[1:0] || mem_la_secondword) begin
++						mem_instr <= 0;
++						mem_state <= 2;
++					end
++				end
++				1: begin
++					`assert(mem_wstrb == 0);
++					`assert(mem_do_prefetch || mem_do_rinst || mem_do_rdata);
++					`assert(mem_valid == !mem_la_use_prefetched_high_word);
++					`assert(mem_instr == (mem_do_prefetch || mem_do_rinst));
++					if (mem_xfer) begin
++						if (COMPRESSED_ISA && mem_la_read) begin
++							mem_valid <= 1;
++							mem_la_secondword <= 1;
++							if (!mem_la_use_prefetched_high_word)
+ 								mem_16bit_buffer <= mem_rdata[31:16];
+-								prefetched_high_word <= 1;
+-							end else begin
+-								prefetched_high_word <= 0;
++						end else begin
++							mem_valid <= 0;
++							mem_la_secondword <= 0;
++							if (COMPRESSED_ISA && !mem_do_rdata) begin
++								if (~&mem_rdata[1:0] || mem_la_secondword) begin
++									mem_16bit_buffer <= mem_rdata[31:16];
++									prefetched_high_word <= 1;
++								end else begin
++									prefetched_high_word <= 0;
++								end
+ 							end
++							mem_state <= mem_do_rinst || mem_do_rdata ? 0 : 3;
+ 						end
+-						mem_state <= mem_do_rinst || mem_do_rdata ? 0 : 3;
+ 					end
+ 				end
+-			end
+-			2: begin
+-				if (mem_xfer) begin
+-					mem_valid <= 0;
+-					mem_state <= 0;
++				2: begin
++					`assert(mem_wstrb != 0);
++					`assert(mem_do_wdata);
++					if (mem_xfer) begin
++						mem_valid <= 0;
++						mem_state <= 0;
++					end
+ 				end
+-			end
+-			3: begin
+-				if (mem_do_rinst) begin
+-					mem_state <= 0;
++				3: begin
++					`assert(mem_wstrb == 0);
++					`assert(mem_do_prefetch);
++					if (mem_do_rinst) begin
++						mem_state <= 0;
++					end
+ 				end
+-			end
+-		endcase
++			endcase
++		end
+ 
+ 		if (clear_prefetched_high_word)
+ 			prefetched_high_word <= 0;
+@@ -1668,12 +1714,16 @@ module picorv32 #(
+ 	reg [3:0] last_mem_nowait;
+ 	always @(posedge clk)
+ 		last_mem_nowait <= {last_mem_nowait, mem_ready || !mem_valid};
++
++	// stall the memory interface for max 4 cycles
+ 	restrict property (|last_mem_nowait || mem_ready || !mem_valid);
+ 
++	// resetn low in first cycle, after that resetn high
++	restrict property (resetn != $initstate);
++
+ 	reg ok;
+ 	always @* begin
+-		restrict (resetn == !$initstate);
+-		if (!$initstate) begin
++		if (resetn) begin
+ 			// instruction fetches are read-only
+ 			if (mem_valid && mem_instr)
+ 				assert (mem_wstrb == 0);
+@@ -1820,6 +1870,72 @@ module picorv32_pcpi_mul #(
+ 	end
+ endmodule
+ 
++module picorv32_pcpi_fast_mul (
++	input clk, resetn,
++
++	input             pcpi_valid,
++	input      [31:0] pcpi_insn,
++	input      [31:0] pcpi_rs1,
++	input      [31:0] pcpi_rs2,
++	output            pcpi_wr,
++	output     [31:0] pcpi_rd,
++	output            pcpi_wait,
++	output            pcpi_ready
++);
++	reg instr_mul, instr_mulh, instr_mulhsu, instr_mulhu;
++	wire instr_any_mul = |{instr_mul, instr_mulh, instr_mulhsu, instr_mulhu};
++	wire instr_any_mulh = |{instr_mulh, instr_mulhsu, instr_mulhu};
++	wire instr_rs1_signed = |{instr_mulh, instr_mulhsu};
++	wire instr_rs2_signed = |{instr_mulh};
++
++	reg active1, active2, shift_out;
++	reg [63:0] rs1, rs2, rd;
++
++	always @* begin
++		instr_mul = 0;
++		instr_mulh = 0;
++		instr_mulhsu = 0;
++		instr_mulhu = 0;
++
++		if (resetn && pcpi_valid && pcpi_insn[6:0] == 7'b0110011 && pcpi_insn[31:25] == 7'b0000001) begin
++			case (pcpi_insn[14:12])
++				3'b000: instr_mul = 1;
++				3'b001: instr_mulh = 1;
++				3'b010: instr_mulhsu = 1;
++				3'b011: instr_mulhu = 1;
++			endcase
++		end
++	end
++
++	always @(posedge clk) begin
++		rd <= rs1 * rs2;
++	end
++
++	always @(posedge clk) begin
++		if (instr_any_mul && !active1 && !active2) begin
++			if (instr_rs1_signed)
++				rs1 <= $signed(pcpi_rs1);
++			else
++				rs1 <= $unsigned(pcpi_rs1);
++
++			if (instr_rs2_signed)
++				rs2 <= $signed(pcpi_rs2);
++			else
++				rs2 <= $unsigned(pcpi_rs2);
++			active1 <= 1;
++		end else begin
++			active1 <= 0;
++		end
++		active2 <= active1;
++		shift_out <= instr_any_mulh;
++	end
++
++	assign pcpi_wr = active2;
++	assign pcpi_wait = 0;
++	assign pcpi_ready = active2;
++	assign pcpi_rd = shift_out ? rd >> 32 : rd;
++endmodule
++
+ 
+ /***************************************************************
+  * picorv32_pcpi_div
+@@ -1923,6 +2039,7 @@ module picorv32_axi #(
+ 	parameter [ 0:0] CATCH_ILLINSN = 1,
+ 	parameter [ 0:0] ENABLE_PCPI = 0,
+ 	parameter [ 0:0] ENABLE_MUL = 0,
++	parameter [ 0:0] ENABLE_FAST_MUL = 0,
+ 	parameter [ 0:0] ENABLE_DIV = 0,
+ 	parameter [ 0:0] ENABLE_IRQ = 0,
+ 	parameter [ 0:0] ENABLE_IRQ_QREGS = 1,
+@@ -2030,6 +2147,7 @@ module picorv32_axi #(
+ 		.CATCH_ILLINSN       (CATCH_ILLINSN       ),
+ 		.ENABLE_PCPI         (ENABLE_PCPI         ),
+ 		.ENABLE_MUL          (ENABLE_MUL          ),
++		.ENABLE_FAST_MUL     (ENABLE_FAST_MUL     ),
+ 		.ENABLE_DIV          (ENABLE_DIV          ),
+ 		.ENABLE_IRQ          (ENABLE_IRQ          ),
+ 		.ENABLE_IRQ_QREGS    (ENABLE_IRQ_QREGS    ),
+diff --git a/scripts/smtbmc/.gitignore b/scripts/smtbmc/.gitignore
+index b27c0e6..54541e1 100644
+--- a/scripts/smtbmc/.gitignore
++++ b/scripts/smtbmc/.gitignore
+@@ -1,3 +1,6 @@
+ tracecmp.smt2
+-tracecmp.vcd
+ tracecmp.yslog
++notrap_validop.smt2
++notrap_validop.yslog
++output.vcd
++output.smtc
+diff --git a/scripts/smtbmc/notrap_validop.sh b/scripts/smtbmc/notrap_validop.sh
+new file mode 100644
+index 0000000..10a7ca5
+--- /dev/null
++++ b/scripts/smtbmc/notrap_validop.sh
+@@ -0,0 +1,13 @@
++#!/bin/bash
++
++set -ex
++
++yosys -ql notrap_validop.yslog \
++        -p 'read_verilog -formal -norestrict -assume-asserts ../../picorv32.v' \
++        -p 'read_verilog -formal notrap_validop.v' \
++	-p 'prep -top testbench -nordff' \
++	-p 'write_smt2 -mem -bv -wires notrap_validop.smt2'
++
++#yosys-smtbmc -s yices -t 50 --dump-vcd output.vcd --dump-smtc output.smtc notrap_validop.smt2
++yosys-smtbmc -s yices -i -t 27 --dump-vcd output.vcd --dump-smtc output.smtc notrap_validop.smt2
++
+diff --git a/scripts/smtbmc/notrap_validop.v b/scripts/smtbmc/notrap_validop.v
+new file mode 100644
+index 0000000..8e50304
+--- /dev/null
++++ b/scripts/smtbmc/notrap_validop.v
+@@ -0,0 +1,67 @@
++module testbench(input clk, mem_ready);
++	`include "opcode.v"
++
++	reg resetn = 0;
++	always @(posedge clk) resetn <= 1;
++
++	(* keep *) wire trap, mem_valid, mem_instr;
++	(* keep *) wire [3:0] mem_wstrb;
++	(* keep *) wire [31:0] mem_addr, mem_wdata, mem_rdata;
++	(* keep *) wire [35:0] trace_data;
++
++	reg [31:0] mem [0:2**30-1];
++
++	assign mem_rdata = mem[mem_addr >> 2];
++
++	always @(posedge clk) begin
++		if (resetn && mem_valid && mem_ready) begin
++			if (mem_wstrb[3]) mem[mem_addr >> 2][31:24] <= mem_wdata[31:24];
++			if (mem_wstrb[2]) mem[mem_addr >> 2][23:16] <= mem_wdata[23:16];
++			if (mem_wstrb[1]) mem[mem_addr >> 2][15: 8] <= mem_wdata[15: 8];
++			if (mem_wstrb[0]) mem[mem_addr >> 2][ 7: 0] <= mem_wdata[ 7: 0];
++		end
++	end
++
++	reg [1:0] mem_ready_stall = 0;
++
++	always @(posedge clk) begin
++		mem_ready_stall <= {mem_ready_stall, mem_valid && !mem_ready};
++		restrict(&mem_ready_stall == 0);
++
++		if (mem_instr && mem_ready && mem_valid) begin
++			assume(opcode_valid(mem_rdata));
++			assume(!opcode_branch(mem_rdata));
++			assume(!opcode_load(mem_rdata));
++			assume(!opcode_store(mem_rdata));
++		end
++
++		if (!mem_valid)
++			assume(!mem_ready);
++
++		if (resetn)
++			assert(!trap);
++	end
++
++	picorv32 #(
++		// change this settings as you like
++		.ENABLE_REGS_DUALPORT(1),
++		.TWO_STAGE_SHIFT(1),
++		.BARREL_SHIFTER(0),
++		.TWO_CYCLE_COMPARE(0),
++		.TWO_CYCLE_ALU(0),
++		.COMPRESSED_ISA(0),
++		.ENABLE_MUL(0),
++		.ENABLE_DIV(0)
++	) cpu (
++		.clk         (clk        ),
++		.resetn      (resetn     ),
++		.trap        (trap       ),
++		.mem_valid   (mem_valid  ),
++		.mem_instr   (mem_instr  ),
++		.mem_ready   (mem_ready  ),
++		.mem_addr    (mem_addr   ),
++		.mem_wdata   (mem_wdata  ),
++		.mem_wstrb   (mem_wstrb  ),
++		.mem_rdata   (mem_rdata  )
++	);
++endmodule
+diff --git a/scripts/smtbmc/opcode.v b/scripts/smtbmc/opcode.v
+new file mode 100644
+index 0000000..4c3792d
+--- /dev/null
++++ b/scripts/smtbmc/opcode.v
+@@ -0,0 +1,104 @@
++function opcode_jump;
++	input [31:0] opcode;
++	begin
++		opcode_jump = 0;
++		if (opcode[6:0] == 7'b1101111) opcode_jump = 1; // JAL
++		if (opcode[14:12] == 3'b000 && opcode[6:0] == 7'b1100111) opcode_jump = 1; // JALR
++	end
++endfunction
++
++function opcode_branch;
++	input [31:0] opcode;
++	begin
++		opcode_branch = 0;
++		if (opcode[14:12] == 3'b000 && opcode[6:0] == 7'b1100011) opcode_branch = 1; // BEQ
++		if (opcode[14:12] == 3'b001 && opcode[6:0] == 7'b1100011) opcode_branch = 1; // BNE
++		if (opcode[14:12] == 3'b100 && opcode[6:0] == 7'b1100011) opcode_branch = 1; // BLT
++		if (opcode[14:12] == 3'b101 && opcode[6:0] == 7'b1100011) opcode_branch = 1; // BGE
++		if (opcode[14:12] == 3'b110 && opcode[6:0] == 7'b1100011) opcode_branch = 1; // BLTU
++		if (opcode[14:12] == 3'b111 && opcode[6:0] == 7'b1100011) opcode_branch = 1; // BGEU
++	end
++endfunction
++
++function opcode_load;
++	input [31:0] opcode;
++	begin
++		opcode_load = 0;
++		if (opcode[14:12] == 3'b000 && opcode[6:0] == 7'b0000011) opcode_load = 1; // LB
++		if (opcode[14:12] == 3'b001 && opcode[6:0] == 7'b0000011) opcode_load = 1; // LH
++		if (opcode[14:12] == 3'b010 && opcode[6:0] == 7'b0000011) opcode_load = 1; // LW
++		if (opcode[14:12] == 3'b100 && opcode[6:0] == 7'b0000011) opcode_load = 1; // LBU
++		if (opcode[14:12] == 3'b101 && opcode[6:0] == 7'b0000011) opcode_load = 1; // LHU
++	end
++endfunction
++
++function opcode_store;
++	input [31:0] opcode;
++	begin
++		opcode_store = 0;
++		if (opcode[14:12] == 3'b000 && opcode[6:0] == 7'b0100011) opcode_store = 1; // SB
++		if (opcode[14:12] == 3'b001 && opcode[6:0] == 7'b0100011) opcode_store = 1; // SH
++		if (opcode[14:12] == 3'b010 && opcode[6:0] == 7'b0100011) opcode_store = 1; // SW
++	end
++endfunction
++
++function opcode_alui;
++	input [31:0] opcode;
++	begin
++		opcode_alui = 0;
++		if (opcode[14:12] == 3'b000 && opcode[6:0] == 7'b0010011) opcode_alui = 1; // ADDI
++		if (opcode[14:12] == 3'b010 && opcode[6:0] == 7'b0010011) opcode_alui = 1; // SLTI
++		if (opcode[14:12] == 3'b011 && opcode[6:0] == 7'b0010011) opcode_alui = 1; // SLTIU
++		if (opcode[14:12] == 3'b100 && opcode[6:0] == 7'b0010011) opcode_alui = 1; // XORI
++		if (opcode[14:12] == 3'b110 && opcode[6:0] == 7'b0010011) opcode_alui = 1; // ORI
++		if (opcode[14:12] == 3'b111 && opcode[6:0] == 7'b0010011) opcode_alui = 1; // ANDI
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b001 && opcode[6:0] == 7'b0010011) opcode_alui = 1; // SLLI
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b101 && opcode[6:0] == 7'b0010011) opcode_alui = 1; // SRLI
++		if (opcode[31:25] == 7'b0100000 && opcode[14:12] == 3'b101 && opcode[6:0] == 7'b0010011) opcode_alui = 1; // SRAI
++	end
++endfunction
++
++function opcode_alu;
++	input [31:0] opcode;
++	begin
++		opcode_alu = 0;
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b000 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // ADD
++		if (opcode[31:25] == 7'b0100000 && opcode[14:12] == 3'b000 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // SUB
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b001 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // SLL
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b010 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // SLT
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b011 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // SLTU
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b100 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // XOR
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b101 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // SRL
++		if (opcode[31:25] == 7'b0100000 && opcode[14:12] == 3'b101 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // SRA
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b110 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // OR
++		if (opcode[31:25] == 7'b0000000 && opcode[14:12] == 3'b111 && opcode[6:0] == 7'b0110011) opcode_alu = 1; // AND
++	end
++endfunction
++
++function opcode_sys;
++	input [31:0] opcode;
++	begin
++		opcode_sys = 0;
++		if (opcode[31:20] == 12'hC00 && opcode[19:12] == 3'b010 && opcode[6:0] == 7'b1110011) opcode_sys = 1; // RDCYCLE
++		if (opcode[31:20] == 12'hC01 && opcode[19:12] == 3'b010 && opcode[6:0] == 7'b1110011) opcode_sys = 1; // RDTIME
++		if (opcode[31:20] == 12'hC02 && opcode[19:12] == 3'b010 && opcode[6:0] == 7'b1110011) opcode_sys = 1; // RDINSTRET
++		if (opcode[31:20] == 12'hC80 && opcode[19:12] == 3'b010 && opcode[6:0] == 7'b1110011) opcode_sys = 1; // RDCYCLEH
++		if (opcode[31:20] == 12'hC81 && opcode[19:12] == 3'b010 && opcode[6:0] == 7'b1110011) opcode_sys = 1; // RDTIMEH
++		if (opcode[31:20] == 12'hC82 && opcode[19:12] == 3'b010 && opcode[6:0] == 7'b1110011) opcode_sys = 1; // RDINSTRETH
++	end
++	
++endfunction
++
++function opcode_valid;
++	input [31:0] opcode;
++	begin
++		opcode_valid = 0;
++		if (opcode_jump  (opcode)) opcode_valid = 1;
++		if (opcode_branch(opcode)) opcode_valid = 1;
++		if (opcode_load  (opcode)) opcode_valid = 1;
++		if (opcode_store (opcode)) opcode_valid = 1;
++		if (opcode_alui  (opcode)) opcode_valid = 1;
++		if (opcode_alu   (opcode)) opcode_valid = 1;
++		if (opcode_sys   (opcode)) opcode_valid = 1;
++	end
++endfunction
+diff --git a/scripts/smtbmc/tracecmp.gtkw b/scripts/smtbmc/tracecmp.gtkw
+index 5f0e578..09dd9b2 100644
+--- a/scripts/smtbmc/tracecmp.gtkw
++++ b/scripts/smtbmc/tracecmp.gtkw
+@@ -2,7 +2,7 @@
+ [*] GTKWave Analyzer v3.3.65 (w)1999-2015 BSI
+ [*] Fri Aug 26 15:42:37 2016
+ [*]
+-[dumpfile] "/home/clifford/Work/picorv32/scripts/smtbmc/tracecmp.vcd"
++[dumpfile] "/home/clifford/Work/picorv32/scripts/smtbmc/output.vcd"
+ [dumpfile_mtime] "Fri Aug 26 15:33:18 2016"
+ [dumpfile_size] 80106
+ [savefile] "/home/clifford/Work/picorv32/scripts/smtbmc/tracecmp.gtkw"
+diff --git a/scripts/smtbmc/tracecmp.sh b/scripts/smtbmc/tracecmp.sh
+index 4520082..6f471bd 100644
+--- a/scripts/smtbmc/tracecmp.sh
++++ b/scripts/smtbmc/tracecmp.sh
+@@ -8,5 +8,5 @@ yosys -ql tracecmp.yslog \
+ 	-p 'prep -top testbench -nordff' \
+ 	-p 'write_smt2 -mem -bv -wires tracecmp.smt2'
+ 
+-yosys-smtbmc -s yices --smtc tracecmp.smtc --dump-vcd tracecmp.vcd tracecmp.smt2
++yosys-smtbmc -s yices --smtc tracecmp.smtc --dump-vcd output.vcd --dump-smtc output.smtc tracecmp.smt2
+ 
+diff --git a/README.md b/README.md
+index 3087e92..2356da1 100644
+--- a/README.md
++++ b/README.md
+@@ -625,7 +625,7 @@ pure RV32I target, and install it in `/opt/riscv32i`:
+     # Ubuntu packages needed:
+     sudo apt-get install autoconf automake autotools-dev curl libmpc-dev \
+             libmpfr-dev libgmp-dev gawk build-essential bison flex texinfo \
+-	    gperf libtool patchutils bc zlib1g-dev git libexpt1-dev
++	    gperf libtool patchutils bc zlib1g-dev git libexpat1-dev
+ 
+     sudo mkdir /opt/riscv32i
+     sudo chown $USER /opt/riscv32i

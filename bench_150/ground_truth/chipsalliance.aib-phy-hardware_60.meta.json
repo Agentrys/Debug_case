@@ -1,0 +1,37 @@
+{
+  "case_id": "chipsalliance.aib-phy-hardware#60",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "aib-phy-hardware"
+  },
+  "fix_repo": {
+    "owner": "chipsalliance",
+    "name": "aib-phy-hardware"
+  },
+  "fix_oid": "13a9ddbdd1c56534e9d026b4eea8ee3a9a57efe0",
+  "buggy_commit_sha": "c7314ce4f77e159813fc567e7e20ba62c5a6f3aa",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/chipsalliance.aib-phy-hardware_60.diff",
+  "diff_sha256": "14ccc0115decb267e148066367bcf4a1df427e4d522bdc1a542e9a0326bb67b1",
+  "fix_oids_sorted": [
+    "13a9ddbdd1c56534e9d026b4eea8ee3a9a57efe0"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "v2.0/rev1/rtl/aib_channel.v"
+  ],
+  "ground_truth_hunks": {
+    "v2.0/rev1/rtl/aib_channel.v": [
+      [
+        181,
+        187
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/chipsalliance.aib-phy-hardware_60.raw.diff"
+}

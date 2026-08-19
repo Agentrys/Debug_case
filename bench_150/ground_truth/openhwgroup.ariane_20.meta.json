@@ -1,0 +1,126 @@
+{
+  "case_id": "openhwgroup.ariane#20",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_oid": "35105da7346d3e8c9f6872458330aee76e9281aa",
+  "buggy_commit_sha": "2f4b412d2086bf96e0012f2d864d6bafbc76439a",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openhwgroup.ariane_20.diff",
+  "diff_sha256": "e1425bfaadd3b121b45054f8fb0a867f99ac3aea572cd653641b28aff54547b3",
+  "fix_oids_sorted": [
+    "35105da7346d3e8c9f6872458330aee76e9281aa",
+    "f4b81776b8b933b064670b978f75aeda7791c4e4",
+    "78e6408e8e3d95e87d555b44a5ba80da6888fbc2",
+    "97131abaaac3b443f5f01d4c0c712646afd51898",
+    "87bea449e481f4ae457349274cc92df6d7b78c92",
+    "f7756dedbb01399e64685e045e73b63831e2f9db"
+  ],
+  "n_fix_commits": 6,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/miss_handler.sv",
+    "piton/design/chipset/mc/rtl/mc_top.v",
+    "piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge.v",
+    "vendor/planv/ace/src/ace_ccu_top.sv",
+    "vendor/planv/ace/src/ccu_fsm.sv"
+  ],
+  "ground_truth_hunks": {
+    "src/miss_handler.sv": [
+      [
+        684,
+        690
+      ],
+      [
+        684,
+        690
+      ],
+      [
+        684,
+        690
+      ],
+      [
+        684,
+        690
+      ]
+    ],
+    "piton/design/chipset/mc/rtl/mc_top.v": [
+      [
+        228,
+        233
+      ],
+      [
+        358,
+        363
+      ]
+    ],
+    "piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge.v": [
+      [
+        0,
+        0
+      ]
+    ],
+    "vendor/planv/ace/src/ace_ccu_top.sv": [
+      [
+        198,
+        208
+      ]
+    ],
+    "vendor/planv/ace/src/ccu_fsm.sv": [
+      [
+        3,
+        9
+      ],
+      [
+        139,
+        148
+      ],
+      [
+        157,
+        167
+      ],
+      [
+        180,
+        186
+      ],
+      [
+        361,
+        369
+      ],
+      [
+        403,
+        409
+      ],
+      [
+        459,
+        465
+      ],
+      [
+        506,
+        519
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "piton/design/chipset/include/mc_define.h",
+    "piton/design/chipset/mc/xilinx/vc707/ip_cores/mig_7series_axi4/mig_7series_axi4.xci",
+    "piton/design/chipset/mc/xilinx/vc707/ip_cores/mig_7series_axi4/mig_a.prj",
+    "piton/design/chipset/mc/xilinx/vc707/ip_cores/mig_7series_axi4/mig_b.prj",
+    "piton/design/chipset/noc_axi4_bridge/rtl/Flist.noc_axi4_bridge",
+    "piton/design/xilinx/design.tcl",
+    "piton/tools/src/proto/common/rtl_setup.tcl",
+    "piton/tools/src/proto/protosyn,2.5",
+    "corev_apu/tb/tb_std_cache_subsystem/hdl/tb_ace_ccu_pkg.sv",
+    "vendor/planv_ace.lock.hjson",
+    "vendor/planv_ace.vendor.hjson"
+  ],
+  "raw_diff_path": "ground_truth/openhwgroup.ariane_20.raw.diff"
+}

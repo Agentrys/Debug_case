@@ -1,0 +1,63 @@
+diff --git a/Makefrag-variables b/Makefrag-variables
+index b12ccee..df94492 100644
+--- a/Makefrag-variables
++++ b/Makefrag-variables
+@@ -17,9 +17,9 @@ TB ?= TestDriver
+ 
+ long_name = $(PROJECT).$(MODEL).$(CONFIG)
+ 
+-SBT ?= java -Xmx2G -Xss8M -jar $(ROCKETCHIP_DIR)/sbt-launch.jar
++SBT ?= java -Xmx2G -Xss8M -jar $(ROCKETCHIP_DIR)/sbt-launch.jar ++2.12.4
+ 
+-ROCKET_CLASSES ?= "$(ROCKETCHIP_DIR)/target/scala-2.11/classes:$(ROCKETCHIP_DIR)/chisel3/target/scala-2.11/*"
++ROCKET_CLASSES ?= "$(ROCKETCHIP_DIR)/target/scala-2.12/classes:$(ROCKETCHIP_DIR)/chisel3/target/scala-2.12/*"
+ FIRRTL_JAR ?= $(ROCKETCHIP_DIR)/firrtl/utils/bin/firrtl.jar
+ FIRRTL ?= java -Xmx2G -Xss8M -cp "$(FIRRTL_JAR)":"$(ROCKET_CLASSES)" firrtl.Driver
+ 
+diff --git a/boom b/boom
+index ea0ef4e..fa2c2c5 160000
+--- a/boom
++++ b/boom
+@@ -1 +1 @@
+-Subproject commit ea0ef4e135452f22bbe6abf5d98351bd22c846bc
++Subproject commit fa2c2c570346df10f55080260da94e5285072f36
+diff --git a/build.sbt b/build.sbt
+index 810eb21..e6d9596 100644
+--- a/build.sbt
++++ b/build.sbt
+@@ -4,4 +4,6 @@ version := "1.0"
+ 
+ name := "boom-template"
+ 
+-scalaVersion := "2.11.7"
++scalaVersion := "2.12.4"
++
++scalacOptions ++= Seq("-Xsource:2.11")
+\ No newline at end of file
+diff --git a/generate-pkg-mk.sh b/generate-pkg-mk.sh
+index dd41389..ecc4206 100755
+--- a/generate-pkg-mk.sh
++++ b/generate-pkg-mk.sh
+@@ -10,7 +10,7 @@ ${base_dir}/lib/${pkg}.stamp: \$(call lookup_scala_srcs, ${pkg_dir}) \$(rocketch
+ 	rm -f ${pkg_dir}/lib
+ 	ln -s ${base_dir}/lib ${pkg_dir}/lib
+ 	cd ${pkg_dir} && \$(SBT) package
+-	cp ${pkg_dir}/target/scala-2.11/*.jar ${base_dir}/lib
++	cp ${pkg_dir}/target/scala-2.12/*.jar ${base_dir}/lib
+ 	touch \$@
+ MAKE
+ done
+diff --git a/rocket-chip b/rocket-chip
+index 5d7a0e7..b8a67a4 160000
+--- a/rocket-chip
++++ b/rocket-chip
+@@ -1 +1 @@
+-Subproject commit 5d7a0e7c42278e523d68f980bf6d1c9674f6bdab
++Subproject commit b8a67a41068b7f7bfe421c35b0cc613cdb2e6b50
+diff --git a/icenet b/icenet
+index 550fd1b..8783059 160000
+--- a/icenet
++++ b/icenet
+@@ -1 +1 @@
+-Subproject commit 550fd1b20dd25847b195e5745c51251d38d8078c
++Subproject commit 87830592ec56854e59bfbf7b9b5728be413a5705

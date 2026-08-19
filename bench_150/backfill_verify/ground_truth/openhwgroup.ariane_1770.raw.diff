@@ -1,0 +1,469 @@
+diff --git a/cva6/env/uvme/uvme_cva6_cfg.sv b/cva6/env/uvme/uvme_cva6_cfg.sv
+index 3d900b7d..0a1d9f7e 100644
+--- a/cva6/env/uvme/uvme_cva6_cfg.sv
++++ b/cva6/env/uvme/uvme_cva6_cfg.sv
+@@ -132,7 +132,6 @@ class uvme_cva6_cfg_c extends uvma_core_cntrl_cfg_c;
+       }
+       if (is_active == UVM_ACTIVE) {
+          clknrst_cfg.is_active   == UVM_ACTIVE;
+-         axi_cfg.is_active       == UVM_ACTIVE;
+       }
+ 
+       if (trn_log_enabled) {
+diff --git a/cva6/env/uvme/uvme_cva6_env.sv b/cva6/env/uvme/uvme_cva6_env.sv
+index a3052c5e..12009f3b 100644
+--- a/cva6/env/uvme/uvme_cva6_env.sv
++++ b/cva6/env/uvme/uvme_cva6_env.sv
+@@ -44,6 +44,10 @@ class uvme_cva6_env_c extends uvm_env;
+    uvma_axi_agent_c       axi_agent;
+    uvma_cva6_core_cntrl_agent_c core_cntrl_agent;
+ 
++   // Handle to agent switch interface
++   virtual uvmt_axi_switch_intf  axi_switch_vif;
++
++
+ 
+    `uvm_component_utils_begin(uvme_cva6_env_c)
+       `uvm_field_object(cfg  , UVM_DEFAULT)
+@@ -80,6 +84,11 @@ class uvme_cva6_env_c extends uvm_env;
+     */
+    extern virtual task run_phase(uvm_phase phase);
+ 
++   /**
++    * Get switch vif and set signals values
++    */
++   extern function void retrieve_vif();
++
+    /**
+     * Assigns configuration handles to components using UVM Configuration Database.
+     */
+@@ -154,6 +163,7 @@ function void uvme_cva6_env_c::build_phase(uvm_phase phase);
+          cntxt = uvme_cva6_cntxt_c::type_id::create("cntxt");
+       end
+ 
++      retrieve_vif();
+       assign_cfg           ();
+       assign_cntxt         ();
+       create_agents        ();
+@@ -249,6 +259,22 @@ function void uvme_cva6_env_c::create_vsequencer();
+ 
+ endfunction: create_vsequencer
+ 
++function void uvme_cva6_env_c::retrieve_vif();
++
++   if (!uvm_config_db#(virtual uvmt_axi_switch_intf)::get(this, "", "axi_switch_vif", axi_switch_vif)) begin
++      `uvm_fatal("VIF", $sformatf("Could not find vif handle of type %s in uvm_config_db", $typename(axi_switch_vif)))
++   end
++   else begin
++      `uvm_info("VIF", $sformatf("Found vif handle of type %s in uvm_config_db", $typename(axi_switch_vif)), UVM_DEBUG)
++   end
++
++   if(cfg.axi_cfg.is_active == UVM_PASSIVE) begin
++      axi_switch_vif.active <= 0;
++   end else begin
++      axi_switch_vif.active <= 1;
++   end
++
++endfunction : retrieve_vif
+ 
+ function void uvme_cva6_env_c::connect_predictor();
+ 
+diff --git a/cva6/sim/cva6.py b/cva6/sim/cva6.py
+index 9627a710..d089da55 100644
+--- a/cva6/sim/cva6.py
++++ b/cva6/sim/cva6.py
+@@ -816,6 +816,8 @@ def setup_parser():
+                       help="custom configuration options, to be passed in config_pkg_generator.py in cva6")
+   parser.add_argument("-l", "--linker", type=str, default="",
+                       help="Path for the link.ld")
++  parser.add_argument("--axi_active", type=str, default="",
++                      help="switch AXI agent mode: yes for Active, no for Passive")
+   return parser
+ 
+ 
+@@ -931,7 +933,12 @@ def main():
+     parser = setup_parser()
+     args = parser.parse_args()
+     global issrun_opts
++    if args.axi_active == "yes":
++      args.issrun_opts = args.issrun_opts + " +uvm_set_config_int=*uvm_test_top,force_axi_mode,1"
++    elif args.axi_active == "no":
++      args.issrun_opts = args.issrun_opts + " +uvm_set_config_int=uvm_test_top,force_axi_mode,0"
+     issrun_opts = "\""+args.issrun_opts+"\""
++
+     global isspostrun_opts
+     isspostrun_opts = "\""+args.isspostrun_opts+"\""
+     global isscomp_opts
+diff --git a/cva6/tb/core/tb_components/axi_master_connect.sv b/cva6/tb/core/tb_components/axi_master_connect.sv
+index 55e1e260..e0e6502d 100644
+--- a/cva6/tb/core/tb_components/axi_master_connect.sv
++++ b/cva6/tb/core/tb_components/axi_master_connect.sv
+@@ -13,57 +13,45 @@
+ 
+ module axi_master_connect (
+     input  ariane_axi::req_t    axi_req_i,
+-    output ariane_axi::resp_t   axi_resp_o,
++    input  bit                  dis_mem,
+     AXI_BUS.Master master
+ );
+ 
+-    assign master.aw_id         = axi_req_i.aw.id;
+-    assign master.aw_addr       = axi_req_i.aw.addr;
+-    assign master.aw_len        = axi_req_i.aw.len;
+-    assign master.aw_size       = axi_req_i.aw.size;
+-    assign master.aw_burst      = axi_req_i.aw.burst;
+-    assign master.aw_lock       = axi_req_i.aw.lock;
+-    assign master.aw_cache      = axi_req_i.aw.cache;
+-    assign master.aw_prot       = axi_req_i.aw.prot;
+-    assign master.aw_qos        = axi_req_i.aw.qos;
+-    assign master.aw_atop       = axi_req_i.aw.atop;
+-    assign master.aw_region     = axi_req_i.aw.region;
+-    assign master.aw_user       = '0;
+-    assign master.aw_valid      = axi_req_i.aw_valid;
+-    assign axi_resp_o.aw_ready  = master.aw_ready;
++    assign master.aw_id         = dis_mem? '0 : axi_req_i.aw.id;
++    assign master.aw_addr       = dis_mem? '0 : axi_req_i.aw.addr;
++    assign master.aw_len        = dis_mem? '0 : axi_req_i.aw.len;
++    assign master.aw_size       = dis_mem? '0 : axi_req_i.aw.size;
++    assign master.aw_burst      = dis_mem? '0 : axi_req_i.aw.burst;
++    assign master.aw_lock       = dis_mem? '0 : axi_req_i.aw.lock;
++    assign master.aw_cache      = dis_mem? '0 : axi_req_i.aw.cache;
++    assign master.aw_prot       = dis_mem? '0 : axi_req_i.aw.prot;
++    assign master.aw_qos        = dis_mem? '0 : axi_req_i.aw.qos;
++    assign master.aw_atop       = dis_mem? '0 : axi_req_i.aw.atop;
++    assign master.aw_region     = dis_mem? '0 : axi_req_i.aw.region;
++    assign master.aw_user       = dis_mem? '0 : '0;
++    assign master.aw_valid      = dis_mem? '0 : axi_req_i.aw_valid;
+ 
+-    assign master.w_data        = axi_req_i.w.data;
+-    assign master.w_strb        = axi_req_i.w.strb;
+-    assign master.w_last        = axi_req_i.w.last;
+-    assign master.w_user        = axi_req_i.w.user;
+-    assign master.w_valid       = axi_req_i.w_valid;
+-    assign axi_resp_o.w_ready   = master.w_ready;
++    assign master.w_data        = dis_mem? '0 : axi_req_i.w.data;
++    assign master.w_strb        = dis_mem? '0 : axi_req_i.w.strb;
++    assign master.w_last        = dis_mem? '0 : axi_req_i.w.last;
++    assign master.w_user        = dis_mem? '0 : axi_req_i.w.user;
++    assign master.w_valid       = dis_mem? '0 : axi_req_i.w_valid;
+ 
+-    assign axi_resp_o.b.id      = master.b_id;
+-    assign axi_resp_o.b.resp    = master.b_resp;
+-    assign axi_resp_o.b_valid   = master.b_valid;
+-    assign master.b_ready       = axi_req_i.b_ready;
++    assign master.b_ready       = dis_mem? '0 : axi_req_i.b_ready;
+ 
+-    assign master.ar_id         = axi_req_i.ar.id;
+-    assign master.ar_addr       = axi_req_i.ar.addr;
+-    assign master.ar_len        = axi_req_i.ar.len;
+-    assign master.ar_size       = axi_req_i.ar.size;
+-    assign master.ar_burst      = axi_req_i.ar.burst;
+-    assign master.ar_lock       = axi_req_i.ar.lock;
+-    assign master.ar_cache      = axi_req_i.ar.cache;
+-    assign master.ar_prot       = axi_req_i.ar.prot;
+-    assign master.ar_qos        = axi_req_i.ar.qos;
+-    assign master.ar_region     = axi_req_i.ar.region;
+-    assign master.ar_user       = '0;
+-    assign master.ar_valid      = axi_req_i.ar_valid;
+-    assign axi_resp_o.ar_ready  = master.ar_ready;
++    assign master.ar_id         = dis_mem? '0 : axi_req_i.ar.id;
++    assign master.ar_addr       = dis_mem? '0 : axi_req_i.ar.addr;
++    assign master.ar_len        = dis_mem? '0 : axi_req_i.ar.len;
++    assign master.ar_size       = dis_mem? '0 : axi_req_i.ar.size;
++    assign master.ar_burst      = dis_mem? '0 : axi_req_i.ar.burst;
++    assign master.ar_lock       = dis_mem? '0 : axi_req_i.ar.lock;
++    assign master.ar_cache      = dis_mem? '0 : axi_req_i.ar.cache;
++    assign master.ar_prot       = dis_mem? '0 : axi_req_i.ar.prot;
++    assign master.ar_qos        = dis_mem? '0 : axi_req_i.ar.qos;
++    assign master.ar_region     = dis_mem? '0 : axi_req_i.ar.region;
++    assign master.ar_user       = dis_mem? '0 : '0;
++    assign master.ar_valid      = dis_mem? '0 : axi_req_i.ar_valid;
+ 
+-    assign axi_resp_o.r.id      = master.r_id;
+-    assign axi_resp_o.r.data    = master.r_data;
+-    assign axi_resp_o.r.user    = master.r_user;
+-    assign axi_resp_o.r.resp    = master.r_resp;
+-    assign axi_resp_o.r.last    = master.r_last;
+-    assign axi_resp_o.r_valid   = master.r_valid;
+-    assign master.r_ready       = axi_req_i.r_ready;
++    assign master.r_ready       = dis_mem? '0 : axi_req_i.r_ready;
+ 
+-endmodule
+\ No newline at end of file
++endmodule
+diff --git a/cva6/tb/uvmt/cva6_tb_wrapper.sv b/cva6/tb/uvmt/cva6_tb_wrapper.sv
+index 92a36af0..5bede3ff 100644
+--- a/cva6/tb/uvmt/cva6_tb_wrapper.sv
++++ b/cva6/tb/uvmt/cva6_tb_wrapper.sv
+@@ -50,7 +50,8 @@ module cva6_tb_wrapper
+   output ariane_pkg::rvfi_port_t       rvfi_o,
+   input  cvxif_pkg::cvxif_resp_t       cvxif_resp,
+   output cvxif_pkg::cvxif_req_t        cvxif_req,
+-  uvma_axi_intf                        axi_slave
++  uvma_axi_intf                        axi_slave,
++  uvmt_axi_switch_intf                 axi_switch_vif
+ );
+ 
+   ariane_axi::req_t    axi_ariane_req;
+@@ -110,21 +111,37 @@ module cva6_tb_wrapper
+   logic [AXI_USER_WIDTH-1:0]    ruser;
+ 
+   //Response structs
+-   assign axi_ariane_resp.aw_ready = axi_slave.aw_ready;
+-   assign axi_ariane_resp.ar_ready = axi_slave.ar_ready;
+-   assign axi_ariane_resp.w_ready  = axi_slave.w_ready;
+-   assign axi_ariane_resp.b_valid  = axi_slave.b_valid;
+-   assign axi_ariane_resp.r_valid  = axi_slave.r_valid;
++   assign axi_ariane_resp.aw_ready = (axi_switch_vif.active) ? axi_slave.aw_ready : cva6_axi_bus.aw_ready;
++   assign axi_ariane_resp.ar_ready = (axi_switch_vif.active) ? axi_slave.ar_ready : cva6_axi_bus.ar_ready;
++   assign axi_ariane_resp.w_ready  = (axi_switch_vif.active) ? axi_slave.w_ready  : cva6_axi_bus.w_ready;
++   assign axi_ariane_resp.b_valid  = (axi_switch_vif.active) ? axi_slave.b_valid  : cva6_axi_bus.b_valid;
++   assign axi_ariane_resp.r_valid  = (axi_switch_vif.active) ? axi_slave.r_valid  : cva6_axi_bus.r_valid;
+    // B Channel
+-   assign axi_ariane_resp.b.id   = axi_slave.b_id;
+-   assign axi_ariane_resp.b.resp = axi_slave.b_resp;
+-   assign axi_ariane_resp.b.user = axi_slave.b_user;
++   assign axi_ariane_resp.b.id   = (axi_switch_vif.active) ? axi_slave.b_id   : cva6_axi_bus.b_id;
++   assign axi_ariane_resp.b.resp = (axi_switch_vif.active) ? axi_slave.b_resp : cva6_axi_bus.b_resp;
++   assign axi_ariane_resp.b.user = (axi_switch_vif.active) ? axi_slave.b_user : cva6_axi_bus.b_user;
+    // R Channel
+-   assign axi_ariane_resp.r.id   = axi_slave.r_id;
+-   assign axi_ariane_resp.r.data = axi_slave.r_data;
+-   assign axi_ariane_resp.r.resp = axi_slave.r_resp;
+-   assign axi_ariane_resp.r.last = axi_slave.r_last;
+-   assign axi_ariane_resp.r.user = axi_slave.r_user;
++   assign axi_ariane_resp.r.id   = (axi_switch_vif.active) ? axi_slave.r_id   : cva6_axi_bus.r_id;
++   assign axi_ariane_resp.r.data = (axi_switch_vif.active) ? axi_slave.r_data : cva6_axi_bus.r_data;
++   assign axi_ariane_resp.r.resp = (axi_switch_vif.active) ? axi_slave.r_resp : cva6_axi_bus.r_resp;
++   assign axi_ariane_resp.r.last = (axi_switch_vif.active) ? axi_slave.r_last : cva6_axi_bus.r_last;
++   assign axi_ariane_resp.r.user = (axi_switch_vif.active) ? axi_slave.r_user : cva6_axi_bus.r_user;
++
++   assign axi_slave.aw_ready  = (axi_switch_vif.active) ? axi_slave.aw_ready : cva6_axi_bus.aw_ready;
++   assign axi_slave.ar_ready  = (axi_switch_vif.active) ? axi_slave.ar_ready : cva6_axi_bus.ar_ready;
++   assign axi_slave.w_ready   = (axi_switch_vif.active) ? axi_slave.w_ready  : cva6_axi_bus.w_ready;
++   assign axi_slave.b_valid   = (axi_switch_vif.active) ? axi_slave.b_valid  : cva6_axi_bus.b_valid;
++   assign axi_slave.r_valid   = (axi_switch_vif.active) ? axi_slave.r_valid  : cva6_axi_bus.r_valid;
++
++   assign axi_slave.b_id      = (axi_switch_vif.active) ? axi_slave.b_id   : cva6_axi_bus.b_id;
++   assign axi_slave.b_resp    = (axi_switch_vif.active) ? axi_slave.b_resp : cva6_axi_bus.b_resp;
++   assign axi_slave.b_user    = (axi_switch_vif.active) ? axi_slave.b_user : cva6_axi_bus.b_user;
++
++   assign axi_slave.r_id      = (axi_switch_vif.active) ? axi_slave.r_id   : cva6_axi_bus.r_id;
++   assign axi_slave.r_data    = (axi_switch_vif.active) ? axi_slave.r_data : cva6_axi_bus.r_data;
++   assign axi_slave.r_resp    = (axi_switch_vif.active) ? axi_slave.r_resp : cva6_axi_bus.r_resp;
++   assign axi_slave.r_last    = (axi_switch_vif.active) ? axi_slave.r_last : cva6_axi_bus.r_last;
++   assign axi_slave.r_user    = (axi_switch_vif.active) ? axi_slave.r_user : cva6_axi_bus.r_user;
+ 
+    // Request structs
+    assign axi_slave.aw_valid = axi_ariane_req.aw_valid;
+@@ -163,4 +180,93 @@ module cva6_tb_wrapper
+    assign axi_slave.ar_user   = 0;
+ 
+ 
++  AXI_BUS #(
++    .AXI_ADDR_WIDTH ( AXI_ADDRESS_WIDTH        ),
++    .AXI_DATA_WIDTH ( AXI_DATA_WIDTH           ),
++    .AXI_ID_WIDTH   ( ariane_soc::IdWidthSlave ),
++    .AXI_USER_WIDTH ( AXI_USER_WIDTH           )
++  ) cva6_axi_bus();
++
++  axi_master_connect #(
++  ) i_axi_master_connect_cva6_to_mem (
++    .axi_req_i  (axi_ariane_req),
++    .dis_mem    (axi_switch_vif.active),
++    .master     (cva6_axi_bus)
++  );
++
++  axi2mem #(
++    .AXI_ID_WIDTH   ( ariane_soc::IdWidthSlave ),
++    .AXI_ADDR_WIDTH ( AXI_ADDRESS_WIDTH        ),
++    .AXI_DATA_WIDTH ( AXI_DATA_WIDTH           ),
++    .AXI_USER_WIDTH ( AXI_USER_WIDTH           )
++  ) i_cva6_axi2mem (
++    .clk_i  ( clk_i       ),
++    .rst_ni ( rst_ni      ),
++    .slave  ( cva6_axi_bus ),
++    .req_o  ( req          ),
++    .we_o   ( we           ),
++    .addr_o ( addr         ),
++    .be_o   ( be           ),
++    .user_o ( wuser        ),
++    .data_o ( wdata        ),
++    .user_i ( ruser        ),
++    .data_i ( rdata        )
++  );
++
++  sram #(
++    .USER_WIDTH ( AXI_USER_WIDTH ),
++    .DATA_WIDTH ( AXI_DATA_WIDTH ),
++    .USER_EN    ( AXI_USER_EN    ),
++    .SIM_INIT   ( "zeros"        ),
++    .NUM_WORDS  ( NUM_WORDS      )
++  ) i_sram (
++    .clk_i      ( clk_i                                                                       ),
++    .rst_ni     ( rst_ni                                                                      ),
++    .req_i      ( req                                                                         ),
++    .we_i       ( we                                                                          ),
++    .addr_i     ( addr[$clog2(NUM_WORDS)-1+$clog2(AXI_DATA_WIDTH/8):$clog2(AXI_DATA_WIDTH/8)] ),
++    .wuser_i    ( wuser                                                                       ),
++    .wdata_i    ( wdata                                                                       ),
++    .be_i       ( be                                                                          ),
++    .ruser_o    ( ruser                                                                       ),
++    .rdata_o    ( rdata                                                                       )
++  );
++
++    initial begin
++        wait (
++          !$isunknown(axi_switch_vif.active)
++        );
++        if(!axi_switch_vif.active) begin
++           automatic logic [7:0][7:0] mem_row;
++           longint address;
++           longint len;
++           byte buffer[];
++           void'(uvcl.get_arg_value("+PRELOAD=", binary));
++
++           if (binary != "") begin
++
++               void'(read_elf(binary));
++
++               wait(clk_i);
++
++               // while there are more sections to process
++               while (get_section(address, len)) begin
++                   automatic int num_words0 = (len+7)/8;
++                   `uvm_info( "Core Test", $sformatf("Loading Address: %x, Length: %x", address, len), UVM_LOW)
++                   buffer = new [num_words0*8];
++                   void'(read_section(address, buffer));
++                   // preload memories
++                   // 64-bit
++                   for (int i = 0; i < num_words0; i++) begin
++                       mem_row = '0;
++                       for (int j = 0; j < 8; j++) begin
++                           mem_row[j] = buffer[i*8 + j];
++                       end
++                       `MAIN_MEM((address[23:0] >> 3) + i) = mem_row;
++                   end
++               end
++           end
++        end
++    end
++
+ endmodule
+diff --git a/cva6/tb/uvmt/uvmt_axi_switch_intf.sv b/cva6/tb/uvmt/uvmt_axi_switch_intf.sv
+new file mode 100644
+index 00000000..6e9d9d61
+--- /dev/null
++++ b/cva6/tb/uvmt/uvmt_axi_switch_intf.sv
+@@ -0,0 +1,18 @@
++// Copyright 2022 Thales DIS SAS
++//
++// Licensed under the Solderpad Hardware Licence, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.0
++// You may obtain a copy of the License at https://solderpad.org/licenses/
++//
++// Original Author: Alae Eddine EZ ZEJJARI (alae-eddine.ez-zejjari@external.thalesgroup.com)
++
++/**** AXI interface to indicate the state of the agent ****/
++
++
++interface uvmt_axi_switch_intf;
++
++   logic        active;
++
++
++endinterface : uvmt_axi_switch_intf
+diff --git a/cva6/tb/uvmt/uvmt_cva6_dut_wrap.sv b/cva6/tb/uvmt/uvmt_cva6_dut_wrap.sv
+index 6a869f8a..1f026219 100644
+--- a/cva6/tb/uvmt/uvmt_cva6_dut_wrap.sv
++++ b/cva6/tb/uvmt/uvmt_cva6_dut_wrap.sv
+@@ -25,6 +25,7 @@ module uvmt_cva6_dut_wrap # ( parameter int unsigned AXI_USER_WIDTH    = 1,
+                             uvma_clknrst_if                     clknrst_if,
+                             uvma_cvxif_intf                     cvxif_if,
+                             uvma_axi_intf                       axi_if,
++                            uvmt_axi_switch_intf                axi_switch_vif,
+                             uvme_cva6_core_cntrl_if             core_cntrl_if,
+                             output logic[31:0]                  tb_exit_o,
+                             output ariane_pkg::rvfi_port_t      rvfi_o
+@@ -46,6 +47,7 @@ module uvmt_cva6_dut_wrap # ( parameter int unsigned AXI_USER_WIDTH    = 1,
+          .cvxif_resp             ( cvxif_if.cvxif_resp_o          ),
+          .cvxif_req              ( cvxif_if.cvxif_req_i           ),
+          .axi_slave              ( axi_if                         ),
++         .axi_switch_vif         ( axi_switch_vif                 ),
+          .tb_exit_o              ( tb_exit_o                      ),
+          .rvfi_o                 ( rvfi_o                         )
+ );
+diff --git a/cva6/tb/uvmt/uvmt_cva6_pkg.sv b/cva6/tb/uvmt/uvmt_cva6_pkg.sv
+index c388fe85..2135ad96 100644
+--- a/cva6/tb/uvmt/uvmt_cva6_pkg.sv
++++ b/cva6/tb/uvmt/uvmt_cva6_pkg.sv
+@@ -27,7 +27,7 @@
+ `include "uvml_logs_macros.sv"
+ `include "uvmt_cva6_macros.sv"
+ 
+-
++`include "uvmt_axi_switch_intf.sv"
+ 
+ /**
+  * Encapsulates all the types and test cases for the verification of an
+diff --git a/cva6/tb/uvmt/uvmt_cva6_tb.sv b/cva6/tb/uvmt/uvmt_cva6_tb.sv
+index 97550b34..e8b4d2e5 100644
+--- a/cva6/tb/uvmt/uvmt_cva6_tb.sv
++++ b/cva6/tb/uvmt/uvmt_cva6_tb.sv
+@@ -51,6 +51,7 @@ module uvmt_cva6_tb;
+                                          .clk(clknrst_if.clk),
+                                          .rst_n(clknrst_if.reset_n)
+                                       );
++   uvmt_axi_switch_intf         axi_switch_vif();
+    uvme_cva6_core_cntrl_if      core_cntrl_if();
+ 
+    //bind assertion module for cvxif interface
+@@ -85,6 +86,7 @@ module uvmt_cva6_tb;
+                     .clknrst_if(clknrst_if),
+                     .cvxif_if  (cvxif_if),
+                     .axi_if    (axi_if),
++                    .axi_switch_vif    (axi_switch_vif),
+                     .core_cntrl_if(core_cntrl_if),
+                     .tb_exit_o(rvfi_if.tb_exit_o),
+                     .rvfi_o(rvfi_if.rvfi_o)
+@@ -103,6 +105,7 @@ module uvmt_cva6_tb;
+      uvm_config_db#(virtual uvma_clknrst_if )::set(.cntxt(null), .inst_name("*.env.clknrst_agent"), .field_name("vif"),       .value(clknrst_if));
+      uvm_config_db#(virtual uvma_cvxif_intf )::set(.cntxt(null), .inst_name("*.env.cvxif_agent"),   .field_name("vif"),       .value(cvxif_if)  );
+      uvm_config_db#(virtual uvma_axi_intf   )::set(.cntxt(null), .inst_name("*"),                   .field_name("axi_vif"),    .value(axi_if));
++     uvm_config_db#(virtual uvmt_axi_switch_intf  )::set(.cntxt(null), .inst_name("*.env"),             .field_name("axi_switch_vif"),   .value(axi_switch_vif));
+      uvm_config_db#(virtual uvmt_rvfi_if    )::set(.cntxt(null), .inst_name("*"),                   .field_name("rvfi_vif"),  .value(rvfi_if));
+      uvm_config_db#(virtual uvme_cva6_core_cntrl_if)::set(.cntxt(null), .inst_name("*"), .field_name("core_cntrl_vif"),  .value(core_cntrl_if));
+ 
+diff --git a/cva6/tests/uvmt/base-tests/uvmt_cva6_base_test.sv b/cva6/tests/uvmt/base-tests/uvmt_cva6_base_test.sv
+index 23fc3634..c487d501 100644
+--- a/cva6/tests/uvmt/base-tests/uvmt_cva6_base_test.sv
++++ b/cva6/tests/uvmt/base-tests/uvmt_cva6_base_test.sv
+@@ -47,11 +47,15 @@ class uvmt_cva6_base_test_c extends uvm_test;
+    // Default sequences
+    rand uvme_cva6_reset_vseq_c  reset_vseq;
+ 
++   // Variable can be modified from command line, to change the AXI agent mode
++   int force_axi_mode = -1;
++
+ 
+    `uvm_component_utils_begin(uvmt_cva6_base_test_c)
+       `uvm_field_object(test_cfg , UVM_DEFAULT)
+       `uvm_field_object(env_cfg  , UVM_DEFAULT)
+       `uvm_field_object(env_cntxt, UVM_DEFAULT)
++      `uvm_field_int (force_axi_mode , UVM_DEFAULT)
+    `uvm_component_utils_end
+ 
+ 
+@@ -61,6 +65,11 @@ class uvmt_cva6_base_test_c extends uvm_test;
+       env_cfg.trn_log_enabled == 1;
+    }
+ 
++   constraint axi_agent_cfg_cons {
++      force_axi_mode == -1  -> env_cfg.axi_cfg.is_active  == UVM_ACTIVE;
++      force_axi_mode != -1  -> env_cfg.axi_cfg.is_active  == uvm_active_passive_enum'(force_axi_mode);
++   }
++
+    constraint test_type_default_cons {
+      soft test_cfg.tpt == NO_TEST_PROGRAM;
+    }

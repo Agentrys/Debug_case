@@ -1,0 +1,77 @@
+{
+  "case_id": "chipsalliance.rocket-chip#3548",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "tymcauley",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "145356d28c70bdb5a3b1687af78a159414717d39",
+  "buggy_commit_sha": "74d65ca320cf5f296b39dc5218f6f099e08e2794",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_3548.diff",
+  "diff_sha256": "6ea7aeb113304287c70f994289f6347c8b2d8e19184fd4f010d83daa7d92d34d",
+  "fix_oids_sorted": [
+    "145356d28c70bdb5a3b1687af78a159414717d39",
+    "7f820d274136da439f378d61ca1f6e6e1268383f",
+    "1ec72d4c0804b3a463761129caf6bb203dd28caf",
+    "2a3bd4efd7cbdaf98e39096a9867170e1c5f36f6",
+    "04b33958fa4ef99c9ab9b66ed1aa7a2e040eb150"
+  ],
+  "n_fix_commits": 5,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/amba/axi4/Xbar.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/amba/axi4/Xbar.scala": [
+      [
+        85,
+        91
+      ],
+      [
+        168,
+        174
+      ],
+      [
+        85,
+        91
+      ],
+      [
+        168,
+        174
+      ],
+      [
+        85,
+        91
+      ],
+      [
+        168,
+        174
+      ],
+      [
+        85,
+        91
+      ],
+      [
+        168,
+        174
+      ],
+      [
+        85,
+        91
+      ],
+      [
+        168,
+        174
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_3548.raw.diff"
+}

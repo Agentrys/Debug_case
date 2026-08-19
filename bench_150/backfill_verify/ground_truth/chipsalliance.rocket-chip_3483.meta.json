@@ -1,0 +1,30 @@
+{
+  "case_id": "chipsalliance.rocket-chip#3483",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "litex-hub",
+    "name": "pythondata-cpu-rocket"
+  },
+  "fix_oid": "85e155f96d0b4a7c4098e1e5f6938eddff8105ec",
+  "buggy_commit_sha": "018e94119d8777f2934ce3fb3ba8b02947cacc33",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_3483.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "85e155f96d0b4a7c4098e1e5f6938eddff8105ec"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "pythondata_cpu_rocket/verilog/update.sh"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_3483.raw.diff"
+}

@@ -1,0 +1,34 @@
+{
+  "case_id": "enjoy-digital.litex#2492",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "TheRakeshPurohit",
+    "name": "litex"
+  },
+  "fix_oid": "9d2b0510ca3a8b37cd431b9ab6eb9229df994129",
+  "buggy_commit_sha": "274c1dff843246ae5f04fecf78e12e0a58c514bf",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_2492.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "9d2b0510ca3a8b37cd431b9ab6eb9229df994129"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/build/yosys_nextpnr_toolchain.py",
+    "litex/build/yosys_wrapper.py",
+    "litex/soc/cores/cpu/ibex/core.py",
+    "test/build/test_yosys_wrapper.py",
+    "test/cores/test_cpu_ibex.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_2492.raw.diff"
+}

@@ -1,0 +1,308 @@
+{
+  "_README": [
+    "Repo -> simulation build/test recipe map, consumed by run_all.py --enable-sim.",
+    "Keyed by the case's fix_repo 'owner/name' (case-INSENSITIVE) and also by the",
+    "short repo id used in bench_150 (e.g. 'openhwgroup.ariane'). run_all resolves a",
+    "case to an entry by trying, in order: exact 'owner/name', lowercased 'owner/name',",
+    "the bench 'repo' short id, then '_default'. A per-case override may live in the",
+    "case .meta.json under key 'sim_target' (a string test target) or 'sim_recipe'",
+    "(a full object like the ones below); those win over this map.",
+    "",
+    "Entry fields:",
+    "  runnable   bool  - whether this repo can actually build+sim in the CI image.",
+    "                     When false, run_all still records the reason; apply_and_test",
+    "                     will report sim_unavailable (exit 12) so no false failures.",
+    "  simulator  str   - preferred backend: verilator | iverilog | vcs | custom.",
+    "  toolchain  [str] - external tools the recipe needs on PATH (audit / gating).",
+    "  build      str   - optional build command run before 'cmd' (cwd = repo root).",
+    "  cmd        str   - the test command; exit 0 == pass. Passed to apply_and_test",
+    "                     via --sim-cmd. If empty, apply_and_test falls back to its",
+    "                     make/sbt/pytest guessing chain using 'target'.",
+    "  target     str   - a make target name (used when cmd is empty).",
+    "  timeout    int   - per-sim wall-clock budget in seconds (default 1200).",
+    "  note       str   - why runnable/blocked, and what a full setup would need.",
+    "",
+    "IMAGE TOOLCHAIN (probed 2026-08-19): verilator 5.051, iverilog, make, cmake,",
+    "python3.12, pytest, riscv64-linux-gnu-gcc (LINUX, not bare-metal elf).",
+    "MISSING: sbt, scala, java, mill (=> all Chisel/SpinalHDL repos NOT runnable),",
+    "riscv64/32-unknown-elf-gcc (=> bare-metal riscv-tests binaries NOT buildable),",
+    "vcs (commercial). Set these up in the image to flip 'runnable' to true."
+  ],
+
+  "_default": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["verilator"],
+    "build": "",
+    "cmd": "",
+    "target": "test",
+    "timeout": 1200,
+    "note": "No verified self-contained sim target; falls back to guessing and will usually report sim_unavailable."
+  },
+
+  "openhwgroup.ariane": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["verilator", "riscv64-unknown-elf-gcc"],
+    "build": "",
+    "cmd": "",
+    "target": "verilate",
+    "timeout": 1200,
+    "note": "CVA6 verilator flow lives under verif/ (a FORBIDDEN path for patches) and needs riscv-tests elf binaries + a bare-metal riscv toolchain. Not runnable until riscv64-unknown-elf-gcc + the CVA6 verif sim are provisioned."
+  },
+  "openhwgroup.cva6": { "$ref": "openhwgroup.ariane" },
+
+  "chipsalliance.rocket-chip": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["sbt", "java", "verilator", "riscv64-unknown-elf-gcc"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Chisel: elaboration needs sbt+JDK; running asm tests needs verilator + riscv-tests elf. Blocked (no sbt/java in image)."
+  },
+
+  "ucb-bar.chipyard": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["sbt", "java", "verilator", "riscv64-unknown-elf-gcc"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Chisel meta-repo; needs sbt+JDK+verilator+riscv toolchain and submodule init. Blocked."
+  },
+
+  "riscv-boom.riscv-boom": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["sbt", "java", "verilator", "riscv64-unknown-elf-gcc"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Chisel core, built via chipyard. Blocked (no sbt/java)."
+  },
+
+  "ucb-bar.gemmini": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["sbt", "java", "verilator", "riscv64-unknown-elf-gcc"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Chisel accelerator, built via chipyard + gemmini-rocc-tests. Blocked."
+  },
+
+  "ucb-bar.constellation": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["sbt", "java", "verilator"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Chisel NoC. Blocked (no sbt/java)."
+  },
+
+  "spinalhdl.vexriscv": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["sbt", "scala", "java", "verilator"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "SpinalHDL: generation needs sbt/scala/JDK; regression uses verilator via sbt 'test'. Blocked (no sbt/scala/java)."
+  },
+  "spinalhdl.naxriscv": { "$ref": "spinalhdl.vexriscv" },
+
+  "openxiangshan.xiangshan": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["mill", "java", "verilator", "riscv64-unknown-elf-gcc"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Chisel (mill). Needs mill+JDK+verilator+NEMU/ready-to-run images. Blocked."
+  },
+
+  "oscpu.nutshell": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["mill", "java", "verilator", "riscv64-unknown-elf-gcc"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Chisel (mill) + NEMU reference. Blocked."
+  },
+
+  "vortexgpgpu.vortex": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["verilator", "riscv64-unknown-elf-gcc", "cmake"],
+    "build": "make -s",
+    "cmd": "./ci/blackbox.sh --driver=simx --cores=1 --app=demo",
+    "target": "",
+    "timeout": 1200,
+    "note": "Verilator + a POCL/riscv-gnu toolchain. Runnable once the vortex-toolchain (riscv64-unknown-elf-gcc + libc) is installed; today only riscv64-linux-gnu-gcc exists so it is blocked."
+  },
+
+  "pulp-platform.fpnew": {
+    "runnable": false,
+    "simulator": "vcs",
+    "toolchain": ["vcs", "questa", "bender"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "FPU (CVFPU); its regression targets QuestaSim/VCS via bender+vsim. No open verilator flow packaged; blocked without a commercial simulator."
+  },
+
+  "openrisc.mor1kx": {
+    "runnable": true,
+    "simulator": "iverilog",
+    "toolchain": ["iverilog", "riscv64-unknown-elf-gcc"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "mor1kx marocchino/monitor testbenches use iverilog but need OpenRISC (or1k) elf binaries + the mor1kx-generic tb harness under a forbidden tb/ dir. Left as guessing; likely reports sim_unavailable."
+  },
+
+  "microsoft.cheriot-ibex": {
+    "runnable": true,
+    "simulator": "verilator",
+    "toolchain": ["verilator", "python3"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Ibex/CHERIoT lint+verilator smoke can run with verilator alone for simple cases, but full sim needs a cheriot-rtos elf and fusesoc. Uses guessing chain."
+  },
+
+  "openhwgroup.cve2": {
+    "runnable": true,
+    "simulator": "verilator",
+    "toolchain": ["verilator", "python3"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "CVE2 (ibex-derived) core; verilator lint/compile works, riscv-dv sim needs a toolchain. Uses guessing chain."
+  },
+
+  "yosyshq.picorv32": {
+    "runnable": true,
+    "simulator": "iverilog",
+    "toolchain": ["iverilog", "verilator", "riscv32-unknown-elf-gcc"],
+    "build": "",
+    "cmd": "make test_verilog",
+    "target": "test_verilog",
+    "timeout": 1200,
+    "note": "picorv32 has a self-contained iverilog testbench (make test / test_verilog). 'test' needs riscv32-unknown-elf-gcc for firmware; 'test_verilog' still needs the compiled firmware. Runnable once a riscv32 elf gcc is present."
+  },
+
+  "pulp-platform.idma": {
+    "runnable": false,
+    "simulator": "vcs",
+    "toolchain": ["vcs", "questa", "bender", "morty"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "iDMA regression targets QuestaSim/VCS via bender. Blocked without a commercial simulator."
+  },
+
+  "pulp-platform.riscv-dbg": {
+    "runnable": false,
+    "simulator": "vcs",
+    "toolchain": ["vcs", "questa", "verilator"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Debug module tb targets QuestaSim/VCS. Blocked without a commercial simulator."
+  },
+
+  "esl-epfl.x-heep": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["verilator", "riscv32-unknown-elf-gcc", "python3", "fusesoc"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "X-HEEP verilator flow via fusesoc + riscv32 elf toolchain. Blocked (no elf gcc/fusesoc)."
+  },
+
+  "jbush001.nyuziprocessor": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["verilator", "cmake", "nyuzi-toolchain"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Nyuzi needs its custom LLVM toolchain + emulator to build test programs. Blocked."
+  },
+
+  "mister-devel.snes_mister": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["quartus"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "FPGA (Quartus) core with no open simulation regression. Not runnable."
+  },
+
+  "chipsalliance.i3c-core": {
+    "runnable": false,
+    "simulator": "verilator",
+    "toolchain": ["verilator", "cocotb", "python3"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Uses cocotb + verilator. Runnable once cocotb is installed (cocotb-config missing today)."
+  },
+
+  "chipsalliance.aib-phy-hardware": {
+    "runnable": false,
+    "simulator": "vcs",
+    "toolchain": ["vcs"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "PHY hardware; no open sim regression. Not runnable."
+  },
+
+  "ipbus.ipbus-firmware": {
+    "runnable": false,
+    "simulator": "vcs",
+    "toolchain": ["vivado", "vcs"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "Xilinx/Vivado firmware; no open standalone sim. Not runnable."
+  },
+
+  "sld-columbia.esp": {
+    "runnable": false,
+    "simulator": "vcs",
+    "toolchain": ["vcs", "questa", "vivado"],
+    "build": "",
+    "cmd": "",
+    "target": "",
+    "timeout": 1200,
+    "note": "ESP SoC generator targets commercial simulators / FPGA. Not runnable."
+  }
+}

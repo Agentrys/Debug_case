@@ -1,0 +1,1064 @@
+diff --git a/scripts/Murax/iCE40-hx8k_breakout_board_xip/Murax_iCE40_hx8k_breakout_board_xip.pcf b/scripts/Murax/iCE40-hx8k_breakout_board_xip/Murax_iCE40_hx8k_breakout_board_xip.pcf
+index 4962e25b..510acf71 100644
+--- a/scripts/Murax/iCE40-hx8k_breakout_board_xip/Murax_iCE40_hx8k_breakout_board_xip.pcf
++++ b/scripts/Murax/iCE40-hx8k_breakout_board_xip/Murax_iCE40_hx8k_breakout_board_xip.pcf
+@@ -1,12 +1,12 @@
+ ## iCE40-hx8k breakout board
+ 
+-set_io io_J3  J3
+-set_io io_H16 H16
+-set_io io_G15 G15
+-set_io io_G16 G16
+-set_io io_F15 F15
+-set_io io_B12 B12
+-set_io io_B10 B10
++set_io io_mainClk  J3
++set_io io_jtag_tck H16
++set_io io_jtag_tdi G15
++set_io io_jtag_tdo G16
++set_io io_jtag_tms F15
++set_io io_uart_txd B12
++set_io io_uart_rxd B10
+ set_io io_led[0] B5
+ set_io io_led[1] B4
+ set_io io_led[2] A2
+@@ -17,7 +17,7 @@ set_io io_led[6] B3
+ set_io io_led[7] C3
+ 
+ #XIP
+-set_io io_P12 P12
+-set_io io_P11 P11
+-set_io io_R11 R11
+-set_io io_R12 R12
+\ No newline at end of file
++set_io io_miso P12
++set_io io_mosi P11
++set_io io_sclk R11
++set_io io_spis R12
+diff --git a/scripts/Murax/iCE40-hx8k_breakout_board_xip/README.md b/scripts/Murax/iCE40-hx8k_breakout_board_xip/README.md
+index f7a4dac0..3ed77c5e 100644
+--- a/scripts/Murax/iCE40-hx8k_breakout_board_xip/README.md
++++ b/scripts/Murax/iCE40-hx8k_breakout_board_xip/README.md
+@@ -11,9 +11,8 @@ by the IceStorm
+ 
+ # Bootloader operations
+ 
+-A bootloader is implemented in a ROM within the FPGA bitfile. It configure the SPI and attempt to read the first word in 'XIP' area of the flash (0xE0040000 in CPU address space, 0x40000 in flash). If this first word is the magic word
++A bootloader is implemented in a ROM within the FPGA bitfile. It configure the SPI and attempt to read the first word in 'XIP' area of the flash (0xE0040000 in CPU address space, 0x40000 in flash). If this first word is not 0xFFFFFFFF and the same value is read 3 times,
+ then the bootloader jump at 0xE0040000.
+-The magic word is 0x12340fb7, which is the value for the instruction "li x31, 0x12340000" or "lui t6,0x12340".
+ 
+ # Using the example
+ 
+diff --git a/src/main/c/murax/xipBootloader/crt.S b/src/main/c/murax/xipBootloader/crt.S
+index 8668c8a9..52687677 100644
+--- a/src/main/c/murax/xipBootloader/crt.S
++++ b/src/main/c/murax/xipBootloader/crt.S
+@@ -43,9 +43,17 @@ crtStart:
+   sw t0, CTRL_XIP_CONFIG(CTRL)
+   li t0, XIP_BASE
+   lw t1, (t0)
+-  li t2, 0x12340fb7
+-  xor t1,t1,t2
+-  bnez t1,retry
++  li t2, 0xFFFFFFFF
++  xor t3,t1,t2
++  beqz t3,retry
++  //if we are here we have read a value from flash which is not all ones
++  lw t2, (t0)
++  xor t3,t1,t2
++  bnez t3,retry
++  lw t2, (t0)
++  xor t3,t1,t2
++  bnez t3,retry
++  //if we are here we have read the same value 3 times, so flash seems good, lets's jump
+   jr t0
+ 
+ retry:
+diff --git a/src/main/c/murax/xipBootloader/crt.bin b/src/main/c/murax/xipBootloader/crt.bin
+index bf751967..3584ff4b 100755
+Binary files a/src/main/c/murax/xipBootloader/crt.bin and b/src/main/c/murax/xipBootloader/crt.bin differ
+diff --git a/src/main/scala/vexriscv/demo/Murax.scala b/src/main/scala/vexriscv/demo/Murax.scala
+index 846fa046..389b91f4 100644
+--- a/src/main/scala/vexriscv/demo/Murax.scala
++++ b/src/main/scala/vexriscv/demo/Murax.scala
+@@ -368,58 +368,55 @@ object Murax_iCE40_hx8k_breakout_board_xip{
+ 
+   case class Murax_iCE40_hx8k_breakout_board_xip() extends Component{
+     val io = new Bundle {
+-      val J3  = in  Bool()
+-      val H16 = in  Bool()
+-      val G15 = in  Bool()
+-      val G16 = out Bool()
+-      val F15 = in  Bool()
+-      val B12 = out Bool()
+-      val B10 = in  Bool()
+-
+-
+-      //p12 as mosi mean flash config
+-      val P12 = inout(Analog(Bool))
+-      val P11 = inout(Analog(Bool))
+-      val R11 = out Bool()
+-      val R12 = out Bool()
++      val mainClk  = in  Bool()
++      val jtag_tck = in  Bool()
++      val jtag_tdi = in  Bool()
++      val jtag_tdo = out Bool()
++      val jtag_tms = in  Bool()
++      val uart_txd = out Bool()
++      val uart_rxd = in  Bool()
++
++      val mosi = inout(Analog(Bool))
++      val miso = inout(Analog(Bool))
++      val sclk = out Bool()
++      val spis = out Bool()
+ 
+       val led = out Bits(8 bits)
+     }
+-    //val murax = Murax(MuraxConfig.default(withXip = true))
+     val murax = Murax(MuraxConfig.default(withXip = true).copy(onChipRamSize = 8 kB))
+     murax.io.asyncReset := False
+ 
+     val mainClkBuffer = SB_GB()
+-    mainClkBuffer.USER_SIGNAL_TO_GLOBAL_BUFFER <> io.J3
++    mainClkBuffer.USER_SIGNAL_TO_GLOBAL_BUFFER <> io.mainClk
+     mainClkBuffer.GLOBAL_BUFFER_OUTPUT <> murax.io.mainClk
+ 
+     val jtagClkBuffer = SB_GB()
+-    jtagClkBuffer.USER_SIGNAL_TO_GLOBAL_BUFFER <> io.H16
++    jtagClkBuffer.USER_SIGNAL_TO_GLOBAL_BUFFER <> io.jtag_tck
+     jtagClkBuffer.GLOBAL_BUFFER_OUTPUT <> murax.io.jtag.tck
+ 
+     io.led <> murax.io.gpioA.write(7 downto 0)
+ 
+-    murax.io.jtag.tdi <> io.G15
+-    murax.io.jtag.tdo <> io.G16
+-    murax.io.jtag.tms <> io.F15
++    murax.io.jtag.tdi <> io.jtag_tdi
++    murax.io.jtag.tdo <> io.jtag_tdo
++    murax.io.jtag.tms <> io.jtag_tms
+     murax.io.gpioA.read <> 0
+-    murax.io.uart.txd <> io.B12
+-    murax.io.uart.rxd <> io.B10
++    murax.io.uart.txd <> io.uart_txd
++    murax.io.uart.rxd <> io.uart_rxd
+ 
+ 
+ 
+     val xip = new ClockingArea(murax.systemClockDomain) {
+-      RegNext(murax.io.xip.ss.asBool) <> io.R12
++      RegNext(murax.io.xip.ss.asBool) <> io.spis
+ 
+       val sclkIo = SB_IO_SCLK()
+-      sclkIo.PACKAGE_PIN <> io.R11
++      sclkIo.PACKAGE_PIN <> io.sclk
+       sclkIo.CLOCK_ENABLE := True
+ 
+       sclkIo.OUTPUT_CLK := ClockDomain.current.readClockWire
+       sclkIo.D_OUT_0 <> murax.io.xip.sclk.write(0)
+       sclkIo.D_OUT_1 <> RegNext(murax.io.xip.sclk.write(1))
+ 
+-      val datas = for ((data, pin) <- (murax.io.xip.data, List(io.P12, io.P11).reverse).zipped) yield new Area {
++      val datas = for ((data, pin) <- (murax.io.xip.data, List(io.mosi, io.miso)).zipped) yield new Area {
+         val dataIo = SB_IO_DATA()
+         dataIo.PACKAGE_PIN := pin
+         dataIo.CLOCK_ENABLE := True
+diff --git a/scripts/Murax/iCE40-hx8k_breakout_board_xip/Murax_iCE40_hx8k_breakout_board_xip.pcf b/scripts/Murax/iCE40-hx8k_breakout_board_xip/Murax_iCE40_hx8k_breakout_board_xip.pcf
+index 4962e25b..510acf71 100644
+--- a/scripts/Murax/iCE40-hx8k_breakout_board_xip/Murax_iCE40_hx8k_breakout_board_xip.pcf
++++ b/scripts/Murax/iCE40-hx8k_breakout_board_xip/Murax_iCE40_hx8k_breakout_board_xip.pcf
+@@ -1,12 +1,12 @@
+ ## iCE40-hx8k breakout board
+ 
+-set_io io_J3  J3
+-set_io io_H16 H16
+-set_io io_G15 G15
+-set_io io_G16 G16
+-set_io io_F15 F15
+-set_io io_B12 B12
+-set_io io_B10 B10
++set_io io_mainClk  J3
++set_io io_jtag_tck H16
++set_io io_jtag_tdi G15
++set_io io_jtag_tdo G16
++set_io io_jtag_tms F15
++set_io io_uart_txd B12
++set_io io_uart_rxd B10
+ set_io io_led[0] B5
+ set_io io_led[1] B4
+ set_io io_led[2] A2
+@@ -17,7 +17,7 @@ set_io io_led[6] B3
+ set_io io_led[7] C3
+ 
+ #XIP
+-set_io io_P12 P12
+-set_io io_P11 P11
+-set_io io_R11 R11
+-set_io io_R12 R12
+\ No newline at end of file
++set_io io_miso P12
++set_io io_mosi P11
++set_io io_sclk R11
++set_io io_spis R12
+diff --git a/scripts/Murax/iCE40-hx8k_breakout_board_xip/README.md b/scripts/Murax/iCE40-hx8k_breakout_board_xip/README.md
+index f7a4dac0..3ed77c5e 100644
+--- a/scripts/Murax/iCE40-hx8k_breakout_board_xip/README.md
++++ b/scripts/Murax/iCE40-hx8k_breakout_board_xip/README.md
+@@ -11,9 +11,8 @@ by the IceStorm
+ 
+ # Bootloader operations
+ 
+-A bootloader is implemented in a ROM within the FPGA bitfile. It configure the SPI and attempt to read the first word in 'XIP' area of the flash (0xE0040000 in CPU address space, 0x40000 in flash). If this first word is the magic word
++A bootloader is implemented in a ROM within the FPGA bitfile. It configure the SPI and attempt to read the first word in 'XIP' area of the flash (0xE0040000 in CPU address space, 0x40000 in flash). If this first word is not 0xFFFFFFFF and the same value is read 3 times,
+ then the bootloader jump at 0xE0040000.
+-The magic word is 0x12340fb7, which is the value for the instruction "li x31, 0x12340000" or "lui t6,0x12340".
+ 
+ # Using the example
+ 
+diff --git a/src/main/c/murax/xipBootloader/crt.S b/src/main/c/murax/xipBootloader/crt.S
+index 8668c8a9..52687677 100644
+--- a/src/main/c/murax/xipBootloader/crt.S
++++ b/src/main/c/murax/xipBootloader/crt.S
+@@ -43,9 +43,17 @@ crtStart:
+   sw t0, CTRL_XIP_CONFIG(CTRL)
+   li t0, XIP_BASE
+   lw t1, (t0)
+-  li t2, 0x12340fb7
+-  xor t1,t1,t2
+-  bnez t1,retry
++  li t2, 0xFFFFFFFF
++  xor t3,t1,t2
++  beqz t3,retry
++  //if we are here we have read a value from flash which is not all ones
++  lw t2, (t0)
++  xor t3,t1,t2
++  bnez t3,retry
++  lw t2, (t0)
++  xor t3,t1,t2
++  bnez t3,retry
++  //if we are here we have read the same value 3 times, so flash seems good, lets's jump
+   jr t0
+ 
+ retry:
+diff --git a/src/main/c/murax/xipBootloader/crt.bin b/src/main/c/murax/xipBootloader/crt.bin
+index bf751967..3584ff4b 100755
+Binary files a/src/main/c/murax/xipBootloader/crt.bin and b/src/main/c/murax/xipBootloader/crt.bin differ
+diff --git a/src/main/scala/vexriscv/demo/Murax.scala b/src/main/scala/vexriscv/demo/Murax.scala
+index 846fa046..389b91f4 100644
+--- a/src/main/scala/vexriscv/demo/Murax.scala
++++ b/src/main/scala/vexriscv/demo/Murax.scala
+@@ -368,58 +368,55 @@ object Murax_iCE40_hx8k_breakout_board_xip{
+ 
+   case class Murax_iCE40_hx8k_breakout_board_xip() extends Component{
+     val io = new Bundle {
+-      val J3  = in  Bool()
+-      val H16 = in  Bool()
+-      val G15 = in  Bool()
+-      val G16 = out Bool()
+-      val F15 = in  Bool()
+-      val B12 = out Bool()
+-      val B10 = in  Bool()
+-
+-
+-      //p12 as mosi mean flash config
+-      val P12 = inout(Analog(Bool))
+-      val P11 = inout(Analog(Bool))
+-      val R11 = out Bool()
+-      val R12 = out Bool()
++      val mainClk  = in  Bool()
++      val jtag_tck = in  Bool()
++      val jtag_tdi = in  Bool()
++      val jtag_tdo = out Bool()
++      val jtag_tms = in  Bool()
++      val uart_txd = out Bool()
++      val uart_rxd = in  Bool()
++
++      val mosi = inout(Analog(Bool))
++      val miso = inout(Analog(Bool))
++      val sclk = out Bool()
++      val spis = out Bool()
+ 
+       val led = out Bits(8 bits)
+     }
+-    //val murax = Murax(MuraxConfig.default(withXip = true))
+     val murax = Murax(MuraxConfig.default(withXip = true).copy(onChipRamSize = 8 kB))
+     murax.io.asyncReset := False
+ 
+     val mainClkBuffer = SB_GB()
+-    mainClkBuffer.USER_SIGNAL_TO_GLOBAL_BUFFER <> io.J3
++    mainClkBuffer.USER_SIGNAL_TO_GLOBAL_BUFFER <> io.mainClk
+     mainClkBuffer.GLOBAL_BUFFER_OUTPUT <> murax.io.mainClk
+ 
+     val jtagClkBuffer = SB_GB()
+-    jtagClkBuffer.USER_SIGNAL_TO_GLOBAL_BUFFER <> io.H16
++    jtagClkBuffer.USER_SIGNAL_TO_GLOBAL_BUFFER <> io.jtag_tck
+     jtagClkBuffer.GLOBAL_BUFFER_OUTPUT <> murax.io.jtag.tck
+ 
+     io.led <> murax.io.gpioA.write(7 downto 0)
+ 
+-    murax.io.jtag.tdi <> io.G15
+-    murax.io.jtag.tdo <> io.G16
+-    murax.io.jtag.tms <> io.F15
++    murax.io.jtag.tdi <> io.jtag_tdi
++    murax.io.jtag.tdo <> io.jtag_tdo
++    murax.io.jtag.tms <> io.jtag_tms
+     murax.io.gpioA.read <> 0
+-    murax.io.uart.txd <> io.B12
+-    murax.io.uart.rxd <> io.B10
++    murax.io.uart.txd <> io.uart_txd
++    murax.io.uart.rxd <> io.uart_rxd
+ 
+ 
+ 
+     val xip = new ClockingArea(murax.systemClockDomain) {
+-      RegNext(murax.io.xip.ss.asBool) <> io.R12
++      RegNext(murax.io.xip.ss.asBool) <> io.spis
+ 
+       val sclkIo = SB_IO_SCLK()
+-      sclkIo.PACKAGE_PIN <> io.R11
++      sclkIo.PACKAGE_PIN <> io.sclk
+       sclkIo.CLOCK_ENABLE := True
+ 
+       sclkIo.OUTPUT_CLK := ClockDomain.current.readClockWire
+       sclkIo.D_OUT_0 <> murax.io.xip.sclk.write(0)
+       sclkIo.D_OUT_1 <> RegNext(murax.io.xip.sclk.write(1))
+ 
+-      val datas = for ((data, pin) <- (murax.io.xip.data, List(io.P12, io.P11).reverse).zipped) yield new Area {
++      val datas = for ((data, pin) <- (murax.io.xip.data, List(io.mosi, io.miso)).zipped) yield new Area {
+         val dataIo = SB_IO_DATA()
+         dataIo.PACKAGE_PIN := pin
+         dataIo.CLOCK_ENABLE := True
+diff --git a/src/main/c/karnix/karnix_soc/src/linker.ld b/src/main/c/karnix/karnix_soc/src/linker.ld
+index ef94ce3c..ea544d41 100644
+--- a/src/main/c/karnix/karnix_soc/src/linker.ld
++++ b/src/main/c/karnix/karnix_soc/src/linker.ld
+@@ -25,45 +25,69 @@ SECTIONS {
+     *crt.o(.text);
+   } > RAM
+ 
++  .text : {
++    . = ALIGN(4);
++    *(.text);
++    *(.text.*);
++    end = .;
++  } > RAM
+ 
+-  .data :
++  .ctors :
++  {
++    . = ALIGN(4);
++    _ctors_start = .;
++    KEEP(*(.init_array*))
++    KEEP (*(SORT(.ctors.*)))
++    KEEP (*(.ctors))
++    . = ALIGN(4);
++    _ctors_end = .;
++    PROVIDE ( END_OF_SW_IMAGE = . );
++  } > RAM
++
++  .rodata :
+   {
++    . = ALIGN(4);
+     *(.rdata)
+-    *(.rodata .rodata.*)
++    *(.rodata)
++    *(.rodata.*)
+     *(.gnu.linkonce.r.*)
+-    *(.data .data.*)
+-    *(.gnu.linkonce.d.*)
+-    . = ALIGN(8);
+-    PROVIDE( __global_pointer$ = . + 0x800 );
+-    *(.sdata .sdata.*)
+-    *(.gnu.linkonce.s.*)
+-    . = ALIGN(8);
+     *(.srodata.cst16)
+     *(.srodata.cst8)
+     *(.srodata.cst4)
+     *(.srodata.cst2)
+     *(.srodata .srodata.*)
++    *(.eh_frame .eh_frame.*) /* C++ exception handling and backtrace */
++    *(.got) /* global offset pointers for dynamic linker */
++    *(.got.plt) /* global function pointers for dynamic linker */
++  } > RAM
++
++  .data :
++  {
++    . = ALIGN(4);
++    PROVIDE (_data_start = .);
++    *(.data)
++    *(.data.*)
++    . = ALIGN(8);
++    PROVIDE( __global_pointer$ = . + 0x800 );
++    *(.gnu.linkonce.d.*)
++    *(.sdata .sdata.*)
++    *(.sdata2 .sdata2.*)
++    *(.gnu.linkonce.s.*)
++    . = ALIGN(4);
++    PROVIDE(_data_end = .);
+   } > RAM
+ 
+   .bss (NOLOAD) : {
+-		. = ALIGN(4);
+-		/* This is used by the startup in order to initialize the .bss secion */
+-		_bss_start = .;
++    . = ALIGN(4);
++    /* This is used by the startup in order to initialize the .bss secion */
++    _bss_start = .;
+     *(.sbss*)
+     *(.gnu.linkonce.sb.*)
+     *(.bss .bss.*)
+     *(.gnu.linkonce.b.*)
+     *(COMMON)
+-		. = ALIGN(4);
+-		_bss_end = .;
+-  } > RAM
+-
+-
+-  .rodata         :
+-  {
+-    *(.rdata)
+-    *(.rodata .rodata.*)
+-    *(.gnu.linkonce.r.*)
++    . = ALIGN(4);
++    _bss_end = .;
+   } > RAM
+ 
+   .noinit (NOLOAD) : {
+@@ -72,31 +96,13 @@ SECTIONS {
+       . = ALIGN(4);
+   } > RAM
+ 
+-  .memory : {
+-    *(.text);
+-    end = .;
+-  } > RAM
+-
+-  .ctors          :
+-  {
+-    . = ALIGN(4);
+-    _ctors_start = .;
+-    KEEP(*(.init_array*))
+-    KEEP (*(SORT(.ctors.*)))
+-    KEEP (*(.ctors))
+-    . = ALIGN(4);
+-    _ctors_end = .;
+-    PROVIDE ( END_OF_SW_IMAGE = . );
+-  } > RAM
+-
+-
+   ._stack (NOLOAD):
+   {
+     . = ALIGN(16);
+-    PROVIDE (_stack_end = .);
++    PROVIDE(_stack_end = .);
+     . = . + _stack_size;
+     . = ALIGN(16);
+-    PROVIDE (_stack_start = .);
++    PROVIDE(_stack_start = .);
+   } > RAM
+ 
+   ._ram_heap (NOLOAD):
+@@ -110,5 +116,4 @@ SECTIONS {
+     PROVIDE ( _ram_heap_end = ALIGN(ORIGIN(RAM) + LENGTH(RAM) ,8) );
+   } > RAM
+ 
+-
+ }
+diff --git a/src/main/c/karnix/karnix_soc/src/crt.S b/src/main/c/karnix/karnix_soc/src/crt.S
+index c3ed60c1..71d89fe7 100644
+--- a/src/main/c/karnix/karnix_soc/src/crt.S
++++ b/src/main/c/karnix/karnix_soc/src/crt.S
+@@ -4,11 +4,14 @@
+ 
+     .section	.start_jump,"ax",@progbits
+ crtStart:
+-  //long jump to allow crtInit to be anywhere
+-  //do it always in 12 bytes
+-  lui x2,       %hi(crtInit)
+-  addi x2, x2,  %lo(crtInit)
+-  jalr x1,x2
++  csrc mstatus, 0x8 // Disable interrupts
++
++  // take address of trap_entry relative to PC and store it to mtvec
++  la t1,trap_entry
++  csrw mtvec, t1
++
++  la t1,crtInit // takes address relative to PC
++  jr t1 // jump crtInit
+   nop
+ 
+ .section .text
+@@ -58,9 +61,15 @@ trap_entry:
+ crtInit:
+   .option push
+   .option norelax
++
++  // Preserve old context: SP, GP and RA
++  mv t1, sp
++  la sp, _stack_start 
++  addi sp, sp, -12
++  sw t1, 8(sp)
++  sw gp, 4(sp)
++  sw ra, 0(sp)
+   la gp, __global_pointer$
+-  .option pop
+-  la sp, _stack_start
+ 
+ bss_init:
+   la a0, _bss_start
+@@ -87,7 +96,6 @@ ctors_loop:
+ ctors_done:
+   addi sp,sp,4
+ 
+-
+   li a0, 0x880     //880 enable timer + external interrupts
+   csrw mie,a0
+   //li a0, 0x1808     //1808 enable interrupts
+@@ -95,5 +103,11 @@ ctors_done:
+   csrw mstatus,a0
+ 
+   call main
+-infinitLoop:
+-  j infinitLoop
++
++return:
++  // Restore old context: SP, GP and RA
++  lw ra,0(sp)
++  lw gp,4(sp)
++  lw sp,8(sp)
++  ret 
++
+diff --git a/src/main/c/karnix/karnix_soc/src/linker.ld b/src/main/c/karnix/karnix_soc/src/linker.ld
+index ea544d41..75f6b319 100644
+--- a/src/main/c/karnix/karnix_soc/src/linker.ld
++++ b/src/main/c/karnix/karnix_soc/src/linker.ld
+@@ -11,7 +11,17 @@ OUTPUT_ARCH(riscv)
+ ENTRY(crtStart)
+ 
+ MEMORY {
++
++  /* Uncomment one of the below RAM regions: */
++
++  /* Synthesized RAM */
+   RAM      (rwx): ORIGIN = 0x80000000, LENGTH = 72k
++
++  /* Synthesized RAM with 1K offset for bootloader/monitor */
++  /* RAM      (rwx): ORIGIN = 0x80001000, LENGTH = 71k */
++
++  /* SRAM */
++  /* RAM      (rwx): ORIGIN = 0x90000000, LENGTH = 512k */
+ }
+ 
+ _stack_size = DEFINED(_stack_size) ? _stack_size : 4096;
+@@ -57,8 +67,14 @@ SECTIONS {
+     *(.srodata.cst2)
+     *(.srodata .srodata.*)
+     *(.eh_frame .eh_frame.*) /* C++ exception handling and backtrace */
++    . = ALIGN(4);
++    PROVIDE(_GOT = .);
+     *(.got) /* global offset pointers for dynamic linker */
+     *(.got.plt) /* global function pointers for dynamic linker */
++    . = ALIGN(4);
++    /* Provide pointer to reference impure_data (struct _reent) used in LIBC */
++    PROVIDE(_IMPURE_DATA = .);
++    *(.data.impure_data)
+   } > RAM
+ 
+   .data :
+diff --git a/src/main/c/karnix/example_ram/Makefile b/src/main/c/karnix/example_ram/Makefile
+new file mode 100644
+index 00000000..93f685dd
+--- /dev/null
++++ b/src/main/c/karnix/example_ram/Makefile
+@@ -0,0 +1,191 @@
++PROJ_NAME=example_ram
++DEBUG=no
++BENCH=no
++MULDIV=yes
++ATOMIC=yes
++FPU=yes
++COMPRESSED=yes
++
++
++SOCDIR=../karnix_soc/src
++CRT=$(SOCDIR)/crt.S
++LDSCRIPT = $(SOCDIR)/linker.ld -Wl
++
++#LWIPDIR=../karnix_lwip/src
++#include $(LWIPDIR)/Filelists.mk
++
++SRCS =  $(wildcard src/*.c) $(wildcard src/*.cpp) \
++       	$(SOCDIR)/utils.c \
++	$(CRT)
++
++#DEFS = -DCONFIG_HAS_MODBUS -DCONFIG_HAS_MAC -DDEBUG_SBRK
++DEFS = -DDEBUG_SBRK
++
++OBJDIR = build
++
++BUILD_NUMBER_FILE=$(OBJDIR)/build_number
++BUILD_NUMBER=`cat $(BUILD_NUMBER_FILE)`
++
++
++INC  = -I./src -I$(LWIPDIR) -I$(LWIPDIR)/include -I$(SOCDIR) -I$(SOCDIR)/include
++LIBS =
++LIBSINC = -L$(OBJDIR)
++
++#include ../../../resources/gcc.mk
++# Set it to yes if you are using the SiFive precompiled GCC pack
++SIFIVE_GCC_PACK ?= yes
++
++ifeq ($(SIFIVE_GCC_PACK),yes)
++	RISCV_NAME ?= riscv64-unknown-elf
++	RISCV_PATH ?= /opt/riscv64
++else
++	RISCV_NAME ?= riscv32-unknown-elf
++	ifeq ($(MULDIV),yes)
++		RISCV_PATH ?= /opt/riscv32im/
++	else
++		RISCV_PATH ?= /opt/riscv32i/
++	endif
++endif
++
++MABI=ilp32
++MARCH := rv32i
++ifeq ($(MULDIV),yes)
++	MARCH := $(MARCH)m
++endif
++ifeq ($(ATOMIC),yes)
++	MARCH := $(MARCH)a
++endif
++ifeq ($(FPU),yes)
++	MARCH := $(MARCH)f
++	#MABI := $(MABI)f
++	MABI := $(MABI)f
++	# Below uses too much RAM (over 100K)
++	#CFLAGS += -Wl,-u,vfprintf
++	#CFLAGS += -Wl,-u,_printf_float
++	#CFLAGS += -Wl,-u,_scanf_float
++endif
++ifeq ($(COMPRESSED),yes)
++	MARCH := $(MARCH)c
++endif
++
++#CFLAGS += -fwhole-program -march=$(MARCH)  -mabi=$(MABI) -DNDEBUG -fno-common -fno-builtin-printf -DBUILD_NUMBER=$(BUILD_NUMBER)+1 
++# use suffix __attribute__((externally_visible))
++
++CFLAGS += -march=$(MARCH)  -mabi=$(MABI) -DNDEBUG -flto -fno-common -fno-builtin-printf -DBUILD_NUMBER=$(BUILD_NUMBER)+1 $(DEFS) 
++LDFLAGS += -march=$(MARCH)  -mabi=$(MABI) -specs=nano.specs -lnosys -lc_nano
++#LDFLAGS += -march=rv32im -mabi=ilp32 -specs=nano.specs -lnosys -lc_nano
++
++
++
++#include ../../../resources/subproject.mk
++
++
++ifeq ($(DEBUG),yes)
++	CFLAGS += -g3 -O0
++endif
++
++ifeq ($(DEBUG),no)
++	CFLAGS += -Os
++endif
++
++ifeq ($(BENCH),yes)
++	CFLAGS += -fno-inline
++endif
++
++ifeq ($(SIFIVE_GCC_PACK),yes)
++	RISCV_CLIB=$(RISCV_PATH)/$(RISCV_NAME)/lib/$(MARCH)/$(MABI)/
++else
++	RISCV_CLIB=$(RISCV_PATH)/$(RISCV_NAME)/lib/
++endif
++
++
++
++
++
++RISCV_OBJCOPY = $(RISCV_PATH)/bin/$(RISCV_NAME)-objcopy
++RISCV_OBJDUMP = $(RISCV_PATH)/bin/$(RISCV_NAME)-objdump
++RISCV_STRIP = $(RISCV_PATH)/bin/$(RISCV_NAME)-strip
++RISCV_CC=$(RISCV_PATH)/bin/$(RISCV_NAME)-gcc
++
++CFLAGS +=  -MD -fstrict-volatile-bitfields -fno-strict-aliasing
++LDFLAGS +=  -nostdlib -lgcc -mcmodel=medany -nostartfiles -ffreestanding -Wl,-Bstatic,-T,$(LDSCRIPT),-Map,$(OBJDIR)/$(PROJ_NAME).map,--print-memory-usage
++#LDFLAGS += -lgcc -lc -lg -nostdlib  -lgcc  -msave-restore    --strip-debug,
++
++OBJS := $(SRCS)
++OBJS := $(OBJS:.c=.o)
++OBJS := $(OBJS:.cpp=.o)
++OBJS := $(OBJS:.S=.o)
++#OBJS := $(OBJS:..=miaou)
++OBJS := $(subst ..,__,$(OBJS))
++OBJS := $(addprefix $(OBJDIR)/,$(OBJS))
++
++
++all: check_build_num_file build_sources
++	
++build_sources: $(OBJDIR)/$(PROJ_NAME).elf $(OBJDIR)/$(PROJ_NAME).asm $(OBJDIR)/$(PROJ_NAME).hex $(OBJDIR)/$(PROJ_NAME).hexx $(OBJDIR)/$(PROJ_NAME).bin
++
++check_build_num_file:
++ifeq (,$(wildcard $(BUILD_NUMBER_FILE)))
++	mkdir -p $(OBJDIR)
++	echo 1 > $(BUILD_NUMBER_FILE)
++endif
++
++inc_build_num:
++	@expr $(BUILD_NUMBER) + 1 > $(BUILD_NUMBER_FILE) 
++
++$(OBJDIR)/%.elf: $(OBJS) | $(OBJDIR)
++	$(RISCV_CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBSINC) $(LIBS)
++#	$(RISCV_STRIP) $@
++
++%.asm: %.elf
++	$(RISCV_OBJDUMP) -S -d $^ > $@
++
++%.bin: %.elf
++	$(RISCV_OBJCOPY) -O binary $^ $@
++
++%.hex: %.elf
++	$(RISCV_OBJCOPY) -O ihex $^ $@
++
++%.hexx: %.bin 
++	hexdump -v -e '/4 "%08X\n"' < $^ > $@ 
++	$(MAKE) inc_build_num
++
++
++%/src/cga.o: CFLAGS += -O1 
++
++$(OBJDIR)/__/%.o: ../%.c
++	mkdir -p $(dir $@)
++	$(RISCV_CC) -c $(CFLAGS)  $(INC) -o $@ $^
++	$(RISCV_CC) -S $(CFLAGS)  $(INC) -o $@.disasm $^
++
++$(OBJDIR)/%.o: %.c
++	mkdir -p $(dir $@)
++	$(RISCV_CC) -c $(CFLAGS)  $(INC) -o $@ $^
++	$(RISCV_CC) -S $(CFLAGS)  $(INC) -o $@.disasm $^
++
++$(OBJDIR)/%.o: %.cpp
++	mkdir -p $(dir $@)
++	$(RISCV_CC) -c $(CFLAGS)  $(INC) -o $@ $^
++
++$(OBJDIR)/__/%.o: ../%.cpp
++	mkdir -p $(dir $@)
++	$(RISCV_CC) -c $(CFLAGS)  $(INC) -o $@ $^
++
++$(OBJDIR)/__/%.o: ../%.S
++	mkdir -p $(dir $@)
++	$(RISCV_CC) -c $(CFLAGS) -o $@ $^ -D__ASSEMBLY__=1
++
++$(OBJDIR)/%.o: %.S
++	mkdir -p $(dir $@)
++	$(RISCV_CC) -c $(CFLAGS) -o $@ $^ -D__ASSEMBLY__=1
++
++$(OBJDIR):
++	mkdir -p $@
++
++.PHONY: clean
++clean:
++	rm -rf $(OBJDIR)/*
++
++clean-all : clean 
++
++.SECONDARY: $(OBJS)
+diff --git a/src/main/c/karnix/example_ram/src/main.c b/src/main/c/karnix/example_ram/src/main.c
+new file mode 100644
+index 00000000..c1610b06
+--- /dev/null
++++ b/src/main/c/karnix/example_ram/src/main.c
+@@ -0,0 +1,294 @@
++/*
++ * Simple program that can be stored in RAM/SRAM at any location.
++ *
++ * Copyright (C) 2024-2025 Fabmicro, LLC. Tyumen, Russia.
++ *
++ * Written by Ruslan Zalata <rz@fabmicro.ru>
++ *
++ * Uses Software Model #1 that is implemented by befault crt.S and linker.ld
++ * from karnix_soc HAL collection.
++ *
++ * This example shows how to set your own interrupt handler, handle CPU traps,
++ * init heap for malloc and other LIBC functions. Restoring trap handler on return
++ * is not necessary, monitor will do it on itself.
++ *
++ * To compile:
++ * 1. Just call "make"
++ *
++ * To run from Monitor:
++ * 1. Connect your terminal to the Monitor
++ * 2. Send "rz 0x90000000" to receive binary file on local machine into SRAM on Karnix
++ * 3. Start sending "example_ram" binary using ZModem protocol
++ * 4. Once uploaded, check CRC32 using "cksum -o 3" (FreeBSD only)
++ * 5. Send "call 0x90000000" command to execute. 
++ *
++ */
++
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <sys/reent.h>
++#include "soc.h"
++#include "riscv.h"
++#include "plic.h"
++#include "uart.h"
++#include "utils.h"
++
++
++extern unsigned int trap_entry; /* Trap entry point provided by crt.S */
++
++/* Context saving structure */
++
++struct _context {
++	char crash_str[16];
++	uint32_t sp;
++	uint32_t gp;
++	uint32_t tp;
++	uint32_t mepc;	/* Trap happened at this instruction */
++	uint32_t mtval; /* access address causing the trap   */
++} context;
++
++/* Some global data used by test fuction. */
++char buf[16];
++
++/* Some test function, tell compiler to not optimize it. */
++void __attribute__((optimize("O0"))) test(int i) {
++
++	buf[0] = 'A';
++	buf[1] = 'B';
++	buf[2] = 'C';
++	buf[3] = i + '0';
++	buf[4] = '\r';
++	buf[5] = '\n';
++	buf[6] = 0;
++
++	print_uart0(buf);
++}
++
++
++extern const struct __sFILE_fake __sf_fake_stdin;
++extern const struct __sFILE_fake __sf_fake_stdout;
++extern const struct __sFILE_fake __sf_fake_stderr;
++extern unsigned int _IMPURE_DATA; /* reference to .data.impure_data section */
++//struct _reent impure_data;
++//struct __sFILE fake_stdin;
++//struct __sFILE fake_stdout;
++//struct __sFILE fake_stderr;
++void __sinit(struct _reent*);
++
++int main(void) {
++
++	/* Disable Machine interrupts during tests */ 
++	//csr_clear(mstatus, MSTATUS_MIE);
++	
++	/*
++	   Note, when running from Monitor there are many IRQ sources already
++	   enabled and configured, including exhausting TIMER0 and TIMER1.
++	   So we might be needing to disable interrupts from PLIC, else may hang.
++	*/
++	//PLIC->ENABLE = 0; /* Disable all PLIC IRQ lines */
++
++
++	/* Wait for CPU clocks to settle, needed only if running stand-alone. */
++	delay_us(2000000);
++
++	/* Save current stack pointer for trap handling. */
++	asm volatile ("sw sp, (%0)" :  : "r"(&context.sp));
++
++	print_uart0("\r\n= = = HELLO WORLD = = =\r\n");
++
++	print_uart0("*** Use global read-write data:\r\n");
++
++	for(int i = 0; i < 10; i++)
++		test(i);
++
++	print_uart0("\r\n*** Print current context:\r\n");
++
++	print_uart0("SP: ");
++	to_hex(buf, (unsigned int)context.sp);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("_stack_start: ");
++	to_hex(buf, (unsigned int)& _stack_start);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("_bss_start: ");
++	to_hex(buf, (unsigned int)& _bss_start);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("_bss_end: ");
++	to_hex(buf, (unsigned int)& _bss_end);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("_ram_heap_start: ");
++	to_hex(buf, (unsigned int)& _ram_heap_start);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("_ram_heap_end: ");
++	to_hex(buf, (unsigned int)& _ram_heap_end);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	/* Initialize heap for malloc to use free RAM right above the stack */
++	print_uart0("\r\n*** Init heap:\r\n");
++	init_sbrk(NULL, 0);
++	print_uart0("init_sbrk done!\r\n");
++
++	print_uart0("heap_start: ");
++	to_hex(buf, (unsigned int)heap_start);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("heap_end: ");
++	to_hex(buf, (unsigned int)heap_end);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("sbrk_heap_end: ");
++	to_hex(buf, (unsigned int)sbrk_heap_end);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("\r\n*** Adjusting global REENT structure:\r\n");
++
++	*(uint32_t*)&_impure_ptr = (uint32_t)&_IMPURE_DATA;
++	*(uint32_t*)&_global_impure_ptr = (uint32_t)_impure_ptr;
++	_impure_ptr->_stdin = (__FILE *)&__sf_fake_stdin;
++	_impure_ptr->_stdout = (__FILE *)&__sf_fake_stdout;
++	_impure_ptr->_stderr = (__FILE *)&__sf_fake_stderr;
++
++	print_uart0("_impure_ptr: ");
++	to_hex(buf, (unsigned int)_impure_ptr);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("_global_impure_ptr: ");
++	to_hex(buf, (unsigned int)_global_impure_ptr);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++	print_uart0("fake_stdout: ");
++	to_hex(buf, (unsigned int)_impure_ptr->_stdout);
++	print_uart0(buf);
++	print_uart0("\r\n");
++
++
++	print_uart0("\r\n*** Checking malloc:\r\n");
++
++
++	for(int i = 0; i < 10; i++) {
++		char *mem = malloc(1024);
++		print_uart0("allocated mem at: ");
++		to_hex(buf, (unsigned int)mem);
++		print_uart0(buf);
++		print_uart0("\r\n");
++	}
++
++
++	print_uart0("\r\n*** Calling LIBC function...\r\n");
++
++	printf("Hello from LIBC! Yoohoo!\r\n");
++
++	print_uart0("\r\n= = = Returning to Monitor = = =\r\n\r\n");
++
++	delay_us(2000000);
++
++	/* return result code to Monitor */
++	return 0x11223344;
++}
++
++void timerInterrupt(void) {
++	/* Not supported on this machine */
++}
++
++void externalInterrupt(void){
++
++	if(PLIC->PENDING & PLIC_IRQ_TIMER0) {
++		print_uart0("TIMER0 IRQ\r\n");
++		timer_run(TIMER0, 1000000); // 1 s timer
++		PLIC->PENDING &= ~PLIC_IRQ_TIMER0;
++	}
++
++	if(PLIC->PENDING & PLIC_IRQ_TIMER1) {
++		print_uart0("TIMER1 IRQ\r\n");
++		timer_run(TIMER1, 100000); // 100 ms timer
++		PLIC->PENDING &= ~PLIC_IRQ_TIMER1;
++	}
++
++	PLIC->PENDING = 0; /* Clear all pending IRQ lines */
++}
++
++void crash(int cause) {
++	
++	context.mepc = csr_read(mepc);
++	context.mtval = csr_read(mtval);
++
++	asm volatile ("sw gp, (%0)" :  : "r"(&context.gp));
++
++	asm volatile ("sw tp, (%0)" :  : "r"(&context.tp));
++
++	/* Add 16 to SP to reference upper level */
++	asm volatile ("mv t1, sp; \
++		      addi t1,t1,16; \
++	      	      sw t1, (%0)" :  : "r"(&context.sp)); 
++
++	print_uart0("\r\n*** TRAP: ");
++	to_hex(context.crash_str, cause);
++	print_uart0(context.crash_str);
++	print_uart0(" at ");
++
++	to_hex(context.crash_str, context.mepc);
++	print(context.crash_str);
++	print(" = ");
++	to_hex(context.crash_str, *(uint32_t*)(context.mepc & 0xfffffffc));
++	print(context.crash_str);
++
++	print(", mtval = ");
++	to_hex(context.crash_str, context.mtval);
++	print(context.crash_str);
++
++	print(", sp = ");
++	to_hex(context.crash_str, context.sp);
++	print(context.crash_str);
++
++	print(", gp = ");
++	to_hex(context.crash_str, context.gp);
++	print(context.crash_str);
++
++	print(", tp = ");
++	to_hex(context.crash_str, context.tp);
++	print(context.crash_str);
++
++	print(", heap_end = ");
++	to_hex(context.crash_str, (uint32_t)sbrk_heap_end);
++	print(context.crash_str);
++
++	print("\r\n");
++
++	for(;;);
++}
++
++
++void irqCallback() {
++
++	//print_uart0("!");
++
++	int32_t mcause = csr_read(mcause);
++	int32_t interrupt = mcause < 0;    /* Interrupt if true, exception if false */
++	int32_t cause     = mcause & 0xF;
++	if(interrupt){
++		switch(cause) {
++			case CAUSE_MACHINE_TIMER: timerInterrupt(); break;
++			case CAUSE_MACHINE_EXTERNAL: externalInterrupt(); break;
++			default: crash(2); break;
++		}
++	} else {
++		crash(1);
++	}
++}
++

@@ -1,0 +1,32 @@
+{
+  "case_id": "riscv-boom.riscv-boom#38",
+  "issue_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_repo": {
+    "owner": "athanor-ai",
+    "name": "riscv-boom-athanor"
+  },
+  "fix_oid": "734070305283ee8041886976a742cba0f91a49a7",
+  "buggy_commit_sha": "502cd7e8e79d08d03a44ba623841472a407c208e",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/riscv-boom.riscv-boom_38.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "734070305283ee8041886976a742cba0f91a49a7"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    ".github/workflows/export-safety.yml",
+    "athanor/export_safety_gate.py",
+    "tests/test_export_safety_gate.py"
+  ],
+  "raw_diff_path": "ground_truth/riscv-boom.riscv-boom_38.raw.diff"
+}

@@ -1,0 +1,12 @@
+diff --git a/components/ipbus_core/firmware/hdl/ipbus_pipeline.vhd b/components/ipbus_core/firmware/hdl/ipbus_pipeline.vhd
+index 1c668f6f..f6a2dd8d 100644
+--- a/components/ipbus_core/firmware/hdl/ipbus_pipeline.vhd
++++ b/components/ipbus_core/firmware/hdl/ipbus_pipeline.vhd
+@@ -87,6 +87,6 @@ begin
+ 	
+ 	m_ipb_out.ipb_ack <= ack_del(latency);
+ 	m_ipb_out.ipb_err <= err_del(latency);	
+-	s_ipb_out.ipb_strobe <= ipbus_in.ipb_strobe and not got_ack;
++	s_ipb_out.ipb_strobe <= m_ipb_in.ipb_strobe and not got_resp;
+ 	
+ end rtl;

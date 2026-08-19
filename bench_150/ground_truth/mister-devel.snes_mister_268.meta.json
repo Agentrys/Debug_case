@@ -1,0 +1,57 @@
+{
+  "case_id": "mister-devel.snes_mister#268",
+  "issue_repo": {
+    "owner": "MiSTer-devel",
+    "name": "SNES_MiSTer"
+  },
+  "fix_repo": {
+    "owner": "birdybro",
+    "name": "SNES_MiSTer"
+  },
+  "fix_oid": "9c8416fc74722e0f1f355900d9b5fb1643a011c3",
+  "buggy_commit_sha": "c3876d887b0b3094019a4e058ee3c7cbba523eb0",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/mister-devel.snes_mister_268.diff",
+  "diff_sha256": "39b4c0bf07d3ce918c49dce36f62c315569d4aa9891b6e106e2aef3f9439eafc",
+  "fix_oids_sorted": [
+    "9c8416fc74722e0f1f355900d9b5fb1643a011c3",
+    "8df97c52adb6676a8454921672d7c176ea1dc279"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "rtl/SPC700/SPC700.vhd",
+    "rtl/SPC700/MCode.vhd"
+  ],
+  "ground_truth_hunks": {
+    "rtl/SPC700/SPC700.vhd": [
+      [
+        329,
+        335
+      ],
+      [
+        329,
+        335
+      ],
+      [
+        374,
+        380
+      ]
+    ],
+    "rtl/SPC700/MCode.vhd": [
+      [
+        736,
+        742
+      ],
+      [
+        1824,
+        1830
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/mister-devel.snes_mister_268.raw.diff"
+}

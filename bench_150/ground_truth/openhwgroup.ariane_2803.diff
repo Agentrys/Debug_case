@@ -1,0 +1,36 @@
+diff --git a/core/decoder.sv b/core/decoder.sv
+index de52e7f2..98fc3b1c 100644
+--- a/core/decoder.sv
++++ b/core/decoder.sv
+@@ -186,6 +186,7 @@ module decoder
+     ecall                                  = 1'b0;
+     ebreak                                 = 1'b0;
+     check_fprm                             = 1'b0;
++    tinst                                  = 32'h0;
+ 
+     if (~ex_i.valid) begin
+       case (instr.rtype.opcode)
+diff --git a/core/decoder.sv b/core/decoder.sv
+index 1d340eca..3ac1823d 100644
+--- a/core/decoder.sv
++++ b/core/decoder.sv
+@@ -192,6 +192,7 @@ module decoder
+     ecall                                  = 1'b0;
+     ebreak                                 = 1'b0;
+     check_fprm                             = 1'b0;
++    tinst                                  = 32'h0;
+ 
+     if (~ex_i.valid) begin
+       case (instr.rtype.opcode)
+diff --git a/core/decoder.sv b/core/decoder.sv
+index 1d340eca..3ac1823d 100644
+--- a/core/decoder.sv
++++ b/core/decoder.sv
+@@ -192,6 +192,7 @@ module decoder
+     ecall                                  = 1'b0;
+     ebreak                                 = 1'b0;
+     check_fprm                             = 1'b0;
++    tinst                                  = 32'h0;
+ 
+     if (~ex_i.valid) begin
+       case (instr.rtype.opcode)

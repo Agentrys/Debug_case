@@ -1,0 +1,30 @@
+{
+  "case_id": "chipsalliance.Cores-VeeR-EH1#61",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "Cores-VeeR-EH1"
+  },
+  "fix_repo": {
+    "owner": "dawidzim",
+    "name": "Cores-SweRV"
+  },
+  "fix_oid": "8186d3db095b96d54bb0c1788de7da0fbfee1c1e",
+  "buggy_commit_sha": "0555dd87639fb84cc066d80f3271048ecd289bc2",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/chipsalliance.Cores-VeeR-EH1_61.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "8186d3db095b96d54bb0c1788de7da0fbfee1c1e"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "tools/Makefile"
+  ],
+  "raw_diff_path": "ground_truth/chipsalliance.Cores-VeeR-EH1_61.raw.diff"
+}

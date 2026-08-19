@@ -1,0 +1,41 @@
+{
+  "case_id": "riscv-boom.riscv-boom#35",
+  "issue_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_oid": "6605572ab7b804f69188bcae1c69337ca3cd1bae",
+  "buggy_commit_sha": "eebc0ddabd0213f490a851d622d8129de44eb5a3",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/riscv-boom.riscv-boom_35.diff",
+  "diff_sha256": "9432545b21e211fec844621ef0024367d6908cb4d438f3878146c86c12612fd1",
+  "fix_oids_sorted": [
+    "6605572ab7b804f69188bcae1c69337ca3cd1bae",
+    "cd821317484ae192bb1d23e53eb0b9685cae4d57"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/configs.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/configs.scala": [
+      [
+        110,
+        121
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "verisim/Makefile",
+    "verisim/csrc/verilator-harness.cc"
+  ],
+  "raw_diff_path": "ground_truth/riscv-boom.riscv-boom_35.raw.diff"
+}

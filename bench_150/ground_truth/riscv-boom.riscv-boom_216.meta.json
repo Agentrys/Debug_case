@@ -1,0 +1,34 @@
+{
+  "case_id": "riscv-boom.riscv-boom#216",
+  "issue_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_oid": "8b5da59b68d00241e196db00e6e0bd073b3e85fe",
+  "buggy_commit_sha": "6e2e4e26045fdcb70419ef7b88b89162449e5844",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/riscv-boom.riscv-boom_216.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "8b5da59b68d00241e196db00e6e0bd073b3e85fe"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    ".gitmodules",
+    "build.sbt",
+    "generators/example/src/main/scala/RocketConfigs.scala",
+    "generators/sha3",
+    "toolchains/esp-tools"
+  ],
+  "raw_diff_path": "ground_truth/riscv-boom.riscv-boom_216.raw.diff"
+}

@@ -1,0 +1,33 @@
+{
+  "case_id": "chipsalliance.rocket-chip#1160",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "6bd4103c06d728707af8d4a2d7443f59b97f9228",
+  "buggy_commit_sha": "9b82f1098d25e71831095c96b8056d42f9cb73a6",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_1160.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "6bd4103c06d728707af8d4a2d7443f59b97f9228",
+    "07540e3caa813262aeffcfd0b0c76049bda585dd",
+    "7385c99435d4414d481b580f8027dc823e1f7667"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "chisel3",
+    "firrtl"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_1160.raw.diff"
+}

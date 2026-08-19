@@ -1,0 +1,35 @@
+{
+  "case_id": "openhwgroup.ariane#31",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "sld-columbia",
+    "name": "ariane"
+  },
+  "fix_oid": "eb8dbadde3952890f755653d7385c7da7ae84cc1",
+  "buggy_commit_sha": "10f6218caa9e3c4cf8115f941560d4f8de583247",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/openhwgroup.ariane_31.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "eb8dbadde3952890f755653d7385c7da7ae84cc1",
+    "680504fecf1ea42d8d3d0b66dc76a466b47da03f"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "rtl/src/sld/caches/esp-caches",
+    "systemc/l2/src/l2.cpp",
+    "Makefile",
+    "corev_apu/fpga/xilinx/xlnx_axi_clock_converter/tcl/run.tcl",
+    "corev_apu/fpga/xilinx/xlnx_mig_7_ddr3/mig_genesys2.prj"
+  ],
+  "raw_diff_path": "ground_truth/openhwgroup.ariane_31.raw.diff"
+}

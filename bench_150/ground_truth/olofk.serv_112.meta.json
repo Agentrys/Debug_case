@@ -1,0 +1,30 @@
+{
+  "case_id": "olofk.serv#112",
+  "issue_repo": {
+    "owner": "olofk",
+    "name": "serv"
+  },
+  "fix_repo": {
+    "owner": "m42uko",
+    "name": "serv"
+  },
+  "fix_oid": "ff5b25fac790586c0169a8da4bf784f33bc0ec9a",
+  "buggy_commit_sha": "c676c5e1fb5cc60cc611f7085908cd889f0470f4",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/olofk.serv_112.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "ff5b25fac790586c0169a8da4bf784f33bc0ec9a"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "zephyr/drivers/timer/serv_timer.c"
+  ],
+  "raw_diff_path": "ground_truth/olofk.serv_112.raw.diff"
+}

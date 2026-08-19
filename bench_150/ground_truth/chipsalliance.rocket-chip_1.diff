@@ -1,0 +1,2660 @@
+diff --git a/groundtest/src/main/scala/cachetest.scala b/groundtest/src/main/scala/cachetest.scala
+index f943a94b3..7d95ee7a8 100644
+--- a/groundtest/src/main/scala/cachetest.scala
++++ b/groundtest/src/main/scala/cachetest.scala
+@@ -4,7 +4,7 @@ import Chisel._
+ import uncore._
+ import cde.{Parameters, Field}
+ 
+-class CacheFillTest(implicit val p: Parameters) extends GroundTest()(p)
++class CacheFillTest(implicit p: Parameters) extends GroundTest()(p)
+     with HasTileLinkParameters {
+   val capacityKb: Int = p("L2_CAPACITY_IN_KB")
+   val nblocks = capacityKb * 1024 / p(CacheBlockBytes)
+@@ -14,6 +14,8 @@ class CacheFillTest(implicit val p: Parameters) extends GroundTest()(p)
+   val inflight = Reg(init = Bool(false))
+   val active = state === s_prefetch || state === s_retrieve
+ 
++  disablePorts(mem = false)
++
+   val (xact_id, xact_flip) = Counter(io.mem.acquire.fire(), tlMaxClientXacts)
+   val (req_block, round_done) = Counter(io.mem.acquire.fire(), nblocks)
+ 
+@@ -39,5 +41,4 @@ class CacheFillTest(implicit val p: Parameters) extends GroundTest()(p)
+   when (state === s_retrieve && round_done) { state := s_finished }
+ 
+   io.finished := (state === s_finished)
+-  io.cache.req.valid := Bool(false)
+ }
+diff --git a/groundtest/src/main/scala/dmatest.scala b/groundtest/src/main/scala/dmatest.scala
+new file mode 100644
+index 000000000..2bb57d4a5
+--- /dev/null
++++ b/groundtest/src/main/scala/dmatest.scala
+@@ -0,0 +1,123 @@
++package groundtest
++
++import Chisel._
++import uncore._
++import rocket._
++import junctions.PAddrBits
++import cde.{Parameters, Field}
++
++case class DmaTestCase(source: Int, dest: Int, length: Int)
++
++object DmaTestCases {
++  def apply(cases: (Int, Int, Int) *): Seq[DmaTestCase] = {
++    cases.toSeq.map {
++      case (source, dest, length) => DmaTestCase(source, dest, length)
++    }
++  }
++}
++
++case object DmaTestSet extends Field[Seq[DmaTestCase]]
++case object DmaTestDataStart extends Field[Int]
++case object DmaTestDataStride extends Field[Int]
++
++class DmaTest(implicit p: Parameters) extends GroundTest()(p)
++    with HasDmaParameters with HasCoreParameters {
++
++  private val testSet = p(DmaTestSet)
++  private val dataStart = p(DmaTestDataStart)
++  private val dataStride = p(DmaTestDataStride)
++  private val wordBits = 32
++  private val wordBytes = wordBits / 8
++  private val pAddrBits = p(PAddrBits)
++
++  disablePorts(cache = false, dma = false, ptw = false)
++
++  val sourceAddrs = Vec(testSet.map(test => UInt(test.source)))
++  val destAddrs = Vec(testSet.map(test => UInt(test.dest)))
++  val transferLengths = Vec(testSet.map(test => UInt(test.length)))
++  val testIdx = Reg(init = UInt(0, log2Up(testSet.size)))
++
++  val (s_start :: s_fill_req :: s_fill_resp :: s_copy_req :: s_copy_wait ::
++       s_check_req :: s_check_resp :: s_finished :: Nil) = Enum(Bits(), 8)
++  val state = Reg(init = s_start)
++
++  val req_data = Reg(UInt(width = wordBits))
++  val req_addr = Reg(UInt(width = pAddrBits))
++  val bytes_left = Reg(UInt(width = pAddrBits))
++  val prefetch = sourceAddrs(testIdx) === destAddrs(testIdx)
++
++  val frontend = Module(new DmaFrontend)
++  frontend.io.cpu.req.valid := (state === s_copy_req)
++  frontend.io.cpu.req.bits := ClientDmaRequest(
++    cmd = Mux(prefetch, DmaRequest.DMA_CMD_PFR, DmaRequest.DMA_CMD_COPY),
++    src_start = sourceAddrs(testIdx),
++    dst_start = destAddrs(testIdx),
++    segment_size = transferLengths(testIdx))
++
++  io.dma <> frontend.io.dma
++  io.ptw <> frontend.io.ptw
++
++  io.cache.req.valid := (state === s_fill_req) || (state === s_check_req)
++  io.cache.req.bits.addr := req_addr
++  io.cache.req.bits.data := req_data
++  io.cache.req.bits.typ  := MT_W
++  io.cache.req.bits.cmd  := Mux(state === s_fill_req, M_XWR, M_XRD)
++  io.cache.req.bits.kill := Bool(false)
++  io.cache.req.bits.phys := Bool(false)
++
++  when (state === s_start) {
++    req_addr := sourceAddrs(testIdx)
++    req_data := UInt(dataStart)
++    bytes_left := transferLengths(testIdx)
++    state := s_fill_req
++  }
++
++  when (io.cache.req.fire()) {
++    req_addr := req_addr + UInt(wordBytes)
++    bytes_left := bytes_left - UInt(wordBytes)
++    state := Mux(state === s_fill_req, s_fill_resp, s_check_resp)
++  }
++
++  when (state === s_fill_resp && io.cache.resp.valid) {
++    req_data := req_data + UInt(dataStride)
++    state := Mux(bytes_left === UInt(0), s_copy_req, s_fill_req)
++  }
++
++  when (frontend.io.cpu.req.fire()) { state := s_copy_wait }
++
++  when (state === s_copy_wait && !frontend.io.busy) {
++    req_addr := destAddrs(testIdx)
++    req_data := UInt(dataStart)
++    bytes_left := transferLengths(testIdx)
++    state := s_check_req
++  }
++
++  when (state === s_check_resp && io.cache.resp.valid) {
++    req_data := req_data + UInt(dataStride)
++    when (bytes_left > UInt(0)) {
++      state := s_check_req
++    } .elsewhen (testIdx === UInt(testSet.size - 1)) {
++      state := s_finished
++    } .otherwise {
++      testIdx := testIdx + UInt(1)
++      state := s_start
++    }
++  }
++
++  io.finished := (state === s_finished)
++
++  testSet.foreach { case DmaTestCase(source, dest, length) =>
++    require(source % wordBytes == 0, "source address must be word-aligned")
++    require(dest % wordBytes == 0, "destination address must be word-aligned")
++    require(length % wordBytes == 0, "transfer length must be word-aligned")
++  }
++
++  assert(!io.cache.resp.valid || !io.cache.resp.bits.has_data ||
++    io.cache.resp.bits.data === req_data, "Received data does not match")
++
++  val dma_timeout = Timer(1000, io.dma.req.fire(), io.dma.resp.fire())
++  assert(!dma_timeout, "DMA request timed out")
++
++  val cache_timeout = Timer(1000, io.cache.req.fire(), io.cache.resp.valid)
++  assert(!cache_timeout, "Memory request timed out")
++}
+diff --git a/groundtest/src/main/scala/generator.scala b/groundtest/src/main/scala/generator.scala
+index 277f6546b..f320b9bcf 100644
+--- a/groundtest/src/main/scala/generator.scala
++++ b/groundtest/src/main/scala/generator.scala
+@@ -151,28 +151,23 @@ class HellaCacheGenerator(id: Int)
+     s"Received incorrect data in cached generator ${id}")
+ }
+ 
+-class GeneratorTest(id: Int)(implicit val p: Parameters)
++class GeneratorTest(id: Int)(implicit p: Parameters)
+     extends GroundTest()(p) with HasGeneratorParams {
+ 
+-  val gen_finished = Wire(Vec(2, Bool()))
++  disablePorts(mem = !genUncached, cache = !genCached)
++
++  val gen_finished = Wire(init = Vec.fill(2){Bool(true)})
+ 
+   if (genUncached) {
+     val uncacheGen = Module(new UncachedTileLinkGenerator(id))
+     io.mem <> uncacheGen.io.mem
+     gen_finished(0) := uncacheGen.io.finished
+-  } else {
+-    io.mem.acquire.valid := Bool(false)
+-    io.mem.grant.ready := Bool(false)
+-    gen_finished(0) := Bool(true)
+   }
+ 
+   if (genCached) {
+     val cacheGen = Module(new HellaCacheGenerator(id))
+     io.cache <> cacheGen.io.mem
+     gen_finished(1) := cacheGen.io.finished
+-  } else {
+-    io.cache.req.valid := Bool(false)
+-    gen_finished(1) := Bool(true)
+   }
+ 
+   io.finished := gen_finished.reduce(_ && _)
+diff --git a/groundtest/src/main/scala/regression.scala b/groundtest/src/main/scala/regression.scala
+index 280bc6278..8bfa13158 100644
+--- a/groundtest/src/main/scala/regression.scala
++++ b/groundtest/src/main/scala/regression.scala
+@@ -386,6 +386,7 @@ object RegressionTests {
+ case object GroundTestRegressions extends Field[Parameters => Seq[Regression]]
+ 
+ class RegressionTest(implicit p: Parameters) extends GroundTest()(p) {
++  disablePorts(mem = false, cache = false)
+ 
+   val regressions = p(GroundTestRegressions)(p)
+   val regressIOs = Vec(regressions.map(_.io))
+diff --git a/groundtest/src/main/scala/tile.scala b/groundtest/src/main/scala/tile.scala
+index deabec344..06f56ef74 100644
+--- a/groundtest/src/main/scala/tile.scala
++++ b/groundtest/src/main/scala/tile.scala
+@@ -12,8 +12,7 @@ case object GroundTestMaxXacts extends Field[Int]
+ 
+ /** A "cache" that responds to probe requests with a release indicating
+  *  the block is not present */
+-class DummyCache(implicit val p: Parameters) extends Module
+-    with HasGeneratorParams {
++class DummyCache(implicit val p: Parameters) extends Module {
+   val io = new ClientTileLinkIO
+ 
+   val req = Reg(new Probe)
+@@ -37,6 +36,45 @@ class DummyCache(implicit val p: Parameters) extends Module
+   }
+ }
+ 
++class DummyPTW(n: Int)(implicit p: Parameters) extends CoreModule()(p) {
++  val io = new Bundle {
++    val requestors = Vec(n, new TLBPTWIO).flip
++  }
++
++  val req_arb = Module(new RRArbiter(new PTWReq, n))
++  req_arb.io.in <> io.requestors.map(_.req)
++  req_arb.io.out.ready := Bool(true)
++
++  def vpn_to_ppn(vpn: UInt): UInt = vpn(ppnBits - 1, 0)
++
++  class QueueChannel extends ParameterizedBundle()(p) {
++    val ppn = UInt(width = ppnBits)
++    val chosen = UInt(width = log2Up(n))
++  }
++
++  val s1_ppn = vpn_to_ppn(req_arb.io.out.bits.addr)
++  val s2_ppn = RegEnable(s1_ppn, req_arb.io.out.valid)
++  val s2_chosen = RegEnable(req_arb.io.chosen, req_arb.io.out.valid)
++  val s2_valid = Reg(next = req_arb.io.out.valid)
++
++  val s2_resp = Wire(new PTWResp)
++  s2_resp.error := Bool(false)
++  s2_resp.pte.ppn := s2_ppn
++  s2_resp.pte.reserved_for_software := UInt(0)
++  s2_resp.pte.d := Bool(false)
++  s2_resp.pte.r := Bool(false)
++  s2_resp.pte.typ := UInt(2)
++  s2_resp.pte.v := Bool(true)
++
++  io.requestors.zipWithIndex.foreach { case (requestor, i) =>
++    requestor.resp.valid := s2_valid && s2_chosen === UInt(i)
++    requestor.resp.bits := s2_resp
++    requestor.status.mprv := Bool(false)
++    requestor.status.vm := UInt("b01000")
++    requestor.status.prv := UInt(PRV_S)
++  }
++}
++
+ class CSRHandler(implicit val p: Parameters) extends Module {
+   private val csrDataBits = 64
+   private val csrAddrBits = 12
+@@ -67,20 +105,44 @@ class CSRHandler(implicit val p: Parameters) extends Module {
+ class GroundTestIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
+   val cache = new HellaCacheIO
+   val mem = new ClientUncachedTileLinkIO
++  val dma = new DmaIO
++  val ptw = new TLBPTWIO
+   val finished = Bool(OUTPUT)
+ }
+ 
+-abstract class GroundTest(implicit p: Parameters) extends Module {
++abstract class GroundTest(implicit val p: Parameters) extends Module {
+   val io = new GroundTestIO
++
++  def disablePorts(mem: Boolean = true,
++                   cache: Boolean = true,
++                   dma: Boolean = true,
++                   ptw: Boolean = true) {
++    if (mem) {
++      io.mem.acquire.valid := Bool(false)
++      io.mem.grant.ready := Bool(false)
++    }
++    if (cache) {
++      io.cache.req.valid := Bool(false)
++    }
++    if (dma) {
++      io.dma.req.valid := Bool(false)
++      io.dma.resp.ready := Bool(false)
++    }
++    if (ptw) {
++      io.ptw.req.valid := Bool(false)
++    }
++  }
+ }
+ 
+ class GroundTestTile(id: Int, resetSignal: Bool)
+                    (implicit val p: Parameters) extends Tile(resetSignal)(p) {
+ 
+-  val dcache = Module(new HellaCache()(dcacheParams))
+-  val dcacheIF = Module(new SimpleHellaCacheIF()(dcacheParams))
+   val test = p(BuildGroundTest)(id, dcacheParams)
+   io.uncached.head <> test.io.mem
++  io.dma <> test.io.dma
++
++  val dcache = Module(new HellaCache()(dcacheParams))
++  val dcacheIF = Module(new SimpleHellaCacheIF()(dcacheParams))
+   dcacheIF.io.requestor <> test.io.cache
+   dcache.io.cpu <> dcacheIF.io.cache
+   io.cached.head <> dcache.io.mem
+@@ -88,4 +150,8 @@ class GroundTestTile(id: Int, resetSignal: Bool)
+   val csr = Module(new CSRHandler)
+   csr.io.finished := test.io.finished
+   csr.io.csr <> io.host.csr
++
++  val ptw = Module(new DummyPTW(2))
++  ptw.io.requestors(0) <> test.io.ptw
++  ptw.io.requestors(1) <> dcache.io.ptw
+ }
+diff --git a/src/main/resources/vsrc/TestDriver.v b/src/main/resources/vsrc/TestDriver.v
+index f9b7f5ae4..a33ec925e 100644
+--- a/src/main/resources/vsrc/TestDriver.v
++++ b/src/main/resources/vsrc/TestDriver.v
+@@ -25,6 +25,16 @@ module TestDriver;
+   reg [2047:0] vcdplusfile = 0;
+   reg [2047:0] vcdfile = 0;
+   int unsigned rand_value;
++
++	 initial 
++	 begin
++      $fsdbDumpfile("tb_top");
++      $fsdbDumpvars("+all");		
++	 end
++
++
++
++
+   initial
+   begin
+     void'($value$plusargs("max-cycles=%d", max_cycles));
+@@ -47,23 +57,29 @@ module TestDriver;
+ `endif
+     end
+ 
++
++
++
+ `ifdef DEBUG
+ 
+     if ($value$plusargs("vcdplusfile=%s", vcdplusfile))
+     begin
+ `ifdef VCS
+-      $vcdplusfile(vcdplusfile);
++     // $vcdplusfile(vcdplusfile);
+ `else
+-      $fdisplay(stderr, "Error: +vcdplusfile is VCS-only; use +vcdfile instead or recompile with VCS=1");
+-      $fatal;
++      //$fdisplay(stderr, "Error: +vcdplusfile is VCS-only; use +vcdfile instead or recompile with VCS=1");
++     // $fatal;
+ `endif
+     end
+ 
+     if ($value$plusargs("fsdbfile=%s", fsdbfile))
+     begin
+ `ifdef FSDB
+-      $fsdbDumpfile(fsdbfile);
+-      $fsdbDumpvars("+all");
++     // $fsdbDumpfile(fsdbfile);
++      //$fsdbDumpvars("+all");
++
++      //$fsdbDumpfile("tb_top");
++      //$fsdbDumpvars("+all");		
+       //$fsdbDumpSVA;
+ `else
+       $fdisplay(stderr, "Error: +fsdbfile is FSDB-only; use +vcdfile/+vcdplus instead or recompile with FSDB=1");
+@@ -73,8 +89,8 @@ module TestDriver;
+ 
+     if ($value$plusargs("vcdfile=%s", vcdfile))
+     begin
+-      $dumpfile(vcdfile);
+-      $dumpvars(0, testHarness);
++     // $dumpfile(vcdfile);
++      //$dumpvars(0, testHarness);
+     end
+ 
+ `ifdef FSDB
+@@ -92,6 +108,8 @@ module TestDriver;
+ `define VCDPLUSON
+ `define VCDPLUSCLOSE
+ 
++
++
+     if ($test$plusargs("vcdplusfile=") || $test$plusargs("vcdfile=") || $test$plusargs("fsdbfile="))
+     begin
+       $fdisplay(stderr, "Error: +vcdfile, +vcdplusfile, or +fsdbfile requested but compile did not have +define+DEBUG enabled");
+@@ -105,8 +123,10 @@ module TestDriver;
+       // Start dumping before first clock edge to capture reset sequence in waveform
+       `VCDPLUSON
+     end
++	 
+   end
+ 
++
+ `ifdef TESTBENCH_IN_UVM
+   // UVM library has its own way to manage end-of-simulation.
+   // A UVM-based testbench will raise an objection, watch this signal until this goes 1, then drop the objection.
+@@ -161,6 +181,10 @@ module TestDriver;
+     end
+   end
+ 
++    
++
++
++
+   `MODEL testHarness(
+     .clock(clock),
+     .reset(reset),
+diff --git a/src/main/scala/devices/tilelink/BootROM.scala b/src/main/scala/devices/tilelink/BootROM.scala
+index 9ffdac9e6..32c05a6e1 100644
+--- a/src/main/scala/devices/tilelink/BootROM.scala
++++ b/src/main/scala/devices/tilelink/BootROM.scala
+@@ -14,10 +14,12 @@ import java.nio.ByteBuffer
+ import java.nio.file.{Files, Paths}
+ 
+ /** Size, location and contents of the boot rom. */
++//wzw:为了让rocket以spike的方式运行 修改了pc的起始地址 但是修改后存在错误
+ case class BootROMParams(
+   address: BigInt = 0x10000,
+   size: Int = 0x10000,
+   hang: BigInt = 0x10040, // The hang parameter is used as the power-on reset vector
++//  hang: BigInt = 0x10000, // The hang parameter is used as the power-on reset vector
+   contentFileName: String)
+ 
+ class TLROM(val base: BigInt, val size: Int, contentsDelayed: => Seq[Byte], executable: Boolean = true, beatBytes: Int = 4,
+diff --git a/src/main/scala/rocket/CSR.scala b/src/main/scala/rocket/CSR.scala
+index 039b63a95..f001564f3 100644
+--- a/src/main/scala/rocket/CSR.scala
++++ b/src/main/scala/rocket/CSR.scala
+@@ -297,6 +297,31 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
+     val set_vstart = Flipped(Valid(vstart))
+     val set_vxsat = Input(Bool())
+   })
++  /**
++   * @Editors: wuzewei
++   * @Description: add for verification
++   */
++  val mepc = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val mtval= coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val mtvec= coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val mcause = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val mip = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val mie = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val mscratch = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val mideleg = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val medeleg = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val minstret = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val sstatus = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val sepc = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val stval = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val stvec = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val scause = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val satp = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val sscratch = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val vtype = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val vcsr = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val vl = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
++  val vstart = coreParams.useVerif.option(Output(UInt((NRET*xLen).W)))
+ }
+ 
+ class VConfig(implicit p: Parameters) extends CoreBundle {
+@@ -308,10 +333,19 @@ object VType {
+   def fromUInt(that: UInt, ignore_vill: Boolean = false)(implicit p: Parameters): VType = {
+     val res = 0.U.asTypeOf(new VType)
+     val in = that.asTypeOf(res)
++    //第二个和三个条件能对应上，第一个有误
+     val vill = (in.max_vsew.U < in.vsew) || !in.lmul_ok || in.reserved =/= 0.U || in.vill
++    //wzw添加otherwise条件 若是不符合时按照spike进行赋值
+     when (!vill || ignore_vill.B) {
+       res := in
+       res.vsew := in.vsew(log2Ceil(1 + in.max_vsew) - 1, 0)
++    }.otherwise{
++      //res := 0.U
++      res.vma := 0.U
++      res.vta := 0.U
++      res.vsew := 0.U
++      res.vlmul_sign := 0.U
++      res.vlmul_mag := 0.U
+     }
+     res.reserved := 0.U
+     res.vill := vill
+@@ -957,6 +991,32 @@ class CSRFile(
+   io.gstatus.uxl := (if (usingUser) log2Ceil(xLen) - 4 else 0).U
+   io.gstatus.sd_rv32 := (xLen == 32).B && io.gstatus.sd
+ 
++/**
++   * @Editors: wuzewei
++   * @Description: add for verification
++   */
++  if(coreParams.useVerif){
++  io.mepc.get := formEPC(wdata)
++  io.mtval.get := reg_mtval.sextTo(xLen)
++  io.mtvec.get := read_mtvec
++  io.mcause.get := reg_mcause
++  io.mip.get := read_mip
++  io.mie.get := reg_mie
++  io.mscratch.get := reg_mscratch 
++  io.mideleg.get := read_mideleg
++  io.medeleg.get := read_medeleg
++  io.minstret.get := reg_instret
++  io.sepc.get := readEPC(reg_sepc).sextTo(xLen) 
++  io.stval.get := reg_stval.sextTo(xLen) 
++  io.stvec.get := read_stvec
++  io.scause.get := reg_scause
++  io.satp.get := reg_satp.asUInt
++  io.sscratch.get := reg_sscratch
++  io.vtype.get := reg_vconfig.get.vtype.asUInt
++  io.vcsr.get := read_vcsr
++  io.vl.get := reg_vconfig.get.vl
++  io.vstart.get := reg_vstart.get}
++
+   val exception = insn_call || insn_break || io.exception
+   assert(PopCount(insn_ret :: insn_call :: insn_break :: io.exception :: Nil) <= 1.U, "these conditions must be mutually exclusive")
+ 
+diff --git a/src/main/scala/rocket/IDecode.scala b/src/main/scala/rocket/IDecode.scala
+index d75be9864..b4d5c50a6 100644
+--- a/src/main/scala/rocket/IDecode.scala
++++ b/src/main/scala/rocket/IDecode.scala
+@@ -16,6 +16,7 @@ abstract trait DecodeConstants
+   val table: Array[(BitPat, List[BitPat])]
+ }
+ 
++//增加vector译码信号
+ class IntCtrlSigs(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends Bundle {
+ 
+   val legal = Bool()
+@@ -49,6 +50,8 @@ class IntCtrlSigs(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends Bu
+   val fence = Bool()
+   val amo = Bool()
+   val dp = Bool()
++  val vector = Bool()
++  val vset = Bool()
+ 
+   def default: List[BitPat] =
+                 //           jal                                                                         renf1               fence.i
+@@ -59,13 +62,16 @@ class IntCtrlSigs(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends Bu
+                 //   | | | | | | | | | zbk     |       |       |      |      |             | |           | | | | | div       | fence
+                 //   | | | | | | | | | | zkn   |       |       |      |      |             | |           | | | | | | wxd     | | amo
+                 //   | | | | | | | | | | | zks |       |       |      |      |             | |           | | | | | | |       | | | dp
+-                List(N,X,X,X,X,X,X,X,X,X,X,X,  A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,   N,M_X,        X,X,X,X,X,X,X,CSR.X,X,X,X,X)
+-
++                List(N,X,X,X,X,X,X,X,X,X,X,X,  A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,   N,M_X,        X,X,X,X,X,X,X,CSR.X,X,X,X,X,X,X)
++  /**
++   * @Editors: wuzewei
++   * @Description: 加入vector和vset
++   */
+   def decode(inst: UInt, table: Iterable[(BitPat, List[BitPat])]) = {
+     val decoder = DecodeLogic(inst, default, table)
+     val sigs = Seq(legal, fp, rocc, branch, jal, jalr, rxs2, rxs1, scie, zbk, zkn, zks, sel_alu2,
+                    sel_alu1, sel_imm, alu_dw, alu_fn, mem, mem_cmd,
+-                   rfs1, rfs2, rfs3, wfd, mul, div, wxd, csr, fence_i, fence, amo, dp)
++                   rfs1, rfs2, rfs3, wfd, mul, div, wxd, csr, fence_i, fence, amo, dp, vector, vset)
+     sigs zip decoder map {case(s,d) => s := d}
+     this
+   }
+@@ -74,62 +80,109 @@ class IntCtrlSigs(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends Bu
+ class IDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    BNE->       List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SNE,   N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    BEQ->       List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SEQ,   N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    BLT->       List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SLT,   N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    BLTU->      List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SLTU,  N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    BGE->       List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SGE,   N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    BGEU->      List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SGEU,  N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-
+-    JAL->       List(Y,N,N,N,Y,N,N,N,N,N,N,N,A2_SIZE,A1_PC,  IMM_UJ,DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    JALR->      List(Y,N,N,N,N,Y,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    AUIPC->     List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_PC,  IMM_U, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-
+-    LB->        List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    LH->        List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    LW->        List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    LBU->       List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    LHU->       List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SB->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    SH->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    SW->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-
+-    LUI->       List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_ZERO,IMM_U, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    ADDI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SLTI ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SLT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SLTIU->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SLTU,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    ANDI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_AND,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    ORI->       List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_OR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    XORI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_XOR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    ADD->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SUB->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SUB,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SLT->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SLT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SLTU->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SLTU,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    AND->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_AND,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    OR->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_OR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    XOR->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_XOR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SLL->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SRL->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SRA->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SRA,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-
+-    FENCE->     List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,Y,N,N),
+-
+-    ECALL->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N),
+-    EBREAK->    List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N),
+-    MRET->      List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N),
+-    WFI->       List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N),
+-    CSRRW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.W,N,N,N,N),
+-    CSRRS->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.S,N,N,N,N),
+-    CSRRC->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.C,N,N,N,N),
+-    CSRRWI->    List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_ZERO,IMM_Z, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.W,N,N,N,N),
+-    CSRRSI->    List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_ZERO,IMM_Z, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.S,N,N,N,N),
+-    CSRRCI->    List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_ZERO,IMM_Z, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.C,N,N,N,N))
++    BNE->       List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SNE,   N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    BEQ->       List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SEQ,   N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    BLT->       List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SLT,   N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    BLTU->      List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SLTU,  N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    BGE->       List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SGE,   N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    BGEU->      List(Y,N,N,Y,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_SB,DW_XPR,aluFn.FN_SGEU,  N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++
++    JAL->       List(Y,N,N,N,Y,N,N,N,N,N,N,N,A2_SIZE,A1_PC,  IMM_UJ,DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    JALR->      List(Y,N,N,N,N,Y,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    AUIPC->     List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_PC,  IMM_U, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++
++    LB->        List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    LH->        List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    LW->        List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    LBU->       List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    LHU->       List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SB->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    SH->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    SW->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++
++    LUI->       List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_ZERO,IMM_U, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    ADDI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SLTI ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SLT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SLTIU->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SLTU,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    ANDI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_AND,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    ORI->       List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_OR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    XORI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_XOR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    ADD->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SUB->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SUB,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SLT->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SLT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SLTU->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SLTU,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    AND->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_AND,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    OR->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_OR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    XOR->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_XOR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SLL->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SRL->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SRA->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_SRA,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++
++    FENCE->     List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,Y,N,N,N,N),
++
++    ECALL->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
++    EBREAK->    List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
++    MRET->      List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
++    WFI->       List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
++    CSRRW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.W,N,N,N,N,N,N),
++    CSRRS->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.S,N,N,N,N,N,N),
++    CSRRC->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.C,N,N,N,N,N,N),
++    CSRRWI->    List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_ZERO,IMM_Z, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.W,N,N,N,N,N,N),
++    CSRRSI->    List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_ZERO,IMM_Z, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.S,N,N,N,N,N,N),
++    CSRRCI->    List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_ZERO,IMM_Z, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.C,N,N,N,N,N,N),
++
++    //增加vector指令译码表，jyf
++    // VL_X->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    // VLS_X->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    // VLX_X->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    // VS_X->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    // VSS_X->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    // VSX_X->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VL_XE8->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VL_XE16->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VL_XE32->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VL_XE64->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VLS_XE8->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VLS_XE16->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VLS_XE32->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VLS_XE64->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VLX_XE8->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VLX_XE16->  List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VLX_XE32->  List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VLX_XE64->  List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VS_XE8->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VS_XE16->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VS_XE32->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VS_XE64->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VSS_XE8->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VSS_XE16->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VSS_XE32->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VSS_XE64->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VSX_XE8->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VSX_XE16->  List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VSX_XE32->  List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    VSX_XE64->  List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    OPIVV->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    OPFVV->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    OPMVV->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    OPIVI->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    OPIVX->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    OPFVF->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    OPMVX->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.N,N,N,N,N,Y,N),
++    /**
++     * @Change: wuzewei
++     * @Description: 更改某些地方逻辑
++     */
++    VSETIVLI->  List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_IMM, A1_ZERO,IMM_I, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,Y),
++    VSETVLI->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_ZERO,IMM_I, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,Y),
++    VSETVL->    List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_ZERO,IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,Y))
++
+ }
+ 
+ class CeaseDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    CEASE->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N))
++    CEASE->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N))
+ }
+ 
+ 
+@@ -138,14 +191,14 @@ class FenceIDecode(flushDCache: Boolean, aluFn: ALUFN = ALUFN())(implicit val p:
+   private val (v, cmd) = if (flushDCache) (Y, BitPat(M_FLUSH_ALL)) else (N, M_X)
+ 
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    FENCE_I->   List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     v,cmd,        N,N,N,N,N,N,N,CSR.N,Y,Y,N,N))
++    FENCE_I->   List(Y,N,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     v,cmd,        N,N,N,N,N,N,N,CSR.N,Y,Y,N,N,N,N))
+ }
+ 
+ class ConditionalZeroDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    CZERO_EQZ-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_CZEQZ, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CZERO_NEZ-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_CZNEZ, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    CZERO_EQZ-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_CZEQZ, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CZERO_NEZ-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_CZNEZ, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class CFlushDecode(supportsFlushLine: Boolean, aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+@@ -154,94 +207,94 @@ class CFlushDecode(supportsFlushLine: Boolean, aluFn: ALUFN = ALUFN())(implicit
+ 
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     zapRs1(CFLUSH_D_L1)->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_FLUSH_ALL,N,N,N,N,N,N,N,CSR.I,N,N,N,N),
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_FLUSH_ALL,N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
+     zapRs1(CDISCARD_D_L1)->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_FLUSH_ALL,N,N,N,N,N,N,N,CSR.I,N,N,N,N))
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_FLUSH_ALL,N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N))
+ }
+ 
+ class SVMDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    SFENCE_VMA->List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_SFENCE,   N,N,N,N,N,N,N,CSR.I,N,N,N,N))
++    SFENCE_VMA->List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_SFENCE,   N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N))
+ }
+ 
+ class SDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    SRET->      List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N))
++    SRET->      List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N))
+ }
+ 
+ class HypervisorDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+ 
+-    HFENCE_VVMA->List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_HFENCEV,  N,N,N,N,N,N,N,CSR.I,N,N,N,N),
+-    HFENCE_GVMA->List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_HFENCEG,  N,N,N,N,N,N,N,CSR.I,N,N,N,N),
++    HFENCE_VVMA->List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_HFENCEV,  N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
++    HFENCE_GVMA->List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_HFENCEG,  N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
+ 
+-    HLV_B ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N),
+-    HLV_BU->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N),
+-    HLV_H ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N),
+-    HLV_HU->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N),
+-    HLVX_HU->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_HLVX,     N,N,N,N,N,N,Y,CSR.I,N,N,N,N),
+-    HLV_W->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N),
+-    HLVX_WU->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_HLVX,     N,N,N,N,N,N,Y,CSR.I,N,N,N,N),
++    HLV_B ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N,N,N),
++    HLV_BU->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N,N,N),
++    HLV_H ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N,N,N),
++    HLV_HU->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N,N,N),
++    HLVX_HU->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_HLVX,     N,N,N,N,N,N,Y,CSR.I,N,N,N,N,N,N),
++    HLV_W->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N,N,N),
++    HLVX_WU->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_HLVX,     N,N,N,N,N,N,Y,CSR.I,N,N,N,N,N,N),
+ 
+-    HSV_B->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_I, DW_XPR, aluFn.FN_ADD, Y,M_XWR,      N,N,N,N,N,N,N,CSR.I,N,N,N,N),
+-    HSV_H->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_I, DW_XPR, aluFn.FN_ADD, Y,M_XWR,      N,N,N,N,N,N,N,CSR.I,N,N,N,N),
+-    HSV_W->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_I, DW_XPR, aluFn.FN_ADD, Y,M_XWR,      N,N,N,N,N,N,N,CSR.I,N,N,N,N))
++    HSV_B->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_I, DW_XPR, aluFn.FN_ADD, Y,M_XWR,      N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
++    HSV_H->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_I, DW_XPR, aluFn.FN_ADD, Y,M_XWR,      N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
++    HSV_W->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_I, DW_XPR, aluFn.FN_ADD, Y,M_XWR,      N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N))
+ }
+ 
+ class DebugDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    DRET->      List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N))
++    DRET->      List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N))
+ }
+ 
+ class NMIDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    MNRET->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N))
++    MNRET->     List(Y,N,N,N,N,N,N,X,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N))
+ }
+ 
+ class I32Decode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     Instructions32.SLLI->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.SRLI->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.SRAI->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SRA,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SRA,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class I64Decode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    LD->        List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    LWU->       List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SD->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,N,N,N,N,N,N,CSR.N,N,N,N,N),
++    LD->        List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    LWU->       List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SD->        List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
+ 
+-    SLLI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SRLI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SRAI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SRA,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++    SLLI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SRLI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SRAI->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_SRA,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+ 
+-    ADDIW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_32,aluFn.FN_ADD,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SLLIW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_32,aluFn.FN_SL,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SRLIW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_32,aluFn.FN_SR,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SRAIW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_32,aluFn.FN_SRA,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    ADDW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_ADD,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SUBW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_SUB,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SLLW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_SL,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SRLW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_SR,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SRAW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_SRA,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    ADDIW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_32,aluFn.FN_ADD,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SLLIW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_32,aluFn.FN_SL,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SRLIW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_32,aluFn.FN_SR,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SRAIW->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_32,aluFn.FN_SRA,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    ADDW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_ADD,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SUBW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_SUB,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SLLW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_SL,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SRLW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_SR,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SRAW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32,aluFn.FN_SRA,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class Hypervisor64Decode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    HLV_D->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N),
+-    HSV_D->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_I, DW_XPR, aluFn.FN_ADD, Y,M_XWR,      N,N,N,N,N,N,N,CSR.I,N,N,N,N),
+-    HLV_WU->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N))
++    HLV_D->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N,N,N),
++    HSV_D->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_I, DW_XPR, aluFn.FN_ADD, Y,M_XWR,      N,N,N,N,N,N,N,CSR.I,N,N,N,N,N,N),
++    HLV_WU->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_ZERO, A1_RS1, IMM_X, DW_XPR, aluFn.FN_ADD, Y,M_XRD,      N,N,N,N,N,N,Y,CSR.I,N,N,N,N,N,N))
+ }
+ 
+ class MDecode(pipelinedMul: Boolean, aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+@@ -249,15 +302,15 @@ class MDecode(pipelinedMul: Boolean, aluFn: ALUFN = ALUFN())(implicit val p: Par
+   val M = if (pipelinedMul) Y else N
+   val D = if (pipelinedMul) N else Y
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    MUL->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_MUL,   N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N),
+-    MULH->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_MULH,  N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N),
+-    MULHU->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_MULHU, N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N),
+-    MULHSU->    List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_MULHSU,N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N),
++    MUL->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_MUL,   N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N,N,N),
++    MULH->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_MULH,  N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N,N,N),
++    MULHU->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_MULHU, N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N,N,N),
++    MULHSU->    List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_MULHSU,N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N,N,N),
+ 
+-    DIV->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_DIV,   N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N),
+-    DIVU->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_DIVU,  N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N),
+-    REM->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_REM,   N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N),
+-    REMU->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_REMU,  N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N))
++    DIV->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_DIV,   N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N,N,N),
++    DIVU->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_DIVU,  N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N,N,N),
++    REM->       List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_REM,   N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N,N,N),
++    REMU->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_XPR,aluFn.FN_REMU,  N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class M64Decode(pipelinedMul: Boolean, aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+@@ -265,184 +318,184 @@ class M64Decode(pipelinedMul: Boolean, aluFn: ALUFN = ALUFN())(implicit val p: P
+   val M = if (pipelinedMul) Y else N
+   val D = if (pipelinedMul) N else Y
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    MULW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_MUL,   N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N),
++    MULW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_MUL,   N,M_X,        N,N,N,N,M,D,Y,CSR.N,N,N,N,N,N,N),
+ 
+-    DIVW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_DIV,   N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N),
+-    DIVUW->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_DIVU,  N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N),
+-    REMW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_REM,   N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N),
+-    REMUW->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_REMU,  N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N))
++    DIVW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_DIV,   N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N,N,N),
++    DIVUW->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_DIVU,  N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N,N,N),
++    REMW->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_REM,   N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N,N,N),
++    REMUW->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2, A1_RS1, IMM_X, DW_32, aluFn.FN_REMU,  N,M_X,        N,N,N,N,N,Y,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ADecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    AMOADD_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_ADD,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOXOR_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_XOR,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOSWAP_W-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_SWAP,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOAND_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_AND,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOOR_W->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_OR,    N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOMIN_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MIN,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOMINU_W-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MINU,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOMAX_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MAX,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOMAXU_W-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MAXU,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
++    AMOADD_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_ADD,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOXOR_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_XOR,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOSWAP_W-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_SWAP,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOAND_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_AND,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOOR_W->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_OR,    N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOMIN_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MIN,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOMINU_W-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MINU,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOMAX_W->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MAX,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOMAXU_W-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MAXU,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
+ 
+-    LR_W->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XLR,      N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    SC_W->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XSC,      N,N,N,N,N,N,Y,CSR.N,N,N,Y,N))
++    LR_W->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XLR,      N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    SC_W->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XSC,      N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N))
+ }
+ 
+ class A64Decode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    AMOADD_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_ADD,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOSWAP_D-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_SWAP,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOXOR_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_XOR,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOAND_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_AND,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOOR_D->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_OR,    N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOMIN_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MIN,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOMINU_D-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MINU,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOMAX_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MAX,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    AMOMAXU_D-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MAXU,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
++    AMOADD_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_ADD,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOSWAP_D-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_SWAP,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOXOR_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_XOR,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOAND_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_AND,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOOR_D->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_OR,    N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOMIN_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MIN,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOMINU_D-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MINU,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOMAX_D->  List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MAX,   N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    AMOMAXU_D-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XA_MAXU,  N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
+ 
+-    LR_D->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XLR,      N,N,N,N,N,N,Y,CSR.N,N,N,Y,N),
+-    SC_D->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XSC,      N,N,N,N,N,N,Y,CSR.N,N,N,Y,N))
++    LR_D->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XLR,      N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N),
++    SC_D->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   Y,M_XSC,      N,N,N,N,N,N,Y,CSR.N,N,N,Y,N,N,N))
+ }
+ 
+ class HDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    FCVT_S_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FCVT_H_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSGNJ_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSGNJX_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSGNJN_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMIN_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMAX_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FADD_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSUB_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMUL_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMADD_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMSUB_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N),
+-    FNMADD_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N),
+-    FNMSUB_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N),
+-    FCLASS_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FMV_X_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FCVT_W_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FCVT_WU_H-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FEQ_H->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FLT_H->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FLE_H->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FMV_H_X->   List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FCVT_H_W->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FCVT_H_WU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FLH->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSH->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,Y,N,N,N,N,N,CSR.N,N,N,N,N),
+-    FDIV_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSQRT_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N))
++    FCVT_S_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FCVT_H_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSGNJ_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSGNJX_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSGNJN_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMIN_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMAX_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FADD_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSUB_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMUL_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMADD_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMSUB_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FNMADD_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FNMSUB_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FCLASS_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FMV_X_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FCVT_W_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FCVT_WU_H-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FEQ_H->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FLT_H->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FLE_H->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FMV_H_X->   List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FCVT_H_W->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FCVT_H_WU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FLH->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSH->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,Y,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    FDIV_H->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSQRT_H->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class FDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    FSGNJ_S->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSGNJX_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSGNJN_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMIN_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMAX_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FADD_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSUB_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMUL_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMADD_S->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N),
+-    FMSUB_S->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N),
+-    FNMADD_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N),
+-    FNMSUB_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N),
+-    FCLASS_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FMV_X_W->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FCVT_W_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FCVT_WU_S-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FEQ_S->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FLT_S->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FLE_S->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FMV_W_X->   List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FCVT_S_W->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FCVT_S_WU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FLW->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSW->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,Y,N,N,N,N,N,CSR.N,N,N,N,N),
+-    FDIV_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FSQRT_S->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N))
++    FSGNJ_S->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSGNJX_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSGNJN_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMIN_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMAX_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FADD_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSUB_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMUL_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMADD_S->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FMSUB_S->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FNMADD_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FNMSUB_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FCLASS_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FMV_X_W->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FCVT_W_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FCVT_WU_S-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FEQ_S->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FLT_S->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FLE_S->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FMV_W_X->   List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FCVT_S_W->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FCVT_S_WU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FLW->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSW->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,Y,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    FDIV_S->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FSQRT_S->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class DDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    FCVT_S_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FCVT_D_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FSGNJ_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FSGNJX_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FSGNJN_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FMIN_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FMAX_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FADD_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FSUB_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FMUL_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FMADD_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FMSUB_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FNMADD_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FNMSUB_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FCLASS_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y),
+-    FCVT_W_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y),
+-    FCVT_WU_D-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y),
+-    FEQ_D->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,Y),
+-    FLT_D->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,Y),
+-    FLE_D->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,Y),
+-    FCVT_D_W->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FCVT_D_WU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FLD->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FSD->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,Y,N,N,N,N,N,CSR.N,N,N,N,Y),
+-    FDIV_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FSQRT_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y))
++    FCVT_S_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FCVT_D_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FSGNJ_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FSGNJX_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FSGNJN_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FMIN_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FMAX_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FADD_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FSUB_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FMUL_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FMADD_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FMSUB_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FNMADD_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FNMSUB_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,Y,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FCLASS_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y,N,N),
++    FCVT_W_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y,N,N),
++    FCVT_WU_D-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y,N,N),
++    FEQ_D->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,Y,N,N),
++    FLT_D->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,Y,N,N),
++    FLE_D->     List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,N,N,N,Y,CSR.N,N,N,N,Y,N,N),
++    FCVT_D_W->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FCVT_D_WU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FLD->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FSD->       List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,Y,N,N,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FDIV_D->    List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FSQRT_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N))
+ }
+ 
+ class HDDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    FCVT_D_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FCVT_H_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,Y))
++    FCVT_D_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FCVT_H_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N))
+ }
+ 
+ class H64Decode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    FCVT_L_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FCVT_LU_H-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FCVT_H_L->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FCVT_H_LU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N))
++    FCVT_L_H->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FCVT_LU_H-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FCVT_H_L->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FCVT_H_LU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class F64Decode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    FCVT_L_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FCVT_LU_S-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    FCVT_S_L->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N),
+-    FCVT_S_LU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N))
++    FCVT_L_S->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FCVT_LU_S-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    FCVT_S_L->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N),
++    FCVT_S_LU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class D64Decode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    FMV_X_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y),
+-    FCVT_L_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y),
+-    FCVT_LU_D-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y),
+-    FMV_D_X->   List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FCVT_D_L->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y),
+-    FCVT_D_LU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y))
++    FMV_X_D->   List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y,N,N),
++    FCVT_L_D->  List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y,N,N),
++    FCVT_LU_D-> List(Y,Y,N,N,N,N,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,N,N,N,N,N,Y,CSR.N,N,N,N,Y,N,N),
++    FMV_D_X->   List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FCVT_D_L->  List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N),
++    FCVT_D_LU-> List(Y,Y,N,N,N,N,N,Y,N,N,N,N,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,Y,N,N))
+ }
+ 
+ class SCIEDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     SCIE.opcode->
+-                List(Y,N,N,N,N,N,Y,Y,Y,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,Y,Y,Y,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_X,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ trait UsesABLUFN {
+@@ -452,113 +505,113 @@ trait UsesABLUFN {
+ class ZBADecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    SH1ADD ->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR, aluFn.FN_SH1ADD,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SH2ADD ->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR, aluFn.FN_SH2ADD,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SH3ADD ->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR, aluFn.FN_SH3ADD,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    SH1ADD ->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR, aluFn.FN_SH1ADD,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SH2ADD ->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR, aluFn.FN_SH2ADD,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SH3ADD ->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR, aluFn.FN_SH3ADD,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBA64Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    ADD_UW ->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_64,aluFn.FN_ADDUW   ,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SLLI_UW ->  List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_64,aluFn.FN_SLLIUW  ,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SH1ADD_UW-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_64,aluFn.FN_SH1ADDUW,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SH2ADD_UW-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_64,aluFn.FN_SH2ADDUW,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SH3ADD_UW-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_64,aluFn.FN_SH3ADDUW,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    ADD_UW ->   List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_64,aluFn.FN_ADDUW   ,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SLLI_UW ->  List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_64,aluFn.FN_SLLIUW  ,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SH1ADD_UW-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_64,aluFn.FN_SH1ADDUW,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SH2ADD_UW-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_64,aluFn.FN_SH2ADDUW,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SH3ADD_UW-> List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_64,aluFn.FN_SH3ADDUW,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ // In both Zbb and Zbkb
+ class ZBBNDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    ANDN ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ANDN,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    ORN  ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ORN ,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    XNOR ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_XNOR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    ANDN ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ANDN,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    ORN  ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ORN ,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    XNOR ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_XNOR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ // In both Zbb and Zbkb
+ class ZBBRDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    ROR ->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    ROL ->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ROL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    ROR ->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    ROL ->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ROL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBBR32Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     Instructions32.RORI ->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBBR64Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    RORI ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    RORW ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_32, aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    ROLW ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_32, aluFn.FN_ROL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    RORIW ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_32, aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    RORI ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    RORW ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_32, aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    ROLW ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_32, aluFn.FN_ROL,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    RORIW ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_32, aluFn.FN_ROR,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ // Only in Zbb
+ class ZBBCDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    CLZ ->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CLZ ,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CTZ ->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CTZ ,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CPOP ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CPOP,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    CLZ ->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CLZ ,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CTZ ->      List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CTZ ,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CPOP ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CPOP,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBBC64Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    CLZW ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_32,aluFn.FN_CLZ ,      N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CTZW ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_32,aluFn.FN_CTZ ,      N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CPOPW ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_32,aluFn.FN_CPOP,      N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    CLZW ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_32,aluFn.FN_CLZ ,      N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CTZW ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_32,aluFn.FN_CTZ ,      N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CPOPW ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_32,aluFn.FN_CPOP,      N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ // Only in Zbb
+ class ZBBMDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    MAX ->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_MAX ,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    MAXU ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_MAXU,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    MIN ->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_MIN ,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    MINU ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_MINU,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    MAX ->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_MAX ,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    MAXU ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_MAXU,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    MIN ->      List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_MIN ,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    MINU ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_MINU,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ // Only in Zbb
+ class ZBBSEDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    SEXT_H ->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_SEXTH,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SEXT_B ->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_SEXTB,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    SEXT_H ->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_SEXTH,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SEXT_B ->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_SEXTB,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBBZE64Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    ZEXT_H ->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ZEXTH,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    ZEXT_H ->   List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ZEXTH,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBBZE32Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     Instructions32.ZEXT_H ->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ZEXTH,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ZEXTH,    N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBBORCBDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    ORC_B ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ORCB,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    ORC_B ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ORCB,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ // In both Zbb and Zbkb
+ class ZBBREV864Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    REV8 ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_REV8,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    REV8 ->     List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_REV8,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ // In both Zbb and Zbkb
+@@ -566,184 +619,185 @@ class ZBBREV832Decode(implicit val p: Parameters) extends DecodeConstants with U
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     Instructions32.REV8->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_REV8,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X,A1_RS1, IMM_X, DW_XPR,aluFn.FN_REV8,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ // Only in Zbkb
+ class ZBKBDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    PACK ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_PACK,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    PACKH ->    List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_PACKH,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    BREV8 ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X  ,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BREV8,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    PACK ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_PACK,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    PACKH ->    List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_PACKH,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    BREV8 ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X  ,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BREV8,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBKB64Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    PACKW ->    List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_32, aluFn.FN_PACK,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    PACKW ->    List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_32, aluFn.FN_PACK,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBKB32Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     Instructions32.ZIP ->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X  ,A1_RS1, IMM_X, DW_X, aluFn.FN_ZIP,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X  ,A1_RS1, IMM_X, DW_X, aluFn.FN_ZIP,     N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.UNZIP ->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X  ,A1_RS1, IMM_X, DW_X, aluFn.FN_UNZIP,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_X  ,A1_RS1, IMM_X, DW_X, aluFn.FN_UNZIP,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ // also in Zbkc but Zbkc does not have CLMULR
+ class ZBCDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    CLMUL ->    List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CLMUL,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CLMULH ->   List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CLMULH, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    CLMUL ->    List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CLMUL,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CLMULH ->   List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CLMULH, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBCRDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    CLMULR ->   List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CLMULR, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    CLMULR ->   List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_CLMULR, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBKXDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    XPERM8 ->   List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_XPERM8, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    XPERM4 ->   List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_XPERM4, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    XPERM8 ->   List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_XPERM8, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    XPERM4 ->   List(Y,N,N,N,N,N,Y,Y,N,Y,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_XPERM4, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBSDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    BCLR ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BCLR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    BEXT ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BEXT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    BINV ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BINV,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    BSET ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BSET,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    BCLR ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BCLR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    BEXT ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BEXT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    BINV ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BINV,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    BSET ->     List(Y,N,N,N,N,N,Y,Y,N,N,N,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_BSET,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBS32Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     Instructions32.BCLRI ->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BCLR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BCLR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.BEXTI ->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BEXT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BEXT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.BINVI ->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BINV,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BINV,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.BSETI ->
+-                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BSET,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BSET,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZBS64Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    BCLRI ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BCLR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    BEXTI ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BEXT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    BINVI ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BINV,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    BSETI ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BSET,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    BCLRI ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BCLR,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    BEXTI ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BEXT,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    BINVI ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BINV,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    BSETI ->    List(Y,N,N,N,N,N,N,Y,N,N,N,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_BSET,   N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZKND32Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     Instructions32.AES32DSI ->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_DS, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_DS, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.AES32DSMI->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_DSM,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_DSM,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ class ZKND64Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    AES64DS ->  List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_DS, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    AES64DSM -> List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_DSM,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    AES64IM ->  List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_IM, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    AES64KS1I ->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_AES_KS1,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    AES64KS2 -> List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_KS2,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    AES64DS ->  List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_DS, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    AES64DSM -> List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_DSM,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    AES64IM ->  List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_IM, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    AES64KS1I ->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_IMM,A1_RS1, IMM_I, DW_XPR,aluFn.FN_AES_KS1,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    AES64KS2 -> List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_KS2,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ class ZKNE32Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     Instructions32.AES32ESI ->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_ES, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_ES, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.AES32ESMI ->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_ESM,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_ESM,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ class ZKNE64Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    AES64ES ->  List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_ES, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    AES64ESM -> List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_ESM,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    AES64ES ->  List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_ES, N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    AES64ESM -> List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_XPR,aluFn.FN_AES_ESM,N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZKNHDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    SHA256SIG0->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA256_SIG0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SHA256SIG1->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA256_SIG1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SHA256SUM0->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA256_SUM0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SHA256SUM1->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA256_SUM1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    SHA256SIG0->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA256_SIG0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SHA256SIG1->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA256_SIG1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SHA256SUM0->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA256_SUM0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SHA256SUM1->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA256_SUM1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ class ZKNH32Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+     Instructions32.SHA512SIG0L ->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.SHA512SIG1L ->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.SHA512SIG0H ->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.SHA512SIG1H ->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.SHA512SUM0R ->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SUM0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SUM0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
+     Instructions32.SHA512SUM1R ->
+-                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SUM1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++                List(Y,N,N,N,N,N,Y,Y,N,N,Y,N,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SUM1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ class ZKNH64Decode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    SHA512SIG0->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SHA512SIG1->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SHA512SUM0->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SUM0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SHA512SUM1->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SUM1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    SHA512SIG0->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SHA512SIG1->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SIG1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SHA512SUM0->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SUM0,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SHA512SUM1->List(Y,N,N,N,N,N,N,Y,N,N,Y,N,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SHA512_SUM1,N,M_X,    N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class ZKSDecode(implicit val p: Parameters) extends DecodeConstants with UsesABLUFN
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    SM4ED ->    List(Y,N,N,N,N,N,Y,Y,N,N,N,Y,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SM4ED,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SM4KS ->    List(Y,N,N,N,N,N,Y,Y,N,N,N,Y,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SM4KS,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SM3P0 ->    List(Y,N,N,N,N,N,N,Y,N,N,N,Y,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SM3P0,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    SM3P1 ->    List(Y,N,N,N,N,N,N,Y,N,N,N,Y,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SM3P1,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    SM4ED ->    List(Y,N,N,N,N,N,Y,Y,N,N,N,Y,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SM4ED,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SM4KS ->    List(Y,N,N,N,N,N,Y,Y,N,N,N,Y,A2_RS2,A1_RS1, IMM_X, DW_X,  aluFn.FN_SM4KS,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SM3P0 ->    List(Y,N,N,N,N,N,N,Y,N,N,N,Y,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SM3P0,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    SM3P1 ->    List(Y,N,N,N,N,N,N,Y,N,N,N,Y,A2_X  ,A1_RS1, IMM_X, DW_X,  aluFn.FN_SM3P1,  N,M_X,        N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
+ 
+ class RoCCDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends DecodeConstants
+ {
+   val table: Array[(BitPat, List[BitPat])] = Array(
+-    CUSTOM0->           List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM0_RS1->       List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM0_RS1_RS2->   List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM0_RD->        List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM0_RD_RS1->    List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM0_RD_RS1_RS2->List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM1->           List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM1_RS1->       List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM1_RS1_RS2->   List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM1_RD->        List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM1_RD_RS1->    List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM1_RD_RS1_RS2->List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM2->           List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM2_RS1->       List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM2_RS1_RS2->   List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM2_RD->        List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM2_RD_RS1->    List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM2_RD_RS1_RS2->List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM3->           List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM3_RS1->       List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM3_RS1_RS2->   List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N),
+-    CUSTOM3_RD->        List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM3_RD_RS1->    List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N),
+-    CUSTOM3_RD_RS1_RS2->List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N))
++    CUSTOM0->           List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM0_RS1->       List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM0_RS1_RS2->   List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM0_RD->        List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM0_RD_RS1->    List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM0_RD_RS1_RS2->List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM1->           List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM1_RS1->       List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM1_RS1_RS2->   List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM1_RD->        List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM1_RD_RS1->    List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM1_RD_RS1_RS2->List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM2->           List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM2_RS1->       List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM2_RS1_RS2->   List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM2_RD->        List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM2_RD_RS1->    List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM2_RD_RS1_RS2->List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM3->           List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM3_RS1->       List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM3_RS1_RS2->   List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,N,CSR.N,N,N,N,N,N,N),
++    CUSTOM3_RD->        List(Y,N,Y,N,N,N,N,N,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM3_RD_RS1->    List(Y,N,Y,N,N,N,N,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N),
++    CUSTOM3_RD_RS1_RS2->List(Y,N,Y,N,N,N,Y,Y,N,N,N,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,aluFn.FN_ADD,   N,M_X,N,N,N,N,N,N,Y,CSR.N,N,N,N,N,N,N))
+ }
++
+diff --git a/src/main/scala/rocket/Instructions.scala b/src/main/scala/rocket/Instructions.scala
+index adf118338..75cd107a9 100644
+--- a/src/main/scala/rocket/Instructions.scala
++++ b/src/main/scala/rocket/Instructions.scala
+@@ -362,6 +362,50 @@ object Instructions {
+   def SUB                = BitPat("b0100000??????????000?????0110011")
+   def SUBW               = BitPat("b0100000??????????000?????0111011")
+   def SW                 = BitPat("b?????????????????010?????0100011")
++
++  //添加vector指令编码,jyf 错误：存在重复
++  def VL_XE8             = BitPat("b????00???????????000?????0000111")
++  def VL_XE16            = BitPat("b????00???????????101?????0000111")
++  def VL_XE32            = BitPat("b????00???????????110?????0000111")
++  def VL_XE64            = BitPat("b????00???????????111?????0000111")
++  def VLS_XE8            = BitPat("b????10???????????000?????0000111")
++  def VLS_XE16           = BitPat("b????10???????????101?????0000111")
++  def VLS_XE32           = BitPat("b????10???????????110?????0000111")
++  def VLS_XE64           = BitPat("b????10???????????111?????0000111")
++  def VLX_XE8            = BitPat("b?????1???????????000?????0000111")
++  def VLX_XE16           = BitPat("b?????1???????????101?????0000111")
++  def VLX_XE32           = BitPat("b?????1???????????110?????0000111")
++  def VLX_XE64           = BitPat("b?????1???????????111?????0000111")
++  def VS_XE8             = BitPat("b????00???????????000?????0100111")
++  def VS_XE16            = BitPat("b????00???????????101?????0100111")
++  def VS_XE32            = BitPat("b????00???????????110?????0100111")
++  def VS_XE64            = BitPat("b????00???????????111?????0100111")
++  def VSS_XE8            = BitPat("b????10???????????000?????0100111")
++  def VSS_XE16           = BitPat("b????10???????????101?????0100111")
++  def VSS_XE32           = BitPat("b????10???????????110?????0100111")
++  def VSS_XE64           = BitPat("b????10???????????111?????0100111")
++  def VSX_XE8            = BitPat("b?????1???????????000?????0100111")
++  def VSX_XE16           = BitPat("b?????1???????????101?????0100111")
++  def VSX_XE32           = BitPat("b?????1???????????110?????0100111")
++  def VSX_XE64           = BitPat("b?????1???????????111?????0100111")
++  // def VL_X               = BitPat("b????00???????????????????0000111")
++  // def VLS_X              = BitPat("b????10???????????????????0000111")
++  // def VLX_X              = BitPat("b?????1???????????????????0000111")
++  // def VS_X               = BitPat("b????00???????????????????0100111")
++  // def VSS_X              = BitPat("b????10???????????????????0100111")
++  // def VSX_X              = BitPat("b?????1???????????????????0100111")
++  def OPIVV              = BitPat("b?????????????????000?????1010111")
++  def OPFVV              = BitPat("b?????????????????001?????1010111")
++  def OPMVV              = BitPat("b?????????????????010?????1010111")
++  def OPIVI              = BitPat("b?????????????????011?????1010111")
++  def OPIVX              = BitPat("b?????????????????100?????1010111")
++  def OPFVF              = BitPat("b?????????????????101?????1010111")
++  def OPMVX              = BitPat("b?????????????????110?????1010111")
++  def VSETVLI            = BitPat("b0????????????????111?????1010111")
++  def VSETIVLI           = BitPat("b11???????????????111?????1010111")
++  def VSETVL             = BitPat("b10???????????????111?????1010111")
++
++  /*删除原有生成的vector指令，jyf
+   def VAADD_VV           = BitPat("b001001???????????010?????1010111")
+   def VAADD_VX           = BitPat("b001001???????????110?????1010111")
+   def VAADDU_VV          = BitPat("b001000???????????010?????1010111")
+@@ -809,6 +853,7 @@ object Instructions {
+   def VZEXT_VF2          = BitPat("b010010??????00110010?????1010111")
+   def VZEXT_VF4          = BitPat("b010010??????00100010?????1010111")
+   def VZEXT_VF8          = BitPat("b010010??????00010010?????1010111")
++  */
+   def WFI                = BitPat("b00010000010100000000000001110011")
+   def XNOR               = BitPat("b0100000??????????100?????0110011")
+   def XOR                = BitPat("b0000000??????????100?????0110011")
+diff --git a/src/main/scala/rocket/Interface.scala b/src/main/scala/rocket/Interface.scala
+new file mode 100644
+index 000000000..a6b2a68da
+--- /dev/null
++++ b/src/main/scala/rocket/Interface.scala
+@@ -0,0 +1,24 @@
++package freechips.rocketchip.rocket
++
++import chisel3._
++import org.chipsalliance.cde.config.Parameters
++import freechips.rocketchip.tile._
++
++class DecodeIO(implicit p: Parameters) extends CoreBundle()(p) {
++  val instr = Output(Bits(32.W))
++  val rs1 = Output(Bits(xLen.W))
++  val rs2 = Output(Bits(xLen.W))
++  val valid = Output(Bool())
++  val vl = Output(Bits(8.W))
++  val vstart = Output(Bits(8.W))
++  val vma = Output(Bits(1.W))
++  val vta = Output(Bits(1.W))
++  val vsew = Output(Bits(3.W))
++  val vlmul = Output(Bits(3.W))
++  val stall_decode = Output(Bool())
++  val ready = Input(Bool())
++  //
++  val lsu_resp_valid = Output(Bits(1.W))
++  val lsu_resp_excp = Output(Bits(1.W))
++  val id_resp_data = Output(Bits(xLen.W))
++}
+diff --git a/src/main/scala/rocket/RocketCore.scala b/src/main/scala/rocket/RocketCore.scala
+index 68b3c90e0..d515cf39d 100644
+--- a/src/main/scala/rocket/RocketCore.scala
++++ b/src/main/scala/rocket/RocketCore.scala
+@@ -14,6 +14,14 @@ import freechips.rocketchip.scie._
+ import scala.collection.mutable.ArrayBuffer
+ 
+ case class RocketCoreParams(
++   /**
++   * @Editors: zhangye
++   * @Description: 使用envector改写父类usingvector
++   */
++  enVector: Boolean = false,
++  //wzw:使用enUVM覆写父类
++  enUVM: Boolean =false,
++
+   bootFreqHz: BigInt = 0,
+   useVM: Boolean = true,
+   useUser: Boolean = false,
+@@ -70,6 +78,13 @@ case class RocketCoreParams(
+   override val customIsaExt = Option.when(haveCease)("xrocket") // CEASE instruction
+   override def minFLen: Int = fpu.map(_.minFLen).getOrElse(32)
+   override def customCSRs(implicit p: Parameters) = new RocketCustomCSRs
++  /**
++   * @Editors: zhangye
++   * @Description: 覆写useVector
++   */  
++  override val useVector: Boolean = enVector
++  //wzw:覆写useVerif
++  override val useVerif: Boolean = enUVM
+ }
+ 
+ trait HasRocketCoreParameters extends HasCoreParameters {
+@@ -257,6 +272,18 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   val mem_scie_pipelined = Reg(Bool())
+   val mem_reg_wdata = Reg(Bits())
+   val mem_reg_rs2 = Reg(Bits())
++   /**
++   * @Editors: wuzewei
++   * @Description: 添加mem_reg_rs1信号，方便vset(i)vl(i)在wb阶段进行计算
++   */
++  val mem_reg_rs1 = Reg(Bits())
++  /**
++   * @Editors: wuzewei
++   * @Description: add for veriification
++   */
++  val mem_reg_verif_mem_addr = coreParams.useVerif.option(Reg(Bits()))
++  val mem_reg_verif_mem_datawr = coreParams.useVerif.option(Reg(Bits()))
++
+   val mem_br_taken = Reg(Bool())
+   val take_pc_mem = Wire(Bool())
+   val mem_reg_wphit          = Reg(Vec(nBreakpoints, Bool()))
+@@ -276,6 +303,19 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   val wb_reg_raw_inst = Reg(UInt())
+   val wb_reg_wdata = Reg(Bits())
+   val wb_reg_rs2 = Reg(Bits())
++    /**
++   * @Editors: wuzewei
++   * @Description: 添加wb_reg_rs1信号，方便vset(i)vl(i)在wb阶段进行计算
++   */
++  val wb_reg_rs1 = Reg(Bits())
++  /**
++   * @Editors: wuzewei
++   * @Description: add for verification
++   */
++  val wb_reg_verif_mem_addr = coreParams.useVerif.option(Reg(Bits()))
++  val wb_reg_verif_mem_datawr = coreParams.useVerif.option(Reg(Bits()))
++  val wb_npc = coreParams.useVerif.option(Reg(Bits()))
++
+   val take_pc_wb = Wire(Bool())
+   val wb_reg_wphit           = Reg(Vec(nBreakpoints, Bool()))
+ 
+@@ -641,6 +681,22 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+       val size = Mux(ex_ctrl.rocc, log2Ceil(xLen/8).U, ex_reg_mem_size)
+       mem_reg_rs2 := new StoreGen(size, 0.U, ex_rs(1), coreDataBytes).data
+     }
++     /**
++     * @Editors: wuzewei
++     * @Description: 用来记录x[rs1]的值
++     */
++    when (ex_ctrl.rxs1) {
++      mem_reg_rs1 := ex_rs(0).asUInt
++    }
++    /**
++     * @Editors: wuzewei
++     * @Description: add for verification
++     */
++    if(coreParams.useVerif){
++    mem_reg_verif_mem_addr.get := alu.io.adder_out
++    mem_reg_verif_mem_datawr.get := (if (fLen == 0) mem_reg_rs2 else Mux(mem_ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), mem_reg_rs2))
++  }
++
+     when (ex_ctrl.jalr && csr.io.status.debug) {
+       // flush I$ on D-mode JALR to effect uncached fetch without D$ flush
+       mem_ctrl.fence_i := true.B
+@@ -674,7 +730,35 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   val ctrl_killm = killm_common || mem_xcpt || fpu_kill_mem
+ 
+   // writeback stage
+-  wb_reg_valid := !ctrl_killm
++  //wzw:add for commit stage,Set it to 0 for now and connect to the vpu interface later.
++  val v_decode_ready=WireDefault(true.B)
++  val commit_vld = WireDefault(false.B)
++  val return_data_vld = WireDefault(false.B)
++  val return_data = WireDefault(0.U)
++  val retrun_reg_idx = WireDefault(0.U)
++  val exception_vld = WireDefault(0.B)
++  val illegal_inst = WireDefault(0.B)
++  val update_vl = WireDefault(0.U)
++  val update_vstart = WireDefault(0.U)
++  val update_data = WireDefault(0.U)
++  //add exception and pc interface
++  val vpu_pc = WireDefault(0.U)
++  val vpu_mcause = WireDefault(0.U)
++  //
++  //wzw:add for decode stage,Set it to 0 for now and connect to the vpu interface later.
++  val vpu_lsu_req_valid = WireDefault(0.B)
++  val vpu_lsu_req_ld = WireDefault(0.B)
++  val vpu_lsu_req_addrs = WireDefault(0.U)
++  val vpu_lsu_req_data_width = WireDefault(0.U)
++  val vpu_lsu_st_req_data = WireDefault(0.U)
++  val vpu_lsu_waddr = WireDefault(UInt(xLen.W),0.U)
++  //wzw:自己添加，是否进行符号位扩展,可能需要扩展接口
++  val vpu_lsu_signed = WireDefault(0.U)
++  val vpu_rs0 = WireDefault(0.U)
++
++
++    wb_reg_valid := !ctrl_killm
++    //TODO:如果正在执行vector指令的话需要停掉replay机制 像是miss之类的情况由vector进行多次发送进行处理 同时注意id阶段要将valid设置为false
+   wb_reg_replay := replay_mem && !take_pc_wb
+   wb_reg_xcpt := mem_xcpt && !take_pc_wb
+   wb_reg_flush_pipe := !ctrl_killm && mem_reg_flush_pipe
+@@ -686,6 +770,21 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+     when (mem_ctrl.rocc || mem_reg_sfence) {
+       wb_reg_rs2 := mem_reg_rs2
+     }
++    /**
++     * @Editors: wuzewei
++     * @Description: x[rs1]
++     */
++    wb_reg_rs1:=mem_reg_rs1
++    /**
++     * @Editors: wuzewei
++     * @Description: add for verification
++     */
++    if(coreParams.useVerif){
++     wb_reg_verif_mem_addr.get := mem_reg_verif_mem_addr.get
++     wb_reg_verif_mem_datawr.get := mem_reg_verif_mem_datawr.get
++     wb_npc.get := mem_npc
++}
++
+     wb_reg_cause := mem_cause
+     wb_reg_inst := mem_reg_inst
+     wb_reg_raw_inst := mem_reg_raw_inst
+@@ -699,6 +798,10 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   }
+ 
+   val (wb_xcpt, wb_cause) = checkExceptions(List(
++    //wzw:若是非法指令的话将wb_cause设置为0x2
++    (commit_vld&&illegal_inst,Causes.illegal_instruction.U),
++    //wzw:若是访存异常的话，将wb_cause设置为vpu传过来的异常号
++    (commit_vld&&exception_vld,vpu_mcause),
+     (wb_reg_xcpt,  wb_reg_cause),
+     (wb_reg_valid && wb_ctrl.mem && io.dmem.s2_xcpt.pf.st, Causes.store_page_fault.U),
+     (wb_reg_valid && wb_ctrl.mem && io.dmem.s2_xcpt.pf.ld, Causes.load_page_fault.U),
+@@ -709,6 +812,7 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+     (wb_reg_valid && wb_ctrl.mem && io.dmem.s2_xcpt.ma.st, Causes.misaligned_store.U),
+     (wb_reg_valid && wb_ctrl.mem && io.dmem.s2_xcpt.ma.ld, Causes.misaligned_load.U)
+   ))
++   //wzw TODO:需要添加vpu dcache接口信号的传递
+ 
+   val wbCoverCauses = List(
+     (Causes.misaligned_store, "MISALIGNED_STORE"),
+@@ -727,6 +831,8 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   val wb_pc_valid = wb_reg_valid || wb_reg_replay || wb_reg_xcpt
+   val wb_wxd = wb_reg_valid && wb_ctrl.wxd
+   val wb_set_sboard = wb_ctrl.div || wb_dcache_miss || wb_ctrl.rocc
++    //wzw 防止vpu产生的写后读问题
++  val id_set_sboard = id_ctrl.vector
+   val replay_wb_common = io.dmem.s2_nack || wb_reg_replay
+   val replay_wb_rocc = wb_reg_valid && wb_ctrl.rocc && !io.rocc.cmd.ready
+   val replay_wb = replay_wb_common || replay_wb_rocc
+@@ -743,6 +849,63 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   val ll_wdata = WireDefault(div.io.resp.bits.data)
+   val ll_waddr = WireDefault(div.io.resp.bits.tag)
+   val ll_wen = WireDefault(div.io.resp.fire)
++
++    /**
++   * @Editors: wuzewei
++   * @Description: 添加avl,usemax,usezero,usecurrent信号
++   */
++  //移动wb_valid的位置 放在应用前面
++  val wb_valid = wb_reg_valid && !replay_wb && !wb_xcpt
++  val wb_raddr1 = wb_reg_inst(19,15) 
++  val wb_uimm = wb_reg_inst(19,15)
++  val wb_usemax=Wire(Bool())
++  val wb_usezero=Wire(Bool())
++  val wb_usecurrent=Wire(Bool())
++  val wb_avl=WireDefault(wb_reg_rs1)
++  wb_usemax  := (wb_raddr1===0.U)&(wb_waddr=/=0.U)
++  wb_usezero :=0.U
++  wb_usecurrent:=(wb_raddr1===0.U)&(wb_waddr===0.U)
++  when(wb_ctrl.rxs1===0.U){
++    val symbol=Fill(xLen-1-5,0.U)
++    wb_avl := Cat(symbol,wb_uimm)
++  }
++  val issue_vconfig = Wire(new VConfig)
++  // val issue_vstart = Wire(UInt(maxVLMax.log2.W))
++  // val issue_vxsat = Wire(Bool())
++  val zeroSignal=0.U(((xLen)-8).W)
++  val zimm=Cat(zeroSignal,wb_reg_wdata(7,0))
++  issue_vconfig.vtype := VType.fromUInt(zimm,false)
++  issue_vconfig.vl := VType.computeVL(wb_avl,zimm,csr.io.vector.get.vconfig.vl,wb_usecurrent,wb_usemax,wb_usezero)
++  csr.io.vector.foreach { vio =>
++    vio.set_vconfig.bits := issue_vconfig   
++    vio.set_vconfig.valid := (wb_valid & wb_ctrl.vset)
++    //wzw:change for updating vstart
++    vio.set_vstart.valid := (commit_vld & update_vl)
++    vio.set_vstart.bits := update_data
++    vio.set_vxsat := 0.U
++    vio.set_vs_dirty := (wb_valid &(wb_ctrl.vset|wb_ctrl.vector))
++    //vio.set_vs_dirty := false.asBool
++    }
++
++  //加decode接口，jyf
++  dontTouch(io.decode_interface)
++  io.decode_interface.instr := id_inst(0)   
++  io.decode_interface.rs1 := ex_rs(0)
++  io.decode_interface.rs2 := ex_rs(1)
++  io.decode_interface.valid := !ctrl_killd && id_ctrl.vector
++  io.decode_interface.vl := csr.io.vector.get.vconfig.vl
++  io.decode_interface.vstart := csr.io.vector.get.vstart
++  io.decode_interface.vma := csr.io.vector.get.vconfig.vtype.vma
++  io.decode_interface.vta := csr.io.vector.get.vconfig.vtype.vta
++  io.decode_interface.vsew := csr.io.vector.get.vconfig.vtype.vsew
++  io.decode_interface.vlmul := csr.io.vector.get.vconfig.vtype.vlmul_signed.asUInt
++  //
++  io.decode_interface.id_resp_data := io.dmem.resp.bits.data(xLen-1,0)
++  io.decode_interface.lsu_resp_valid := io.dmem.resp.valid
++  io.decode_interface.lsu_resp_excp := io.dmem.s2_xcpt.pf.st||io.dmem.s2_xcpt.pf.ld
++
++
++
+   if (usingRoCC) {
+     io.rocc.resp.ready := !wb_wxd
+     when (io.rocc.resp.fire) {
+@@ -752,6 +915,14 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+       ll_wen := true.B
+     }
+   }
++  //wzw:写回阶段的接口
++  if(usingVector){
++    when(commit_vld){
++      ll_wdata := return_data
++      ll_wen := return_data_vld
++      ll_waddr := retrun_reg_idx
++    }
++  }
+   when (dmem_resp_replay && dmem_resp_xpu) {
+     div.io.resp.ready := false.B
+     if (usingRoCC)
+@@ -760,15 +931,21 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+     ll_wen := true.B
+   }
+ 
+-  val wb_valid = wb_reg_valid && !replay_wb && !wb_xcpt
+   val wb_wen = wb_valid && wb_ctrl.wxd
++  //wzw 防止vpu可能产生的写后读问题
++  val id_wen = (!ctrl_killd) & wb_ctrl.wxd
+   val rf_wen = wb_wen || ll_wen
+   val rf_waddr = Mux(ll_wen, ll_waddr, wb_waddr)
+   val rf_wdata = Mux(dmem_resp_valid && dmem_resp_xpu, io.dmem.resp.bits.data(xLen-1, 0),
++                 /**
++                  * @Editors: wuzewei
++                  * @Description: 若是vset(i)vl(i)信号，则写回的是从csr返回的vl的值
++                  */
++                 Mux(wb_ctrl.vset,issue_vconfig.vl,
+                  Mux(ll_wen, ll_wdata,
+                  Mux(wb_ctrl.csr =/= CSR.N, csr.io.rw.rdata,
+                  Mux(wb_ctrl.mul, mul.map(_.io.resp.bits.data).getOrElse(wb_reg_wdata),
+-                 wb_reg_wdata))))
++                 wb_reg_wdata)))))
+   when (rf_wen) { rf.write(rf_waddr, rf_wdata) }
+ 
+   // hook up control/status regfile
+@@ -785,7 +962,12 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   io.fpu.time := csr.io.time(31,0)
+   io.fpu.hartid := io.hartid
+   csr.io.rocc_interrupt := io.rocc.interrupt
+-  csr.io.pc := wb_reg_pc
++  //wzw：当vpu返回的值有效时，此时的pc是vpu传过来的pc
++  when(commit_vld){
++    csr.io.pc := vpu_pc
++  }.otherwise{
++    csr.io.pc := wb_reg_pc
++  }
+   val tval_dmem_addr = !wb_reg_xcpt
+   val tval_any_addr = tval_dmem_addr ||
+     wb_reg_cause.isOneOf(Causes.breakpoint.U, Causes.fetch_access.U, Causes.fetch_page_fault.U, Causes.fetch_guest_page_fault.U)
+@@ -852,7 +1034,10 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+     else div.io.resp.fire && div.io.resp.bits.tag === r || dmem_resp_replay && dmem_resp_xpu && dmem_resp_waddr === r
+   }
+   val id_sboard_hazard = checkHazards(hazard_targets, rd => sboard.read(rd) && !id_sboard_clear_bypass(rd))
+-  sboard.set(wb_set_sboard && wb_wen, wb_waddr)
++  //wzw: 添加vpu设置scoreboard支持
++  // TODO:译码部分加入对id_wen的译码
++  val sboard_waddr =Mux((id_set_sboard & id_wen), id_waddr,wb_waddr)
++  sboard.set((wb_set_sboard && wb_wen)||(id_set_sboard & id_wen), sboard_waddr)
+ 
+   // stall for RAW/WAW hazards on CSRs, loads, AMOs, and mul/div in execute stage.
+   val ex_cannot_bypass = ex_ctrl.csr =/= CSR.N || ex_ctrl.jalr || ex_ctrl.mem || ex_ctrl.mul || ex_ctrl.div || ex_ctrl.fp || ex_ctrl.rocc || ex_scie_pipelined
+@@ -893,7 +1078,17 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   val rocc_blocked = Reg(Bool())
+   rocc_blocked := !wb_xcpt && !io.rocc.cmd.ready && (io.rocc.cmd.valid || rocc_blocked)
+ 
+-  val ctrl_stalld =
++  //if vpu busy, satll rocket，jyf
++  //not ready，要stall住标量和向量的发送，故ctrl_stalld置1，并导致ctrl_killd置1
++  //isvectorrun,有向量指令在执行，但如果下一条仍是向量且ready仍能发
++  val table = RegInit(0.U(4.W))
++  when(io.decode_interface.valid&v_decode_ready) {table := table + 1.U}
++  when(commit_vld) {table := table - 1.U}
++  val isvectorrun = table =/= 0.U
++
++  val ctrl_stalld = {
++    //jyf:add stall logic
++    (id_ctrl.vector&&(!v_decode_ready))||(isvectorrun && !id_ctrl.vector)||
+     id_ex_hazard || id_mem_hazard || id_wb_hazard || id_sboard_hazard ||
+     csr.io.singleStep && (ex_reg_valid || mem_reg_valid || wb_reg_valid) ||
+     id_csr_en && csr.io.decode(0).fp_csr && !io.fpu.fcsr_rdy ||
+@@ -906,7 +1101,8 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+     csr.io.csr_stall ||
+     id_reg_pause ||
+     io.traceStall
+-  ctrl_killd := !ibuf.io.inst(0).valid || ibuf.io.inst(0).bits.replay || take_pc_mem_wb || ctrl_stalld || csr.io.interrupt
++  }
++    ctrl_killd := !ibuf.io.inst(0).valid || ibuf.io.inst(0).bits.replay || take_pc_mem_wb || ctrl_stalld || csr.io.interrupt
+ 
+   io.imem.req.valid := take_pc
+   io.imem.req.bits.speculative := !take_pc_wb
+@@ -961,19 +1157,31 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   io.fpu.dmem_resp_tag := dmem_resp_waddr
+   io.fpu.keep_clock_enabled := io.ptw.customCSRs.disableCoreClockGate
+ 
+-  io.dmem.req.valid     := ex_reg_valid && ex_ctrl.mem
++  //wzw:添加dmem访问条件
++  io.dmem.req.valid     := (ex_reg_valid && ex_ctrl.mem)|(vpu_lsu_req_valid)
+   val ex_dcache_tag = Cat(ex_waddr, ex_ctrl.fp)
++  //wzw:添加vpu_dcache_tag
++  val vpu_dcache_tag = Cat(vpu_lsu_waddr, 0.B)
+   require(coreParams.dcacheReqTagBits >= ex_dcache_tag.getWidth)
+-  io.dmem.req.bits.tag  := ex_dcache_tag
+-  io.dmem.req.bits.cmd  := ex_ctrl.mem_cmd
+-  io.dmem.req.bits.size := ex_reg_mem_size
+-  io.dmem.req.bits.signed := !Mux(ex_reg_hls, ex_reg_inst(20), ex_reg_inst(14))
++  //require(coreParams.dcacheReqTagBits >= vpu_dcache_tag.getWidth)
++  //wzw:tag 用来传递waddr信息，在此更改条件,添加vpu访存信息。
++  io.dmem.req.bits.tag  := Mux(vpu_lsu_req_valid,vpu_dcache_tag,ex_dcache_tag)
++  //wzw:添加vpu_mem_cmd
++  val vpu_mem_cmd = Mux(vpu_lsu_req_ld,M_XWR,M_XRD)
++  io.dmem.req.bits.cmd  := Mux(vpu_lsu_req_valid,vpu_mem_cmd,ex_ctrl.mem_cmd)
++  //wzw:ex_reg_mem_size代表写的大小
++  io.dmem.req.bits.size := Mux(vpu_lsu_req_valid,vpu_lsu_req_data_width,ex_reg_mem_size)
++  //signed代表是否扩展符号
++  io.dmem.req.bits.signed := Mux(vpu_lsu_req_valid,vpu_lsu_signed,!Mux(ex_reg_hls, ex_reg_inst(20), ex_reg_inst(14)))
+   io.dmem.req.bits.phys := false.B
+-  io.dmem.req.bits.addr := encodeVirtualAddress(ex_rs(0), alu.io.adder_out)
++  io.dmem.req.bits.addr := Mux(vpu_lsu_req_valid,encodeVirtualAddress(vpu_rs0, vpu_lsu_waddr),encodeVirtualAddress(ex_rs(0), alu.io.adder_out))
+   io.dmem.req.bits.idx.foreach(_ := io.dmem.req.bits.addr)
+-  io.dmem.req.bits.dprv := Mux(ex_reg_hls, csr.io.hstatus.spvp, csr.io.status.dprv)
+-  io.dmem.req.bits.dv := ex_reg_hls || csr.io.status.dv
+-  io.dmem.s1_data.data := (if (fLen == 0) mem_reg_rs2 else Mux(mem_ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), mem_reg_rs2))
++  io.dmem.req.bits.dprv := Mux(vpu_lsu_req_valid,csr.io.status.dprv,Mux(ex_reg_hls, csr.io.hstatus.spvp, csr.io.status.dprv))
++  io.dmem.req.bits.dv := Mux(vpu_lsu_req_valid,csr.io.status.dv,ex_reg_hls || csr.io.status.dv)
++  //vpu传过来的数据需要延迟一拍 传入dcache
++  val vpu_lsu_st_req_data_delay = RegEnable(vpu_lsu_st_req_data,0.U,vpu_lsu_req_valid)
++  io.dmem.s1_data.data := Mux(vpu_lsu_req_valid,vpu_lsu_st_req_data_delay ,(if (fLen == 0) mem_reg_rs2 else Mux(mem_ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), mem_reg_rs2)))
++  //若是vpu出现异常的话是否添加冲刷指令?
+   io.dmem.s1_kill := killm_common || mem_ldst_xcpt || fpu_kill_mem
+   io.dmem.s2_kill := false.B
+   // don't let D$ go to sleep if we're probably going to use it soon
+@@ -991,6 +1199,174 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+   when (unpause) { id_reg_pause := false.B }
+   io.cease := csr.io.status.cease && !clock_en_reg
+   io.wfi := csr.io.status.wfi
++/**
++   * @Editors: wuzewei
++   * @Description: verif接口
++   */
++  //有的信号延迟一拍的原因是区分before和after信号
++if(coreParams.useVerif){
++  dontTouch(io.verif.get)
++  io.verif.get.commit_valid := RegEnable(wb_reg_valid,0.U,coreParams.useVerif.B)
++  io.verif.get.commit_prevPc := RegEnable(wb_reg_pc,0.U,coreParams.useVerif.B)
++  io.verif.get.commit_currPc := RegEnable(wb_npc.get,0.U,coreParams.useVerif.B)
++  val reg_commit_order = RegInit(0.U((NRET*10).W))
++//  when(wb_reg_valid&(coreParams.useVerif.B)){
++//      reg_commit_order := reg_commit_order + 1.U
++//  }
++//  io.verif.get.commit_order := reg_commit_order
++  io.verif.get.commit_order := 0.U
++  io.verif.get.commit_insn := RegEnable(wb_reg_inst,0.U,coreParams.useVerif.B)
++  io.verif.get.commit_fused := 0.U
++
++  io.verif.get.sim_halt := 0.U
++
++  io.verif.get.trap_valid := RegEnable(wb_xcpt,0.U,coreParams.useVerif.B)
++//  io.verif.get.trap_pc := RegEnable(wb_reg_pc,0.U,coreParams.useVerif.B)
++  io.verif.get.trap_pc := 0.U
++//  io.verif.get.trap_firstInsn := RegEnable(csr.io.evec,0.U,coreParams.useVerif.B)
++  io.verif.get.trap_firstInsn := 0.U
++
++
++//因为延迟了一个周期所以寄存器中的值是after commit
++  io.verif.get.reg_gpr := rf.ver_read()
++//fpu寄存器的值通过fpu io接口引出
++  io.verif.get.reg_fpr := io.fpu.fpu_ver_reg.get
++//verif_reg_vpr
++
++  //TODO: open later now set to 0
++/*
++  io.verif.get.dest_gprWr := RegEnable(wb_ctrl.wxd,0.U,coreParams.useVerif.B)
++  io.verif.get.dest_fprWr := RegEnable(wb_ctrl.wfd,0.U,coreParams.useVerif.B)
++//verif_dest_vprWr
++  io.verif.get.dest_idx := RegEnable(wb_waddr,0.U,coreParams.useVerif.B)
++//verif_src_vmaskRd
++  io.verif.get.src1_gprRd := RegEnable(wb_ctrl.rxs1,0.U,coreParams.useVerif.B)
++  io.verif.get.src1_fprRd := RegEnable(wb_ctrl.rfs1,0.U,coreParams.useVerif.B)
++//verif_src1_vprRd
++  io.verif.get.src1_idx := RegEnable(wb_raddr1,0.U,coreParams.useVerif.B)//是直接向后引还是取再次译码的值 有时间的话再引
++  io.verif.get.src2_gprRd := RegEnable(wb_ctrl.rxs2,0.U,coreParams.useVerif.B)
++  io.verif.get.src2_fprRd := RegEnable(wb_ctrl.rfs2,0.U,coreParams.useVerif.B)
++//verif_src2_vprRd
++  io.verif.get.src2_idx :=  RegEnable(wb_reg_inst(24,20),0.U,coreParams.useVerif.B)
++  io.verif.get.src3_gprRd := false.B
++  io.verif.get.src3_fprRd := false.B
++//verif_src3_vprRd
++//verif_src3_idx
++*/
++  io.verif.get.dest_gprWr := 0.U
++  io.verif.get.dest_fprWr := 0.U
++  io.verif.get.dest_vprWr := 0.U
++  io.verif.get.dest_idx := 0.U
++  io.verif.get.src_vmaskRd :=0.U
++  io.verif.get.src1_gprRd := 0.U
++  io.verif.get.src1_fprRd := 0.U
++  io.verif.get.src1_vprRd := 0.U
++  io.verif.get.src1_idx := 0.U
++  io.verif.get.src2_gprRd := 0.U
++  io.verif.get.src2_fprRd := 0.U
++  io.verif.get.src2_vprRd := 0.U
++  io.verif.get.src2_idx := 0.U
++  io.verif.get.src3_gprRd := 0.U
++  io.verif.get.src3_fprRd := 0.U
++  io.verif.get.src3_vprRd := 0.U
++  io.verif.get.src3_idx := 0.U
++
++  io.verif.get.csr_mstatusWr := csr.io.status.asUInt
++  io.verif.get.csr_mepcWr := csr.io.mepc.get 
++  io.verif.get.csr_mtvalWr := csr.io.mtval.get
++  io.verif.get.csr_mtvecWr := csr.io.mtvec.get
++  io.verif.get.csr_mcauseWr := csr.io.mcause.get
++  io.verif.get.csr_mipWr := csr.io.mip.get
++  io.verif.get.csr_mieWr := csr.io.mie.get
++  io.verif.get.csr_mscratchWr := csr.io.mscratch.get
++  io.verif.get.csr_midelegWr := csr.io.mideleg.get
++  io.verif.get.csr_medelegWr := csr.io.medeleg.get
++  io.verif.get.csr_minstretWr := csr.io.minstret.get
++  io.verif.get.csr_sstatusWr := csr.io.sstatus.get.asUInt
++  io.verif.get.csr_sepcWr := csr.io.sepc.get
++  io.verif.get.csr_stvalWr := csr.io.stval.get
++  io.verif.get.csr_stvecWr := csr.io.stvec.get
++  io.verif.get.csr_scauseWr := csr.io.scause.get
++  io.verif.get.csr_satpWr := csr.io.satp.get
++  io.verif.get.csr_sscratchWr := csr.io.sscratch.get
++  io.verif.get.csr_vtypeWr := csr.io.vtype.get
++  io.verif.get.csr_vcsrWr := csr.io.vcsr.get
++  io.verif.get.csr_vlWr := csr.io.vl.get
++  io.verif.get.csr_vstartWr := csr.io.vstart.get
++
++  //TODO: open later now set to 0
++  /*
++    io.verif.get.csr_mstatusRd := RegEnable(csr.io.status.asUInt,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_mepcRd := RegEnable(csr.io.mepc.get ,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_mtvalRd := RegEnable(csr.io.mtval.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_mtvecRd := RegEnable(csr.io.mtvec.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_mcauseRd := RegEnable(csr.io.mcause.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_mipRd := RegEnable(csr.io.mip.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_mieRd := RegEnable(csr.io.mie.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_mscratchRd := RegEnable(csr.io.mscratch.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_midelegRd := RegEnable(csr.io.mideleg.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_medelegRd := RegEnable(csr.io.medeleg.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_minstretRd := RegEnable(csr.io.minstret.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_sstatusRd := RegEnable(csr.io.sstatus.get.asUInt,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_sepcRd := RegEnable(csr.io.sepc.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_stvalRd := RegEnable(csr.io.stval.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_stvecRd := RegEnable(csr.io.stvec.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_scauseRd := RegEnable(csr.io.scause.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_satpRd := RegEnable(csr.io.satp.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_sscratchRd := RegEnable(csr.io.sscratch.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_vtypeRd := RegEnable(csr.io.vtype.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_vcsrRd := RegEnable(csr.io.vcsr.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_vlRd := RegEnable(csr.io.vl.get,0.U,coreParams.useVerif.B)
++    io.verif.get.csr_vstartRd := RegEnable(csr.io.vstart.get,0.U,coreParams.useVerif.B)
++  */
++  io.verif.get.csr_mstatusRd := 0.U
++  io.verif.get.csr_mepcRd := 0.U
++  io.verif.get.csr_mtvalRd := 0.U
++  io.verif.get.csr_mtvecRd := 0.U
++  io.verif.get.csr_mcauseRd := 0.U
++  io.verif.get.csr_mipRd := 0.U
++  io.verif.get.csr_mieRd := 0.U
++  io.verif.get.csr_mscratchRd := 0.U
++  io.verif.get.csr_midelegRd := 0.U
++  io.verif.get.csr_medelegRd := 0.U
++  io.verif.get.csr_minstretRd := 0.U
++  io.verif.get.csr_sstatusRd := 0.U
++  io.verif.get.csr_sepcRd := 0.U
++  io.verif.get.csr_stvalRd := 0.U
++  io.verif.get.csr_stvecRd := 0.U
++  io.verif.get.csr_scauseRd := 0.U
++  io.verif.get.csr_satpRd := 0.U
++  io.verif.get.csr_sscratchRd := 0.U
++  io.verif.get.csr_vtypeRd := 0.U
++  io.verif.get.csr_vcsrRd := 0.U
++  io.verif.get.csr_vlRd := 0.U
++  io.verif.get.csr_vstartRd := 0.U
++
++  //TODO: open later now set to 0
++/*
++  io.verif.get.mem_valid := RegEnable(((wb_ctrl.mem_cmd === M_XRD)||(wb_ctrl.mem_cmd === M_XWR))&(wb_valid),0.U,coreParams.useVerif.B) //TODO:vector在这需要进行判断加一个或条件
++  io.verif.get.mem_addr := RegEnable(wb_reg_verif_mem_addr.get,0.U,coreParams.useVerif.B) 
++  io.verif.get.mem_isStore := RegEnable((wb_ctrl.mem_cmd === M_XRD),0.U,coreParams.useVerif.B)
++  io.verif.get.mem_isLoad  := RegEnable((wb_ctrl.mem_cmd === M_XWR),0.U,coreParams.useVerif.B)  
++  io.verif.get.mem_isVector := RegEnable((wb_ctrl.vector===true.B),0.U,coreParams.useVerif.B)
++  val delay_wb_reg_mem_size = RegEnable(1.U<<(1.U<<wb_reg_mem_size)-1.U,0.U,coreParams.useVerif.B)
++  io.verif.get.mem_maskWr := delay_wb_reg_mem_size
++  io.verif.get.mem_maskRd := delay_wb_reg_mem_size 
++  io.verif.get.mem_dataWr := RegEnable(wb_reg_verif_mem_datawr.get,0.U,coreParams.useVerif.B) 
++  io.verif.get.mem_datatRd := RegEnable(io.dmem.resp.bits.data(xLen-1, 0),0.U,coreParams.useVerif.B)
++  */
++  io.verif.get.mem_valid := 0.U
++  io.verif.get.mem_addr := 0.U
++  io.verif.get.mem_isStore := 0.U
++  io.verif.get.mem_isLoad := 0.U
++  io.verif.get.mem_isVector := 0.U
++  io.verif.get.mem_maskWr := 0.U
++  io.verif.get.mem_maskRd := 0.U
++  io.verif.get.mem_dataWr := 0.U
++  io.verif.get.mem_datatRd := 0.U
++
++}
++
+   if (rocketParams.clockGate) {
+     long_latency_stall := csr.io.csr_stall || io.dmem.perf.blocked || id_reg_pause && !unpause
+     clock_en := clock_en_reg || ex_pc_valid || (!long_latency_stall && io.imem.resp.valid)
+@@ -1068,6 +1444,15 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+          Mux(wb_ctrl.rxs2 || wb_ctrl.rfs2, coreMonitorBundle.rd1src, 0.U),
+          Mux(wb_ctrl.rxs2 || wb_ctrl.rfs2, coreMonitorBundle.rd1val, 0.U),
+          coreMonitorBundle.inst, coreMonitorBundle.inst)
++
++        /**
++         * @Editors: wuzewei
++         * @Description: add vtrace
++         */
++        if(openvtrace){
++        when(wb_valid){
++          printf(p"finish signal:vtype:${csr.io.vector.get.vconfig.vtype.asUInt}, vl:${csr.io.vector.get.vconfig.vl} \n") 
++        }}
+     }
+   }
+ 
+@@ -1160,6 +1545,18 @@ class RegFile(n: Int, w: Int, zero: Boolean = false) {
+         when (addr === raddr) { rdata := data }
+     }
+   }
++  /**
++   * @Editors: wuzewei
++   * @Description: work for verification
++   */
++  def ver_read() = {
++     val memoryValues = Wire(Vec(n,UInt(w.W)))
++     memoryValues(0):=0.U
++     for(i<- 1 until n){
++      memoryValues(i):= access(i.U)  
++    }
++    Cat(memoryValues.reverse)
++  }
+ }
+ 
+ object ImmGen {
+diff --git a/src/main/scala/rocket/VER.scala b/src/main/scala/rocket/VER.scala
+new file mode 100644
+index 000000000..a8ef6b260
+--- /dev/null
++++ b/src/main/scala/rocket/VER.scala
+@@ -0,0 +1,107 @@
++// See LICENSE.Berkeley for license details.
++// See LICENSE.SiFive for license details.
++
++package freechips.rocketchip.rocket
++
++import chisel3._
++import chisel3.util._
++import chisel3.{withClock,withReset}
++import chisel3.internal.sourceinfo.SourceInfo
++import org.chipsalliance.cde.config._
++import freechips.rocketchip.diplomacy._
++import freechips.rocketchip.tile._
++import freechips.rocketchip.util._
++import freechips.rocketchip.util.property
++
++class VERIO(implicit p: Parameters) extends CoreBundle()(p) {
++
++    val commit_valid = Output(UInt(NRET.W))
++    val commit_prevPc = Output(UInt((NRET*xLen).W))
++    val commit_currPc = Output(UInt((NRET*xLen).W))
++    val commit_order = Output(UInt((NRET*10).W))
++    val commit_insn = Output(UInt((NRET*32).W))
++    val commit_fused = Output(UInt((NRET).W))
++
++    val sim_halt = Output(UInt((NRET).W))
++
++    val  trap_valid = Output(UInt((NTRAP).W))
++    val  trap_pc = Output(UInt((xLen).W))
++    val  trap_firstInsn = Output(UInt((NTRAP*xLen).W))
++
++    val  reg_gpr= Output(UInt((NRET*31*xLen).W))
++    val  reg_fpr= Output(UInt((NRET*32*fLen).W))
++    val  reg_vpr= Output(UInt((NRET*32*vLen).W))
++    val  dest_gprWr= Output(UInt((NRET).W))
++    val  dest_fprWr= Output(UInt((NRET).W))
++    val  dest_vprWr= Output(UInt((NRET).W))
++    val  dest_idx= Output(UInt((NRET*8).W))
++    val  src_vmaskRd= Output(UInt((NRET*vLen).W))
++    val  src1_gprRd= Output(UInt((NRET).W))
++    val  src1_fprRd= Output(UInt((NRET).W))
++    val  src1_vprRd= Output(UInt((NRET).W))
++    val  src1_idx= Output(UInt((NRET*8).W))
++    val  src2_gprRd= Output(UInt((NRET).W))
++    val  src2_fprRd= Output(UInt((NRET).W))
++    val  src2_vprRd= Output(UInt((NRET).W))
++    val  src2_idx= Output(UInt((NRET*8).W))
++    val  src3_gprRd= Output(UInt((NRET).W))
++    val  src3_fprRd= Output(UInt((NRET).W))
++    val  src3_vprRd= Output(UInt((NRET).W))
++    val  src3_idx= Output(UInt((NRET*8).W))
++
++    val  csr_mstatusWr= Output(UInt((NRET*xLen).W))
++    val  csr_mepcWr= Output(UInt((NRET*xLen).W))
++    val  csr_mtvalWr= Output(UInt((NRET*xLen).W))
++    val  csr_mtvecWr= Output(UInt((NRET*xLen).W))
++    val  csr_mcauseWr= Output(UInt((NRET*xLen).W))
++    val  csr_mipWr= Output(UInt((NRET*xLen).W))
++    val  csr_mieWr= Output(UInt((NRET*xLen).W))
++    val  csr_mscratchWr= Output(UInt((NRET*xLen).W))
++    val  csr_midelegWr= Output(UInt((NRET*xLen).W))
++    val  csr_medelegWr= Output(UInt((NRET*xLen).W))
++    val  csr_minstretWr= Output(UInt((NRET*xLen).W))
++    val  csr_sstatusWr= Output(UInt((NRET*xLen).W))
++    val  csr_sepcWr= Output(UInt((NRET*xLen).W))
++    val  csr_stvalWr= Output(UInt((NRET*xLen).W))
++    val  csr_stvecWr= Output(UInt((NRET*xLen).W))
++    val  csr_scauseWr= Output(UInt((NRET*xLen).W))
++    val  csr_satpWr= Output(UInt((NRET*xLen).W))
++    val  csr_sscratchWr= Output(UInt((NRET*xLen).W))
++    val  csr_vtypeWr= Output(UInt((NRET*xLen).W))
++    val  csr_vcsrWr= Output(UInt((NRET*xLen).W))
++    val  csr_vlWr= Output(UInt((NRET*xLen).W))
++    val  csr_vstartWr= Output(UInt((NRET*xLen).W))
++    val  csr_mstatusRd= Output(UInt((NRET*xLen).W))
++    val  csr_mepcRd= Output(UInt((NRET*xLen).W))
++    val  csr_mtvalRd= Output(UInt((NRET*xLen).W))
++    val  csr_mtvecRd= Output(UInt((NRET*xLen).W))
++    val  csr_mcauseRd= Output(UInt((NRET*xLen).W))
++    val  csr_mipRd= Output(UInt((NRET*xLen).W))
++    val  csr_mieRd= Output(UInt((NRET*xLen).W))
++    val  csr_mscratchRd= Output(UInt((NRET*xLen).W))
++    val  csr_midelegRd= Output(UInt((NRET*xLen).W))
++    val  csr_medelegRd= Output(UInt((NRET*xLen).W))
++    val  csr_minstretRd= Output(UInt((NRET*xLen).W))
++    val  csr_sstatusRd= Output(UInt((NRET*xLen).W))
++    val  csr_sepcRd= Output(UInt((NRET*xLen).W))
++    val  csr_stvalRd= Output(UInt((NRET*xLen).W))
++    val  csr_stvecRd= Output(UInt((NRET*xLen).W))
++    val  csr_scauseRd= Output(UInt((NRET*xLen).W))
++    val  csr_satpRd= Output(UInt((NRET*xLen).W))
++    val  csr_sscratchRd= Output(UInt((NRET*xLen).W))
++    val  csr_vtypeRd= Output(UInt((NRET*xLen).W))
++    val  csr_vcsrRd= Output(UInt((NRET*xLen).W))
++    val  csr_vlRd = Output(UInt((NRET*xLen).W))
++    val  csr_vstartRd = Output(UInt((NRET*xLen).W))
++
++    val  mem_valid= Output(UInt((NRET).W))
++    val  mem_addr= Output(UInt((NRET*xLen).W))
++    val  mem_isStore= Output(UInt((NRET).W))
++    val  mem_isLoad= Output(UInt((NRET).W))
++    val  mem_isVector= Output(UInt((NRET).W))
++    val  mem_maskWr= Output(UInt((NRET*xLen/8).W))
++    val  mem_maskRd= Output(UInt((NRET*xLen/8).W))
++    val  mem_dataWr= Output(UInt((NRET*vLen*8).W))
++    val  mem_datatRd= Output(UInt((NRET*vLen*8).W))
++
++    }
+diff --git a/src/main/scala/subsystem/Configs.scala b/src/main/scala/subsystem/Configs.scala
+index 92e4fb812..1d9aaa6ca 100644
+--- a/src/main/scala/subsystem/Configs.scala
++++ b/src/main/scala/subsystem/Configs.scala
+@@ -114,6 +114,72 @@ class WithNBigCores(
+   }
+ })
+ 
++/**
++ * @Editors: zhangye
++ * @Description: 添加usevector功能
++ */
++class WithVectorNBigCores(
++  n: Int,
++  overrideIdOffset: Option[Int] = None,
++  crossing: RocketCrossingParams = RocketCrossingParams()
++) extends Config((site, here, up) => {
++  case TilesLocated(InSubsystem) => {
++    val prev = up(TilesLocated(InSubsystem), site)
++    val idOffset = overrideIdOffset.getOrElse(prev.size)
++    val big = RocketTileParams(
++      core   = RocketCoreParams(
++        enVector = true,
++        mulDiv = Some(MulDivParams(
++         mulUnroll = 8,
++         mulEarlyOut = true,
++         divEarlyOut = true))),
++      dcache = Some(DCacheParams(
++        rowBits = site(SystemBusKey).beatBits,
++        nMSHRs = 0,
++        blockBytes = site(CacheBlockBytes))),
++      icache = Some(ICacheParams(
++        rowBits = site(SystemBusKey).beatBits,
++        blockBytes = site(CacheBlockBytes))))
++    List.tabulate(n)(i => RocketTileAttachParams(
++      big.copy(hartId = i + idOffset),
++      crossing
++    )) ++ prev
++  }
++})
++/**
++ * @Editors: wuzewei
++ * @Description: 添加usevector和useuvm功能
++ */
++class WithVectorUvmNBigCores(
++  n: Int,
++  overrideIdOffset: Option[Int] = None,
++  crossing: RocketCrossingParams = RocketCrossingParams()
++) extends Config((site, here, up) => {
++  case TilesLocated(InSubsystem) => {
++    val prev = up(TilesLocated(InSubsystem), site)
++    val idOffset = overrideIdOffset.getOrElse(prev.size)
++    val big = RocketTileParams(
++      core   = RocketCoreParams(
++        enVector = true,
++        enUVM = true,
++        mulDiv = Some(MulDivParams(
++          mulUnroll = 8,
++          mulEarlyOut = true,
++          divEarlyOut = true))),
++      dcache = Some(DCacheParams(
++        rowBits = site(SystemBusKey).beatBits,
++        nMSHRs = 0,
++        blockBytes = site(CacheBlockBytes))),
++      icache = Some(ICacheParams(
++        rowBits = site(SystemBusKey).beatBits,
++        blockBytes = site(CacheBlockBytes))))
++    List.tabulate(n)(i => RocketTileAttachParams(
++      big.copy(hartId = i + idOffset),
++      crossing
++    )) ++ prev
++  }
++})
++
+ class WithNMedCores(
+   n: Int,
+   overrideIdOffset: Option[Int] = None,
+diff --git a/src/main/scala/system/Configs.scala b/src/main/scala/system/Configs.scala
+index 7f9666a5b..797c8e20a 100644
+--- a/src/main/scala/system/Configs.scala
++++ b/src/main/scala/system/Configs.scala
+@@ -20,7 +20,15 @@ class BaseConfig extends Config(
+   new BaseSubsystemConfig
+ )
+ 
+-class DefaultConfig extends Config(new WithNBigCores(1) ++ new WithCoherentBusTopology ++ new BaseConfig)
++/**
++ * @Editors: wuzewei
++ * @Description: add the vector config
++ */
++// class DefaultConfig extends Config(new WithNBigCores(1) ++ new WithCoherentBusTopology ++ new BaseConfig)
++class DefaultConfig extends Config(new WithVectorUvmNBigCores(1) ++ new WithCoherentBusTopology ++ new BaseConfig)
++//class DefaultConfig extends Config(new WithVectorNBigCores(1) ++ new WithCoherentBusTopology ++ new BaseConfig)
++// class VectorConfig extends Config(new WithVectorNBigCores(1) ++ new WithCoherentBusTopology ++ new BaseConfig)
++
+ 
+ class DefaultBufferlessConfig extends Config(new WithBufferlessBroadcastHub ++ new DefaultConfig)
+ class DefaultSmallConfig extends Config(new WithNSmallCores(1) ++ new WithCoherentBusTopology ++ new BaseConfig)
+diff --git a/src/main/scala/tile/BaseTile.scala b/src/main/scala/tile/BaseTile.scala
+index 1265cb622..fb02c6077 100644
+--- a/src/main/scala/tile/BaseTile.scala
++++ b/src/main/scala/tile/BaseTile.scala
+@@ -53,6 +53,13 @@ trait HasNonDiplomaticTileParameters {
+   def usingDataScratchpad: Boolean = tileParams.dcache.flatMap(_.scratch).isDefined
+ 
+   def xLen: Int = p(XLen)
++  /**
++   * @Editors: wuzewei
++   * @Description: 添加NRET和NTRAP以适配vset接口添加
++   */
++  def NRET: Int = 1 
++  def NTRAP: Int = 1
++
+   def xBytes: Int = xLen / 8
+   def iLen: Int = 32
+   def pgIdxBits: Int = 12
+@@ -93,7 +100,12 @@ trait HasNonDiplomaticTileParameters {
+ 
+   // TODO make HellaCacheIO diplomatic and remove this brittle collection of hacks
+   //                  Core   PTW                DTIM                    coprocessors           
+-  def dcacheArbPorts = 1 + usingVM.toInt + usingDataScratchpad.toInt + p(BuildRoCC).size + tileParams.core.useVector.toInt
++  /**
++   * @Editors: wuzewei
++   * @Description: change to use vector
++   */
++  // def dcacheArbPorts = 1 + usingVM.toInt + usingDataScratchpad.toInt + p(BuildRoCC).size + tileParams.core.useVector.toInt
++  def dcacheArbPorts = 1 + usingVM.toInt + usingDataScratchpad.toInt + p(BuildRoCC).size //+ tileParams.core.useVector.toInt
+ 
+   // TODO merge with isaString in CSR.scala
+   def isaDTS: String = {
+diff --git a/src/main/scala/tile/Core.scala b/src/main/scala/tile/Core.scala
+index 70c478367..680d1cf46 100644
+--- a/src/main/scala/tile/Core.scala
++++ b/src/main/scala/tile/Core.scala
+@@ -68,10 +68,23 @@ trait CoreParams {
+   def dcacheReqTagBits: Int = 6
+ 
+   def minFLen: Int = 32
+-  def vLen: Int = 0
++  /**
++   * @Editors: wuzewei
++   * @Description: change the vlen
++   */
++  def vLen: Int =128 
+   def sLen: Int = 0
+   def eLen(xLen: Int, fLen: Int): Int = xLen max fLen
+-  def vMemDataBits: Int = 0
++  /**
++   * @Editors: wuzewei
++   * @Description: change the vmemdatabits
++   */
++  def vMemDataBits: Int = 64 
++  /**
++   * @Editors: wuzewei
++   * @Description: add for verification
++   */
++  val useVerif: Boolean = true
+ }
+ 
+ trait HasCoreParameters extends HasTileParameters {
+@@ -139,6 +152,16 @@ trait HasCoreParameters extends HasTileParameters {
+   // Requires post-processing due to out-of-order writebacks.
+   val enableCommitLog = false
+ 
++  /**
++   * @Editors: wuzewei
++   * @Description: 用来开启trace 方便查看
++   */
++  //usetrace trace总开关
++  val opentrace = true
++  //vtrace 副开关
++  val openvtrace = true
++  val usevtrace = if(opentrace & openvtrace) true else false
++
+ }
+ 
+ abstract class CoreModule(implicit val p: Parameters) extends Module
+@@ -157,7 +180,7 @@ class TraceBundle(implicit val p: Parameters) extends Bundle with HasCoreParamet
+   val time = UInt(64.W)
+   val custom = coreParams.traceCustom
+ }
+-
++//加接口io，jyf
+ trait HasCoreIO extends HasTileParameters {
+   implicit val p: Parameters
+   def nTotalRoCCCSRs: Int
+@@ -175,5 +198,11 @@ trait HasCoreIO extends HasTileParameters {
+     val cease = Bool().asOutput
+     val wfi = Bool().asOutput
+     val traceStall = Bool().asInput
++    val decode_interface = new DecodeIO
++    /**
++     * @Editors: wuzewei
++     * @Description: add for verification
++     */
++    val verif = coreParams.useVerif.option(new VERIO)
+   }
+ }
+diff --git a/src/main/scala/tile/FPU.scala b/src/main/scala/tile/FPU.scala
+index 6393daae2..6c45237d9 100644
+--- a/src/main/scala/tile/FPU.scala
++++ b/src/main/scala/tile/FPU.scala
+@@ -205,11 +205,17 @@ class FPUCoreIO(implicit p: Parameters) extends CoreBundle()(p) {
+   val sboard_clra = Output(UInt(5.W))
+ 
+   val keep_clock_enabled = Input(Bool())
++  /**
++ * @Editors: wuzewei
++ * @Description: add for verification
++ */
++  val fpu_ver_reg = coreParams.useVerif.option(Output(UInt((NRET*32*fLen).W)))
+ }
+ 
+ class FPUIO(implicit p: Parameters) extends FPUCoreIO ()(p) {
+   val cp_req = Flipped(Decoupled(new FPInput())) //cp doesn't pay attn to kill sigs
+   val cp_resp = Decoupled(new FPResult())
++
+ }
+ 
+ class FPResult(implicit p: Parameters) extends CoreBundle()(p) {
+@@ -791,6 +797,17 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
+ 
+   // regfile
+   val regfile = Mem(32, Bits((fLen+1).W))
++  /**
++   * @Editors: wuzewei
++   * @Description: add for verification
++   */
++  if(coreParams.useVerif){
++  val memoryValues = Wire(Vec(32,UInt((fLen+1).W)))
++  for(i<-0 until 32){
++    memoryValues(i):= regfile(i)
++  }
++  io.fpu_ver_reg.get := Cat(memoryValues)
++}
+   when (load_wb) {
+     val wdata = recode(load_wb_data, load_wb_typeTag)
+     regfile(load_wb_tag) := wdata

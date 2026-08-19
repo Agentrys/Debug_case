@@ -1,0 +1,52 @@
+{
+  "case_id": "openhwgroup.ariane#2912",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "planvtech",
+    "name": "cva6"
+  },
+  "fix_oid": "f5b77185554f2964d09c31f0358082190cbae0dc",
+  "buggy_commit_sha": "b9da1d9e2d6d0a4952084d370d5be84ed4bcd921",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_2912.diff",
+  "diff_sha256": "d8ba89e6691592bd1b4747ecc026759a0c65210d9062c4c75e30eb651099ab14",
+  "fix_oids_sorted": [
+    "f5b77185554f2964d09c31f0358082190cbae0dc",
+    "f7fae486ff02bc2c8be8af86cd1f71928ac6438a",
+    "0dd8ba293a5e88bf3aae28257009f04341773726",
+    "bb11e1d826ad1e219784fd0d1ecd86094bc1e0ce"
+  ],
+  "n_fix_commits": 4,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/cva6_mmu/cva6_mmu.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/cva6_mmu/cva6_mmu.sv": [
+      [
+        223,
+        229
+      ],
+      [
+        223,
+        229
+      ],
+      [
+        223,
+        229
+      ],
+      [
+        223,
+        229
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_2912.raw.diff"
+}

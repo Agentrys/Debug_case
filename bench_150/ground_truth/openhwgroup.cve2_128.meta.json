@@ -1,0 +1,38 @@
+{
+  "case_id": "openhwgroup.cve2#128",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cve2"
+  },
+  "fix_repo": {
+    "owner": "NXP",
+    "name": "openhwgroup-cve2"
+  },
+  "fix_oid": "34214541e0ec268db307c4e4dcf5764f92a7db76",
+  "buggy_commit_sha": "b8c94a3e84087e230581fcdddadbea398ea19a7e",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openhwgroup.cve2_128.diff",
+  "diff_sha256": "f0b3807690cc048e9871312132320e84a14356712ed79cb5be29af92666904c4",
+  "fix_oids_sorted": [
+    "34214541e0ec268db307c4e4dcf5764f92a7db76",
+    "a0f5aafc4d71324e7320e6dd1e304b1dc5176b78"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "range",
+  "design_only": true,
+  "ground_truth_files": [
+    "rtl/cve2_cs_registers.sv"
+  ],
+  "ground_truth_hunks": {
+    "rtl/cve2_cs_registers.sv": [
+      [
+        743,
+        750
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/openhwgroup.cve2_128.raw.diff"
+}

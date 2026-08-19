@@ -1,0 +1,63 @@
+diff --git a/src/main/scala/rocket/Tile.scala b/src/main/scala/rocket/Tile.scala
+index 688218e47..abfecce83 100644
+--- a/src/main/scala/rocket/Tile.scala
++++ b/src/main/scala/rocket/Tile.scala
+@@ -61,7 +61,7 @@ class AsyncRocketTile(c: RocketConfig)(implicit p: Parameters) extends LazyModul
+ 
+   lazy val module = new LazyModuleImp(this) {
+     val io = new Bundle {
+-      val master = masterNodes.map(_.bundleOut)
++      val master = masterNodes.head.bundleOut // TODO fix after Chisel #366
+       val slave = slaveNode.map(_.bundleIn)
+       val hartid = UInt(INPUT, p(XLen))
+       val interrupts = new TileInterrupts()(p).asInput
+diff --git a/src/main/scala/coreplex/RocketTiles.scala b/src/main/scala/coreplex/RocketTiles.scala
+index 1286df673..6b3ab4573 100644
+--- a/src/main/scala/coreplex/RocketTiles.scala
++++ b/src/main/scala/coreplex/RocketTiles.scala
+@@ -49,6 +49,7 @@ trait HasSynchronousRocketTilesModule extends CoreplexRISCVPlatformModule {
+ trait HasAsynchronousRocketTiles extends CoreplexRISCVPlatform {
+   val module: HasAsynchronousRocketTilesModule
+ 
++  import rocket.AsyncRocketTile
+   val rocketTiles: Seq[AsyncRocketTile] = p(RocketConfigs).map { c =>
+     LazyModule(new AsyncRocketTile(c)(p.alterPartial {
+       case SharedMemoryTLEdge => l1tol2.node.edgesIn(0)
+diff --git a/src/main/scala/rocket/Tile.scala b/src/main/scala/rocket/Tile.scala
+index 688218e47..abfecce83 100644
+--- a/src/main/scala/rocket/Tile.scala
++++ b/src/main/scala/rocket/Tile.scala
+@@ -61,7 +61,7 @@ class AsyncRocketTile(c: RocketConfig)(implicit p: Parameters) extends LazyModul
+ 
+   lazy val module = new LazyModuleImp(this) {
+     val io = new Bundle {
+-      val master = masterNodes.map(_.bundleOut)
++      val master = masterNodes.head.bundleOut // TODO fix after Chisel #366
+       val slave = slaveNode.map(_.bundleIn)
+       val hartid = UInt(INPUT, p(XLen))
+       val interrupts = new TileInterrupts()(p).asInput
+diff --git a/src/main/scala/coreplex/RocketTiles.scala b/src/main/scala/coreplex/RocketTiles.scala
+index 1286df673..6b3ab4573 100644
+--- a/src/main/scala/coreplex/RocketTiles.scala
++++ b/src/main/scala/coreplex/RocketTiles.scala
+@@ -49,6 +49,7 @@ trait HasSynchronousRocketTilesModule extends CoreplexRISCVPlatformModule {
+ trait HasAsynchronousRocketTiles extends CoreplexRISCVPlatform {
+   val module: HasAsynchronousRocketTilesModule
+ 
++  import rocket.AsyncRocketTile
+   val rocketTiles: Seq[AsyncRocketTile] = p(RocketConfigs).map { c =>
+     LazyModule(new AsyncRocketTile(c)(p.alterPartial {
+       case SharedMemoryTLEdge => l1tol2.node.edgesIn(0)
+diff --git a/src/main/scala/rocket/Tile.scala b/src/main/scala/rocket/Tile.scala
+index 688218e47..abfecce83 100644
+--- a/src/main/scala/rocket/Tile.scala
++++ b/src/main/scala/rocket/Tile.scala
+@@ -61,7 +61,7 @@ class AsyncRocketTile(c: RocketConfig)(implicit p: Parameters) extends LazyModul
+ 
+   lazy val module = new LazyModuleImp(this) {
+     val io = new Bundle {
+-      val master = masterNodes.map(_.bundleOut)
++      val master = masterNodes.head.bundleOut // TODO fix after Chisel #366
+       val slave = slaveNode.map(_.bundleIn)
+       val hartid = UInt(INPUT, p(XLen))
+       val interrupts = new TileInterrupts()(p).asInput

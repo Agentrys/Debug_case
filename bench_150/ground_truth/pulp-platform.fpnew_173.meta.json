@@ -1,0 +1,41 @@
+{
+  "case_id": "pulp-platform.fpnew#173",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cvfpu"
+  },
+  "fix_repo": {
+    "owner": "IhsaneTahir",
+    "name": "cvfpu"
+  },
+  "fix_oid": "bb0e8bbbddaf47f1feb3e37af8320c94c8e99a78",
+  "buggy_commit_sha": "3eb6afeab2cb33f7d8689222955d0171aeb3a801",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/pulp-platform.fpnew_173.diff",
+  "diff_sha256": "a7835cbe55a75c6d9b4034244e5adeba9f7a4a422ec1519bf96a4c3edbb9c8f9",
+  "fix_oids_sorted": [
+    "bb0e8bbbddaf47f1feb3e37af8320c94c8e99a78"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/fpnew_divsqrt_th_64_multi.sv"
+  ],
+  "ground_truth_hunks": {
+    "src/fpnew_divsqrt_th_64_multi.sv": [
+      [
+        234,
+        240
+      ],
+      [
+        335,
+        345
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/pulp-platform.fpnew_173.raw.diff"
+}

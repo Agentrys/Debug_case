@@ -1,0 +1,95 @@
+diff --git a/machine/configstring.c b/machine/configstring.c
+index fb2fed7..2b72080 100644
+--- a/machine/configstring.c
++++ b/machine/configstring.c
+@@ -6,12 +6,12 @@
+ 
+ static void query_mem(const char* config_string)
+ {
+-  query_result res = query_config_string(config_string, "ram{0{addr");
+-  assert(res.start);
+-  uintptr_t base = get_uint(res);
++//  query_result res = query_config_string(config_string, "ram{0{addr");
++//  assert(res.start);
++  uintptr_t base = 0x80000000; //get_uint(res);
+   assert(base == DRAM_BASE);
+-  res = query_config_string(config_string, "ram{0{size");
+-  mem_size = get_uint(res);
++//  res = query_config_string(config_string, "ram{0{size");
++  mem_size = 0x4000000; //get_uint(res);
+ }
+ 
+ static void query_rtc(const char* config_string)
+@@ -60,6 +60,7 @@ static void query_hart_plic(const char* config_string, hls_t* hls, int core, int
+ 
+ static void query_harts(const char* config_string)
+ {
++	uint32_t hartid = read_const_csr(mhartid);
+   for (int core = 0, hart; ; core++) {
+     for (hart = 0; ; hart++) {
+       char buf[32];
+@@ -67,6 +68,8 @@ static void query_harts(const char* config_string)
+       query_result res = query_config_string(config_string, buf);
+       if (!res.start)
+         break;
++
++	  if(core == hartid) {
+       hls_t* hls = hls_init(num_harts);
+       hls->ipi = (void*)(uintptr_t)get_uint(res);
+ 
+@@ -80,8 +83,9 @@ static void query_harts(const char* config_string)
+       mb();
+ 
+       // wake up the hart
+-      *hls->ipi = 1;
++      //*hls->ipi = 1;
+ 
++	  }
+       num_harts++;
+     }
+     if (!hart)
+diff --git a/machine/mentry.S b/machine/mentry.S
+index 95653c1..74d4588 100644
+--- a/machine/mentry.S
++++ b/machine/mentry.S
+@@ -230,7 +230,8 @@ do_reset:
+   slli a1, a0, RISCV_PGSHIFT
+   add sp, sp, a1
+ 
+-  beqz a0, init_first_hart
++#  beqz a0, init_first_hart
++  tail init_first_hart
+ 
+   # set MSIE bit to receive IPI
+   li a1, MIP_MSIP
+diff --git a/machine/minit.c b/machine/minit.c
+index f9a082f..ff35349 100644
+--- a/machine/minit.c
++++ b/machine/minit.c
+@@ -133,8 +133,10 @@ static void hart_plic_init()
+ void init_first_hart()
+ {
+   uart_init();
++  uint32_t hartid = read_const_csr(mhartid);
++  printm("line %d: hartid = %d\n", __LINE__, hartid);
+   hart_init();
+-  hls_init(0); // this might get called again from parse_config_string
++  hls_init(hartid); // this might get called again from parse_config_string
+   parse_config_string();
+   plic_init();
+   hart_plic_init();
+diff --git a/machine/uart.c b/machine/uart.c
+index 44a95b3..5250447 100644
+--- a/machine/uart.c
++++ b/machine/uart.c
+@@ -1,8 +1,9 @@
+ // See LICENSE for license details.
+ 
+ #include "uart.h"
++#include "mtrap.h"
+ 
+-#define UART_BASE 0x60000000
++#define UART_BASE (0x60000000 + read_const_csr(mhartid) * 0x10000)
+ 
+ #define uart_base_ptr (volatile char *)(UART_BASE)
+ 

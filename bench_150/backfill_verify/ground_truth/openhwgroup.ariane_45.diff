@@ -1,0 +1,1070 @@
+diff --git a/piton/design/chipset/io_ctrl/rtl/uart_reseter.v b/piton/design/chipset/io_ctrl/rtl/uart_reseter.v
+new file mode 100644
+index 00000000..0fb6ad3e
+--- /dev/null
++++ b/piton/design/chipset/io_ctrl/rtl/uart_reseter.v
+@@ -0,0 +1,124 @@
++`include "uart16550_define.vh"
++
++module uart_reseter(
++    input axi_clk, 
++    input axi_rst_n, 
++
++    input [31:0] axi_rdata,
++    input        axi_rvalid,
++    input        axi_rready,
++    input [12:0] axi_araddr, 
++    input axi_arvalid, 
++    input axi_arready, 
++
++    output uart_rst_out_n
++);
++
++// This module sniffs uart bytes and compares them with this
++// magic sequence. If comparison is successful - sends reset to the whole system
++localparam reset_sequence = 64'h9a337213af278f34;
++
++wire axi_rgo = axi_rvalid & axi_rready;
++wire axi_argo = axi_arvalid & axi_arready;
++
++reg [4:0] state;
++localparam IDLE = 4'd0;
++localparam BYTE1 = 4'd1;
++localparam BYTE2 = 4'd2;
++localparam BYTE3 = 4'd3;
++localparam BYTE4 = 4'd4;
++localparam BYTE5 = 4'd5;
++localparam BYTE6 = 4'd6;
++localparam BYTE7 = 4'd7;
++localparam RESET = 4'd8;
++
++reg waiting;
++
++assign uart_rst_out_n = !(state == RESET);
++
++always @(posedge axi_clk) begin
++    if(~axi_rst_n) begin
++        state <= 0;
++    end 
++    else begin
++        if (waiting & axi_rgo) begin
++            case (state)
++                IDLE: begin
++                    if (axi_rdata[7:0] == reset_sequence[7:0])
++                        state <= BYTE1;
++                    else 
++                        state <= IDLE;
++                end
++                BYTE1: begin
++                    if (axi_rdata[7:0] == reset_sequence[15:8])                        
++                        state <= BYTE2;
++                    else 
++                        state <= IDLE;
++                end
++                BYTE2: begin
++                    if (axi_rdata[7:0] == reset_sequence[23:16])
++                        state <= BYTE3;
++                    else 
++                        state <= IDLE;
++                end
++                BYTE3: begin
++                    if (axi_rdata[7:0] == reset_sequence[31:24])
++                        state <= BYTE4;
++                    else 
++                        state <= IDLE;
++                end
++                BYTE4: begin
++                    if (axi_rdata[7:0] == reset_sequence[39:32])
++                        state <= BYTE5;
++                    else 
++                        state <= IDLE;
++                end
++                BYTE5: begin
++                    if (axi_rdata[7:0] == reset_sequence[47:40])
++                        state <= BYTE6;
++                    else 
++                        state <= IDLE;
++                end
++                BYTE6: begin
++                    if (axi_rdata[7:0] == reset_sequence[55:48])
++                        state <= BYTE7;
++                    else 
++                        state <= IDLE;
++                end
++                BYTE7: begin
++                    if (axi_rdata[7:0] == reset_sequence[63:56])
++                        state <= RESET;
++                    else 
++                        state <= IDLE;
++                end
++                RESET: begin
++                    state <= RESET;
++                end
++                default: begin
++                    state <= IDLE;
++                end
++            endcase // state
++        end
++        else begin
++            state <= state;
++        end
++    end
++end
++
++
++
++always @(posedge axi_clk) begin
++    if(~axi_rst_n) begin
++        waiting <= 0;
++    end 
++    else begin
++        if (axi_argo & (axi_araddr == `UART_RBR) & !waiting) 
++            waiting <= 1;
++        else if (axi_rgo & waiting)
++            waiting <= 0;
++        else
++            waiting <= waiting; //should never be here
++    end
++end
++
++endmodule
+diff --git a/piton/design/chipset/io_ctrl/rtl/uart_top.v b/piton/design/chipset/io_ctrl/rtl/uart_top.v
+index c9118a4c..94a59966 100644
+--- a/piton/design/chipset/io_ctrl/rtl/uart_top.v
++++ b/piton/design/chipset/io_ctrl/rtl/uart_top.v
+@@ -44,6 +44,7 @@ module uart_top (
+     output                                  test_start,
+     input                                   test_good_end,
+     input                                   test_bad_end,
++    output                                  uart_rst_out_n,
+     input                                   init_calib_complete,
+ 
+     input [`NOC_CHIPID_WIDTH-1:0]          chip_id,
+@@ -309,6 +310,24 @@ assign uart16550_rx   = uart_rx;
+   assign reader_stop = 1'b1;
+ `endif  // PITONSYS_UART_BOOT
+ 
++`ifdef PITONSYS_UART_RESET
++  uart_reseter uart_reseter(
++    .axi_clk(axi_clk),
++    .axi_rst_n(rst_n),
++
++    .axi_rdata(s_axi_rdata),
++    .axi_rvalid(s_axi_rvalid),
++    .axi_rready(s_axi_rready),
++    .axi_araddr    (s_axi_araddr),
++    .axi_arvalid   (s_axi_arvalid),
++    .axi_arready   (s_axi_arready),
++    
++    .uart_rst_out_n(uart_rst_out_n)
++  );
++`else 
++  assign uart_rst_out_n = 1'b1;
++`endif
++
+ uart_mux   uart_mux (
+   .axi_clk              (axi_clk            ),
+   .axi_rst_n            (rst_n              ),
+diff --git a/piton/design/chipset/mc/rtl/mc_top.v b/piton/design/chipset/mc/rtl/mc_top.v
+index 85a513c4..ea09b74f 100644
+--- a/piton/design/chipset/mc/rtl/mc_top.v
++++ b/piton/design/chipset/mc/rtl/mc_top.v
+@@ -43,20 +43,20 @@ module mc_top (
+ 
+     input                           uart_boot_en,
+     
+-`ifdef VCU118_BOARD
++`ifdef PITONSYS_DDR4
+     // directly feed in 250MHz ref clock
+     input                           sys_clk_p,
+     input                           sys_clk_n,
+ 
+     output                          ddr_act_n,
+     output [`DDR3_BG_WIDTH-1:0]     ddr_bg,
+-`else // VCU118_BOARD
++`else // PITONSYS_DDR4
+     input                           sys_clk,
+ 
+     output                          ddr_cas_n,
+     output                          ddr_ras_n,
+     output                          ddr_we_n,
+-`endif
++`endif // PITONSYS_DDR4
+ 
+     output [`DDR3_ADDR_WIDTH-1:0]   ddr_addr,
+     output [`DDR3_BA_WIDTH-1:0]     ddr_ba,
+@@ -70,16 +70,21 @@ module mc_top (
+ `ifndef NEXYSVIDEO_BOARD
+     output [`DDR3_CS_WIDTH-1:0]     ddr_cs_n,
+ `endif // endif NEXYSVIDEO_BOARD
+-`ifdef VCU118_BOARD
++`ifdef PITONSYS_DDR4
++`ifdef XUPP3R_BOARD
++    output                          ddr_parity,
++`else
+     inout [`DDR3_DM_WIDTH-1:0]      ddr_dm,
+-`else 
++`endif // XUPP3R_BOARD
++`else // PITONSYS_DDR4
+     output [`DDR3_DM_WIDTH-1:0]     ddr_dm,
+-`endif
+-    output                          ddr_odt,
++`endif // PITONSYS_DDR4
++    output [`DDR3_ODT_WIDTH-1:0]    ddr_odt,
+ 
+     output                          init_calib_complete_out,
+     input                           sys_rst_n
+ );
++
+ reg     [31:0]                      delay_cnt;
+ reg                                 ui_clk_syn_rst_delayed;
+ wire                                init_calib_complete;
+@@ -478,7 +483,7 @@ memory_zeroer #(
+ );
+ `endif
+ 
+-`ifdef VCU118_BOARD
++`ifdef PITONSYS_DDR4
+ 
+ // reserved, tie to 0
+ wire app_hi_pri;
+@@ -503,7 +508,9 @@ ddr4_0 i_ddr4_0 (
+   .c0_ddr4_ck_t              ( ddr_ck_p                  ),
+   .c0_ddr4_ck_c              ( ddr_ck_n                  ),
+   .c0_ddr4_reset_n           ( ddr_reset_n               ),
++`ifndef XUPP3R_BOARD
+   .c0_ddr4_dm_dbi_n          ( ddr_dm                    ), // dbi_n is a data bus inversion feature that cannot be used simultaneously with dm
++`endif
+   .c0_ddr4_dq                ( ddr_dq                    ), 
+   .c0_ddr4_dqs_c             ( ddr_dqs_n                 ), 
+   .c0_ddr4_dqs_t             ( ddr_dqs_p                 ), 
+@@ -524,10 +531,17 @@ ddr4_0 i_ddr4_0 (
+   .c0_ddr4_app_rd_data_valid ( app_rd_data_valid         ),
+   .c0_ddr4_app_rdy           ( app_rdy                   ),
+   .c0_ddr4_app_wdf_rdy       ( app_wdf_rdy               )
++`ifdef XUPP3R_BOARD
++,
++  .c0_ddr4_ecc_err_addr      (                           ),            // output wire [51 : 0] c0_ddr4_ecc_err_addr
++  .c0_ddr4_ecc_single        (                           ),                // output wire [7 : 0] c0_ddr4_ecc_single
++  .c0_ddr4_ecc_multiple      (                           ),            // output wire [7 : 0] c0_ddr4_ecc_multiple
++  .c0_ddr4_app_correct_en_i  ( 1'b1                      ),     // input wire c0_ddr4_app_correct_en_i
++  .c0_ddr4_parity            ( ddr_parity                )                        // output wire c0_ddr4_parity
++`endif
+ );
+ 
+-
+-`else // VCU118_BOARD
++`else // PITONSYS_DDR4
+ mig_7series_0   mig_7series_0 (
+     // Memory interface ports
+ `ifndef NEXYS4DDR_BOARD
+@@ -593,9 +607,9 @@ mig_7series_0   mig_7series_0 (
+     .sys_clk_i                      (sys_clk),
+     .sys_rst                        (sys_rst_n)
+ );
+-`endif // VCU118_BOARD
++`endif // PITONSYS_DDR4
+ 
+-`else // ifdef AXI4_MEM, use AXI, works only with VC707
++`else // AXI4_MEM
+ 
+ `ifdef PITONSYS_MEM_ZEROER
+ assign m_axi_awid = zeroer_axi_awid;
+@@ -610,7 +624,7 @@ assign m_axi_awqos = zeroer_axi_awqos;
+ assign m_axi_awregion = zeroer_axi_awregion;
+ assign m_axi_awuser = zeroer_axi_awuser;
+ assign m_axi_awvalid = zeroer_axi_awvalid;
+-assign m_axi_awready = zeroer_axi_awready;
++assign zeroer_axi_awready = m_axi_awready;
+ 
+ assign m_axi_wid = zeroer_axi_wid;
+ assign m_axi_wdata = zeroer_axi_wdata;
+@@ -618,7 +632,7 @@ assign m_axi_wstrb = zeroer_axi_wstrb;
+ assign m_axi_wlast = zeroer_axi_wlast;
+ assign m_axi_wuser = zeroer_axi_wuser;
+ assign m_axi_wvalid = zeroer_axi_wvalid;
+-assign m_axi_wready = zeroer_axi_wready;
++assign zeroer_axi_wready = m_axi_wready;
+ 
+ assign m_axi_arid = zeroer_axi_arid;
+ assign m_axi_araddr = zeroer_axi_araddr;
+@@ -632,26 +646,26 @@ assign m_axi_arqos = zeroer_axi_arqos;
+ assign m_axi_arregion = zeroer_axi_arregion;
+ assign m_axi_aruser = zeroer_axi_aruser;
+ assign m_axi_arvalid = zeroer_axi_arvalid;
+-assign m_axi_arready = zeroer_axi_arready;
+-
+-assign m_axi_rid = zeroer_axi_rid;
+-assign m_axi_rdata = zeroer_axi_rdata;
+-assign m_axi_rresp = zeroer_axi_rresp;
+-assign m_axi_rlast = zeroer_axi_rlast;
+-assign m_axi_ruser = zeroer_axi_ruser;
+-assign m_axi_rvalid = zeroer_axi_rvalid;
++assign zeroer_axi_arready = m_axi_arready;
++
++assign zeroer_axi_rid = m_axi_rid;
++assign zeroer_axi_rdata = m_axi_rdata;
++assign zeroer_axi_rresp = m_axi_rresp;
++assign zeroer_axi_rlast = m_axi_rlast;
++assign zeroer_axi_ruser = m_axi_ruser;
++assign zeroer_axi_rvalid = m_axi_rvalid;
+ assign m_axi_rready = zeroer_axi_rready;
+ 
+-assign m_axi_bid = zeroer_axi_bid;
+-assign m_axi_bresp = zeroer_axi_bresp;
+-assign m_axi_buser = zeroer_axi_buser;
+-assign m_axi_bvalid = zeroer_axi_bvalid;
++assign zeroer_axi_bid = m_axi_bid;
++assign zeroer_axi_bresp = m_axi_bresp;
++assign zeroer_axi_buser = m_axi_buser;
++assign zeroer_axi_bvalid = m_axi_bvalid;
+ assign m_axi_bready = zeroer_axi_bready;
+ 
+ assign noc_axi4_bridge_rst       = ui_clk_sync_rst & ~init_calib_complete_zero;
+ assign noc_axi4_bridge_init_done = init_calib_complete_zero;
+ assign init_calib_complete_out  = init_calib_complete_zero & ~ui_clk_syn_rst_delayed;
+-`else
++`else // PITONSYS_MEM_ZEROER
+ 
+ assign m_axi_awid = core_axi_awid;
+ assign m_axi_awaddr = core_axi_awaddr;
+@@ -665,7 +679,7 @@ assign m_axi_awqos = core_axi_awqos;
+ assign m_axi_awregion = core_axi_awregion;
+ assign m_axi_awuser = core_axi_awuser;
+ assign m_axi_awvalid = core_axi_awvalid;
+-assign m_axi_awready = core_axi_awready;
++assign core_axi_awready = m_axi_awready;
+ 
+ assign m_axi_wid = core_axi_wid;
+ assign m_axi_wdata = core_axi_wdata;
+@@ -673,7 +687,7 @@ assign m_axi_wstrb = core_axi_wstrb;
+ assign m_axi_wlast = core_axi_wlast;
+ assign m_axi_wuser = core_axi_wuser;
+ assign m_axi_wvalid = core_axi_wvalid;
+-assign m_axi_wready = core_axi_wready;
++assign core_axi_wready = m_axi_wready;
+ 
+ assign m_axi_arid = core_axi_arid;
+ assign m_axi_araddr = core_axi_araddr;
+@@ -687,26 +701,26 @@ assign m_axi_arqos = core_axi_arqos;
+ assign m_axi_arregion = core_axi_arregion;
+ assign m_axi_aruser = core_axi_aruser;
+ assign m_axi_arvalid = core_axi_arvalid;
+-assign m_axi_arready = core_axi_arready;
+-
+-assign m_axi_rid = core_axi_rid;
+-assign m_axi_rdata = core_axi_rdata;
+-assign m_axi_rresp = core_axi_rresp;
+-assign m_axi_rlast = core_axi_rlast;
+-assign m_axi_ruser = core_axi_ruser;
+-assign m_axi_rvalid = core_axi_rvalid;
++assign core_axi_arready = m_axi_arready;
++
++assign core_axi_rid = m_axi_rid;
++assign core_axi_rdata = m_axi_rdata;
++assign core_axi_rresp = m_axi_rresp;
++assign core_axi_rlast = m_axi_rlast;
++assign core_axi_ruser = m_axi_ruser;
++assign core_axi_rvalid = m_axi_rvalid;
+ assign m_axi_rready = core_axi_rready;
+ 
+-assign m_axi_bid = core_axi_bid;
+-assign m_axi_bresp = core_axi_bresp;
+-assign m_axi_buser = core_axi_buser;
+-assign m_axi_bvalid = core_axi_bvalid;
++assign core_axi_bid = m_axi_bid;
++assign core_axi_bresp = m_axi_bresp;
++assign core_axi_buser = m_axi_buser;
++assign core_axi_bvalid = m_axi_bvalid;
+ assign m_axi_bready = core_axi_bready;
+ 
+ assign noc_axi4_bridge_rst       = ui_clk_sync_rst;
+ assign noc_axi4_bridge_init_done = init_calib_complete;
+ assign init_calib_complete_out  = init_calib_complete & ~ui_clk_syn_rst_delayed;
+-`endif
++`endif // PITONSYS_MEM_ZEROER
+ 
+ 
+ noc_axi4_bridge noc_axi4_bridge  (
+@@ -885,6 +899,99 @@ axi4_zeroer axi4_zeroer(
+ );
+ `endif // PITONSYS_MEM_ZEROER
+ 
++`ifdef PITONSYS_DDR4
++
++ddr4_axi4 ddr_axi4 (
++  .sys_rst                   ( ~sys_rst_n                ),
++  .c0_sys_clk_p              ( sys_clk_p                 ),
++  .c0_sys_clk_n              ( sys_clk_n                 ),
++  .dbg_clk                   (                           ), // not used 
++  .dbg_bus                   (                           ), // not used
++  .c0_ddr4_ui_clk            ( ui_clk                    ),
++  .c0_ddr4_ui_clk_sync_rst   ( ui_clk_sync_rst           ),
++  
++  .c0_ddr4_act_n             ( ddr_act_n                 ), // cas_n, ras_n and we_n are multiplexed in ddr4
++  .c0_ddr4_adr               ( ddr_addr                  ),
++  .c0_ddr4_ba                ( ddr_ba                    ),
++  .c0_ddr4_bg                ( ddr_bg                    ), // bank group address
++  .c0_ddr4_cke               ( ddr_cke                   ),
++  .c0_ddr4_odt               ( ddr_odt                   ),
++  .c0_ddr4_cs_n              ( ddr_cs_n                  ),
++  .c0_ddr4_ck_t              ( ddr_ck_p                  ),
++  .c0_ddr4_ck_c              ( ddr_ck_n                  ),
++  .c0_ddr4_reset_n           ( ddr_reset_n               ),
++`ifndef XUPP3R_BOARD
++  .c0_ddr4_dm_dbi_n          ( ddr_dm                    ), // dbi_n is a data bus inversion feature that cannot be used simultaneously with dm
++`endif
++  .c0_ddr4_dq                ( ddr_dq                    ), 
++  .c0_ddr4_dqs_c             ( ddr_dqs_n                 ), 
++  .c0_ddr4_dqs_t             ( ddr_dqs_p                 ), 
++  .c0_init_calib_complete    ( init_calib_complete       ),
++`ifdef XUPP3R_BOARD
++  .c0_ddr4_parity            ( ddr_parity                ),                        // output wire c0_ddr4_parity
++`endif
++  .c0_ddr4_interrupt         (                           ),                    // output wire c0_ddr4_interrupt
++  .c0_ddr4_aresetn           ( sys_rst_n                 ),                        // input wire c0_ddr4_aresetn
++  
++  .c0_ddr4_s_axi_ctrl_awvalid(1'b0                  ),  // input wire c0_ddr4_s_axi_ctrl_awvalid
++  .c0_ddr4_s_axi_ctrl_awready(                      ),  // output wire c0_ddr4_s_axi_ctrl_awready
++  .c0_ddr4_s_axi_ctrl_awaddr (32'b0                 ),    // input wire [31 : 0] c0_ddr4_s_axi_ctrl_awaddr
++  .c0_ddr4_s_axi_ctrl_wvalid (1'b0                  ),    // input wire c0_ddr4_s_axi_ctrl_wvalid
++  .c0_ddr4_s_axi_ctrl_wready (                      ),    // output wire c0_ddr4_s_axi_ctrl_wready
++  .c0_ddr4_s_axi_ctrl_wdata  (32'b0                 ),      // input wire [31 : 0] c0_ddr4_s_axi_ctrl_wdata
++  .c0_ddr4_s_axi_ctrl_bvalid (                      ),    // output wire c0_ddr4_s_axi_ctrl_bvalid
++  .c0_ddr4_s_axi_ctrl_bready (1'b0                  ),    // input wire c0_ddr4_s_axi_ctrl_bready
++  .c0_ddr4_s_axi_ctrl_bresp  (                      ),      // output wire [1 : 0] c0_ddr4_s_axi_ctrl_bresp
++  .c0_ddr4_s_axi_ctrl_arvalid(1'b0                  ),  // input wire c0_ddr4_s_axi_ctrl_arvalid
++  .c0_ddr4_s_axi_ctrl_arready(                      ),  // output wire c0_ddr4_s_axi_ctrl_arready
++  .c0_ddr4_s_axi_ctrl_araddr (32'b0                 ),    // input wire [31 : 0] c0_ddr4_s_axi_ctrl_araddr
++  .c0_ddr4_s_axi_ctrl_rvalid (                      ),    // output wire c0_ddr4_s_axi_ctrl_rvalid
++  .c0_ddr4_s_axi_ctrl_rready (1'b0                  ),    // input wire c0_ddr4_s_axi_ctrl_rready
++  .c0_ddr4_s_axi_ctrl_rdata  (                      ),      // output wire [31 : 0] c0_ddr4_s_axi_ctrl_rdata
++  .c0_ddr4_s_axi_ctrl_rresp  (                      ),      // output wire [1 : 0] c0_ddr4_s_axi_ctrl_rresp
++  
++  .c0_ddr4_s_axi_awid(m_axi_awid),                  // input wire [15 : 0] c0_ddr4_s_axi_awid
++  .c0_ddr4_s_axi_awaddr(m_axi_awaddr),              // input wire [34 : 0] c0_ddr4_s_axi_awaddr
++  .c0_ddr4_s_axi_awlen(m_axi_awlen),                // input wire [7 : 0] c0_ddr4_s_axi_awlen
++  .c0_ddr4_s_axi_awsize(m_axi_awsize),              // input wire [2 : 0] c0_ddr4_s_axi_awsize
++  .c0_ddr4_s_axi_awburst(m_axi_awburst),            // input wire [1 : 0] c0_ddr4_s_axi_awburst
++  .c0_ddr4_s_axi_awlock(m_axi_awlock),              // input wire [0 : 0] c0_ddr4_s_axi_awlock
++  .c0_ddr4_s_axi_awcache(m_axi_awcache),            // input wire [3 : 0] c0_ddr4_s_axi_awcache
++  .c0_ddr4_s_axi_awprot(m_axi_awprot),              // input wire [2 : 0] c0_ddr4_s_axi_awprot
++  .c0_ddr4_s_axi_awqos(m_axi_awqos),                // input wire [3 : 0] c0_ddr4_s_axi_awqos
++  .c0_ddr4_s_axi_awvalid(m_axi_awvalid),            // input wire c0_ddr4_s_axi_awvalid
++  .c0_ddr4_s_axi_awready(m_axi_awready),            // output wire c0_ddr4_s_axi_awready
++  .c0_ddr4_s_axi_wdata(m_axi_wdata),                // input wire [511 : 0] c0_ddr4_s_axi_wdata
++  .c0_ddr4_s_axi_wstrb(m_axi_wstrb),                // input wire [63 : 0] c0_ddr4_s_axi_wstrb
++  .c0_ddr4_s_axi_wlast(m_axi_wlast),                // input wire c0_ddr4_s_axi_wlast
++  .c0_ddr4_s_axi_wvalid(m_axi_wvalid),              // input wire c0_ddr4_s_axi_wvalid
++  .c0_ddr4_s_axi_wready(m_axi_wready),              // output wire c0_ddr4_s_axi_wready
++  .c0_ddr4_s_axi_bready(m_axi_bready),              // input wire c0_ddr4_s_axi_bready
++  .c0_ddr4_s_axi_bid(m_axi_bid),                    // output wire [15 : 0] c0_ddr4_s_axi_bid
++  .c0_ddr4_s_axi_bresp(m_axi_bresp),                // output wire [1 : 0] c0_ddr4_s_axi_bresp
++  .c0_ddr4_s_axi_bvalid(m_axi_bvalid),              // output wire c0_ddr4_s_axi_bvalid
++  .c0_ddr4_s_axi_arid(m_axi_arid),                  // input wire [15 : 0] c0_ddr4_s_axi_arid
++  .c0_ddr4_s_axi_araddr(m_axi_araddr),              // input wire [34 : 0] c0_ddr4_s_axi_araddr
++  .c0_ddr4_s_axi_arlen(m_axi_arlen),                // input wire [7 : 0] c0_ddr4_s_axi_arlen
++  .c0_ddr4_s_axi_arsize(m_axi_arsize),              // input wire [2 : 0] c0_ddr4_s_axi_arsize
++  .c0_ddr4_s_axi_arburst(m_axi_arburst),            // input wire [1 : 0] c0_ddr4_s_axi_arburst
++  .c0_ddr4_s_axi_arlock(m_axi_arlock),              // input wire [0 : 0] c0_ddr4_s_axi_arlock
++  .c0_ddr4_s_axi_arcache(m_axi_arcache),            // input wire [3 : 0] c0_ddr4_s_axi_arcache
++  .c0_ddr4_s_axi_arprot(m_axi_arprot),              // input wire [2 : 0] c0_ddr4_s_axi_arprot
++  .c0_ddr4_s_axi_arqos(m_axi_arqos),                // input wire [3 : 0] c0_ddr4_s_axi_arqos
++  .c0_ddr4_s_axi_arvalid(m_axi_arvalid),            // input wire c0_ddr4_s_axi_arvalid
++  .c0_ddr4_s_axi_arready(m_axi_arready),            // output wire c0_ddr4_s_axi_arready
++  .c0_ddr4_s_axi_rready(m_axi_rready),              // input wire c0_ddr4_s_axi_rready
++  .c0_ddr4_s_axi_rlast(m_axi_rlast),                // output wire c0_ddr4_s_axi_rlast
++  .c0_ddr4_s_axi_rvalid(m_axi_rvalid),              // output wire c0_ddr4_s_axi_rvalid
++  .c0_ddr4_s_axi_rresp(m_axi_rresp),                // output wire [1 : 0] c0_ddr4_s_axi_rresp
++  .c0_ddr4_s_axi_rid(m_axi_rid),                    // output wire [15 : 0] c0_ddr4_s_axi_rid
++  .c0_ddr4_s_axi_rdata(m_axi_rdata)                 // output wire [511 : 0] c0_ddr4_s_axi_rdata
++);
++
++`else // PITONSYS_DDR4
++
++
+ mig_7series_axi4 u_mig_7series_axi4 (
+ 
+     // Memory interface ports
+@@ -966,9 +1073,10 @@ mig_7series_axi4 u_mig_7series_axi4 (
+     .sys_rst                        (sys_rst_n) // input sys_rst
+ );
+ 
++`endif // PITONSYS_DDR4
+ 
+ 
+-`endif
++`endif // AXI4_MEM
+ 
+ 
+ `ifdef PITON_PROTO
+diff --git a/piton/design/chipset/mc/rtl/memory_zeroer.v b/piton/design/chipset/mc/rtl/memory_zeroer.v
+index 7df1ef23..c2d4febf 100644
+--- a/piton/design/chipset/mc/rtl/memory_zeroer.v
++++ b/piton/design/chipset/mc/rtl/memory_zeroer.v
+@@ -61,7 +61,7 @@ module memory_zeroer
+ // need extended range here as board mem size may be above 2GB which is out 
+ // of range for int datatype
+ localparam reg [63:0] BOARD_MEM_SIZE_MB = `BOARD_MEM_SIZE_MB;
+-localparam reg [63:0] MAX_MEM_ADDR      = (BOARD_MEM_SIZE_MB * 2**20) / (`DDR3_DQ_WIDTH / 8);
++localparam reg [63:0] MAX_MEM_ADDR      = (BOARD_MEM_SIZE_MB * 2**20) / `WORD_SIZE;
+ localparam reg [63:0] WORDS_PER_WR      = `WORDS_PER_BURST;
+ 
+ wire                          app_wdf_wren;
+diff --git a/piton/design/chipset/mc/rtl/noc_mig_bridge.v b/piton/design/chipset/mc/rtl/noc_mig_bridge.v
+index 511bd526..c3db3c45 100644
+--- a/piton/design/chipset/mc/rtl/noc_mig_bridge.v
++++ b/piton/design/chipset/mc/rtl/noc_mig_bridge.v
+@@ -51,24 +51,10 @@
+ `define ADDR_ONE {{BUFFER_ADDR_SIZE-1{1'b0}}, {1'b1}}
+ 
+ module noc_mig_bridge # (
+-  parameter MAX_PKT_LEN                 = 11, // measured in flits
+-  parameter MAX_PKT_LEN_LOG             = 4,
+-  parameter ADDR_WIDTH                  = 29, // size of addr to MC
+-  parameter CL_ADDR_WIDTH               = 24, // 1G, addressed by 64 byte cache lines
+   parameter MIG_APP_ADDR_WIDTH          = 28,
+-  parameter MEMORY_WIDTH                = 8,  // not used
+-  parameter DATA_WIDTH                  = 64,
+-  parameter MIG_RATIO                   = 4,
+-  parameter APP_DATA_WIDTH              = 512, // local value DATA_WIDTH * MIG_RATIO * 2,
+-  parameter APP_MASK_WIDTH              = APP_DATA_WIDTH / 8,   // byte mask
+   parameter MIG_APP_DATA_WIDTH          = 128, // value for a generated MIG, which varies for different FPGAs
+   parameter MIG_APP_MASK_WIDTH          = MIG_APP_DATA_WIDTH / 8,
+-  parameter LOC_ADDR_HI                 = 45,
+-  parameter LOC_ADDR_LO                 = 22,
+-  parameter LOC_ADDR_SIZE               = 24, //512 MB, addressed by 64 byte cache lines 
+-  
+-  parameter FLIT_SIZE                   = 64, //Size of one flit
+-  
++
+   parameter IN_FLIGHT_LIMIT             = 16, //number of commands the MC can have in flight
+   parameter BUFFER_ADDR_SIZE            = 4 //(log_2(IN_FLIGHT_LIMIT)+1)
+ )
+@@ -80,11 +66,11 @@ module noc_mig_bridge # (
+    input                                uart_boot_en,
+ 
+   // System Network Interface
+-   input       [FLIT_SIZE-1:0]           flit_in,
++   input       [`NOC_DATA_WIDTH-1:0]           flit_in,
+    input                                 flit_in_val,
+    output                                flit_in_rdy,
+ 
+-   output      [FLIT_SIZE-1:0]           flit_out,
++   output      [`NOC_DATA_WIDTH-1:0]           flit_out,
+    output                                flit_out_val,
+    input                                 flit_out_rdy,
+ 
+@@ -105,17 +91,26 @@ module noc_mig_bridge # (
+    output reg  [2:0]                     app_cmd_reg
+ 
+ );
++
++localparam CL_ADDR_WIDTH = `PHY_ADDR_WIDTH - 6;
++localparam APP_DATA_WIDTH              = 512; // data width in noc
++localparam APP_MASK_WIDTH              = APP_DATA_WIDTH / 8;   // byte mask
++localparam MAX_PKT_LEN                 = 11; // measured in flits
++localparam MAX_PKT_LEN_LOG             = clogb2(MAX_PKT_LEN);
++localparam LOC_ADDR_HI                 = `MSG_ADDR_HI_;
++localparam LOC_ADDR_LO                 = `MSG_ADDR_LO_ + 6;
+ localparam RATIO        = APP_DATA_WIDTH / MIG_APP_DATA_WIDTH;  // must be a power of 2!
+ localparam RATIO_WIDTH  = clogb2(RATIO);
+-localparam DDR3_DQ_BYTE_WIDTH     = `DDR3_DQ_WIDTH / 8;
+-localparam DDR3_DQ_BYTE_WIDTH_LOG = clogb2(DDR3_DQ_BYTE_WIDTH);
++localparam WORD_SIZE_LOG = clogb2(`WORD_SIZE);
++
++
+ 
+ integer i;
+ 
+ // global buffers
+-reg [FLIT_SIZE-1:0]           pkt_w1        [IN_FLIGHT_LIMIT-1:0];
+-reg [FLIT_SIZE-1:0]           pkt_w2        [IN_FLIGHT_LIMIT-1:0];
+-reg [FLIT_SIZE-1:0]           pkt_w3        [IN_FLIGHT_LIMIT-1:0]; 
++reg [`NOC_DATA_WIDTH-1:0]           pkt_w1        [IN_FLIGHT_LIMIT-1:0];
++reg [`NOC_DATA_WIDTH-1:0]           pkt_w2        [IN_FLIGHT_LIMIT-1:0];
++reg [`NOC_DATA_WIDTH-1:0]           pkt_w3        [IN_FLIGHT_LIMIT-1:0]; 
+ reg [APP_DATA_WIDTH-1:0]  pkt_data_buf  [IN_FLIGHT_LIMIT-1:0];
+  reg [2:0]                     pkt_state_buf [IN_FLIGHT_LIMIT-1:0];
+  reg [`MSG_TYPE_WIDTH-1:0]   pkt_cmd_buf   [IN_FLIGHT_LIMIT-1:0];
+@@ -123,7 +118,7 @@ reg [APP_DATA_WIDTH-1:0]  pkt_data_buf  [IN_FLIGHT_LIMIT-1:0];
+ //*******************************************************
+ // ACCEPT PACKETS
+ //*******************************************************
+-reg [FLIT_SIZE-1:0]           in_data_buf[MAX_PKT_LEN-4:0]; //buffer for incomming packets
++reg [`NOC_DATA_WIDTH-1:0]           in_data_buf[MAX_PKT_LEN-4:0]; //buffer for incomming packets
+ reg [BUFFER_ADDR_SIZE-1:0]    buf_current_in;  //address of buffer slot being filled
+ reg [BUFFER_ADDR_SIZE-1:0]    buf_current_out; //address of buffer slot being sent
+ reg [MAX_PKT_LEN_LOG-1:0]     remaining_flits; //flits remaining in current packet
+@@ -136,7 +131,7 @@ reg                           r_app_en;         //command enable
+ reg [BUFFER_ADDR_SIZE-1:0]    buf_current_data_rcv;
+ 
+ reg [MAX_PKT_LEN_LOG-1:0]     remaining_flt_out;
+-reg [FLIT_SIZE-1:0]           flit_out_buffer[MAX_PKT_LEN-1:0];
++reg [`NOC_DATA_WIDTH-1:0]           flit_out_buffer[MAX_PKT_LEN-1:0];
+ 
+ reg [BUFFER_ADDR_SIZE-1:0]    buf_current_wdf; //tracks the current data sender to MC
+ reg                           buf_wdf_data_half;  //which half of the data we are writing;
+@@ -561,7 +556,7 @@ assign app_addr_virt = pkt_w2[buf_current_cmd][`MSG_ADDR_];
+ 
+   // make byte address from DDR3_DQ_WIDTH address
+   // get cache line addres from above address
+-  assign cl_addr_uart_boot   = {storage_addr_out, {DDR3_DQ_BYTE_WIDTH_LOG{1'b0}}} >> 6;
++  assign cl_addr_uart_boot   = {storage_addr_out, {WORD_SIZE_LOG{1'b0}}} >> 6;
+   assign cl_addr      = uart_boot_en ? cl_addr_uart_boot : 
+                                       pkt_w2[buf_current_cmd][LOC_ADDR_HI: LOC_ADDR_LO];  // Alexey: bug fix. 512 = 64 * 8 = 64 * ( 1 << 3)
+ 
+@@ -686,14 +681,14 @@ always @(posedge clk) begin
+                 
+                 //initialize return data
+                 //TODO: this should be done genericly
+-                flit_out_buffer[0]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((8)*FLIT_SIZE)-1:(7)*FLIT_SIZE];
+-                flit_out_buffer[1]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((7)*FLIT_SIZE)-1:(6)*FLIT_SIZE];
+-                flit_out_buffer[2]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((6)*FLIT_SIZE)-1:(5)*FLIT_SIZE];
+-                flit_out_buffer[3]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((5)*FLIT_SIZE)-1:(4)*FLIT_SIZE];
+-                flit_out_buffer[4]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((4)*FLIT_SIZE)-1:(3)*FLIT_SIZE];
+-                flit_out_buffer[5]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((3)*FLIT_SIZE)-1:(2)*FLIT_SIZE];
+-                flit_out_buffer[6]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((2)*FLIT_SIZE)-1:(1)*FLIT_SIZE];
+-                flit_out_buffer[7]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((1)*FLIT_SIZE)-1:(0)*FLIT_SIZE];
++                flit_out_buffer[0]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((8)*`NOC_DATA_WIDTH)-1:(7)*`NOC_DATA_WIDTH];
++                flit_out_buffer[1]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((7)*`NOC_DATA_WIDTH)-1:(6)*`NOC_DATA_WIDTH];
++                flit_out_buffer[2]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((6)*`NOC_DATA_WIDTH)-1:(5)*`NOC_DATA_WIDTH];
++                flit_out_buffer[3]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((5)*`NOC_DATA_WIDTH)-1:(4)*`NOC_DATA_WIDTH];
++                flit_out_buffer[4]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((4)*`NOC_DATA_WIDTH)-1:(3)*`NOC_DATA_WIDTH];
++                flit_out_buffer[5]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((3)*`NOC_DATA_WIDTH)-1:(2)*`NOC_DATA_WIDTH];
++                flit_out_buffer[6]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((2)*`NOC_DATA_WIDTH)-1:(1)*`NOC_DATA_WIDTH];
++                flit_out_buffer[7]  <= pkt_data_buf[buf_current_out+`ADDR_ONE][((1)*`NOC_DATA_WIDTH)-1:(0)*`NOC_DATA_WIDTH];
+             end
+             else begin //store command
+                 flit_out_buffer[0][`MSG_LENGTH] <= 0; //no data to return
+diff --git a/piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_read.v b/piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_read.v
+index 0167d642..39b0769b 100644
+--- a/piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_read.v
++++ b/piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_read.v
+@@ -273,7 +273,7 @@ always @(posedge clk) begin
+         data_offseted <= 0;
+     end 
+     else begin
+-        data_offseted <= m_axi_rgo ? (m_axi_rdata << offset[m_axi_rid]) : 0;
++        data_offseted <= m_axi_rgo ? (m_axi_rdata >> (8*offset[m_axi_rid])) : 0;
+     end
+ end
+ 
+diff --git a/piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_write.v b/piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_write.v
+index bc955b7c..835632ba 100644
+--- a/piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_write.v
++++ b/piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_write.v
+@@ -240,7 +240,7 @@ end
+ 
+ assign m_axi_awaddr = {addr[`AXI4_ADDR_WIDTH-1:6], 6'b0};
+ assign m_axi_wstrb = strb_before_offset << offset;
+-assign m_axi_wdata = req_data_f << offset;
++assign m_axi_wdata = req_data_f << (8*offset);
+ 
+ // inbound responses
+ wire m_axi_bgo = m_axi_bvalid & m_axi_bready;
+diff --git a/piton/design/chipset/rtl/chipset.v b/piton/design/chipset/rtl/chipset.v
+index df93f703..5ec67dee 100644
+--- a/piton/design/chipset/rtl/chipset.v
++++ b/piton/design/chipset/rtl/chipset.v
+@@ -95,10 +95,10 @@ module chipset(
+     `endif // endif PITON_CHIPSET_DIFF_CLK
+ 
+     // 250MHz diff input ref clock for DDR4 memory controller
+-    `ifdef VCU118_BOARD
++    `ifdef PITONSYS_DDR4
+         input                                       mc_clk_p,
+         input                                       mc_clk_n,
+-    `endif // VCU118_BOARD
++    `endif // PITONSYS_DDR4
+ 
+ `else // ifndef PITON_CHIPSET_CLKS_GEN
+     input                                       chipset_clk,
+@@ -217,14 +217,14 @@ module chipset(
+ `ifdef PITON_FPGA_MC_DDR3
+     // Generalized interface for any FPGA board we support.
+     // Not all signals will be used for all FPGA boards (see constraints)
+-`ifdef VCU118_BOARD
++`ifdef PITONSYS_DDR4
+     output                                      ddr_act_n,
+     output [`DDR3_BG_WIDTH-1:0]                 ddr_bg,
+-`else // VCU118_BOARD            
++`else // PITONSYS_DDR4           
+     output                                      ddr_cas_n,
+     output                                      ddr_ras_n,
+     output                                      ddr_we_n,
+-`endif
++`endif // PITONSYS_DDR4
+     output [`DDR3_ADDR_WIDTH-1:0]               ddr_addr,
+     output [`DDR3_BA_WIDTH-1:0]                 ddr_ba,
+     output [`DDR3_CK_WIDTH-1:0]                 ddr_ck_n,
+@@ -237,12 +237,16 @@ module chipset(
+ `ifndef NEXYSVIDEO_BOARD
+     output [`DDR3_CS_WIDTH-1:0]                 ddr_cs_n,
+ `endif // endif NEXYSVIDEO_BOARD
+-`ifdef VCU118_BOARD
++`ifdef PITONSYS_DDR4
++`ifdef XUPP3R_BOARD
++    output                                      ddr_parity,
++`else
+     inout [`DDR3_DM_WIDTH-1:0]                  ddr_dm,
+-`else 
++`endif // XUPP3R_BOARD
++`else // PITONSYS_DDR4
+     output [`DDR3_DM_WIDTH-1:0]                 ddr_dm,
+-`endif
+-    output                                      ddr_odt,
++`endif // PITONSYS_DDR4
++    output [`DDR3_ODT_WIDTH-1:0]                ddr_odt,
+ `endif // endif PITON_FPGA_MC_DDR3
+ `endif // endif PITONSYS_NO_MC
+ 
+@@ -252,12 +256,13 @@ module chipset(
+         output                                      uart_tx,
+         input                                       uart_rx,
+         `ifdef PITONSYS_UART_BOOT
+-        `ifdef PITONSYS_NON_UART_BOOT
+             `ifndef PITONSYS_CHIPSET_TOP
+                 output                                      test_start,
+             `endif
+-        `endif // endif PITONSYS_NON_UART_BOOT
+         `endif // endif PITONSYS_UART_BOOT
++        `ifdef PITONSYS_UART_RESET
++            output uart_rst_out_n,
++        `endif
+     `endif // endif PITONSYS_UART
+ 
+ 
+@@ -391,11 +396,17 @@ module chipset(
+     `ifdef VCU118_BOARD
+         // we only have 4 gpio dip switches on this board
+         input  [3:0]                                        sw,
++    `elsif XUPP3R_BOARD
++        // no switches :(
+     `else         
+         input  [7:0]                                        sw,
+     `endif
+ 
++    `ifdef XUPP3R_BOARD
++     output [3:0]                                           leds
++    `else 
+      output [7:0]                                           leds
++     `endif
+ 
+ `endif  // PITON_BOARD
+ 
+@@ -640,8 +651,12 @@ begin
+     // Derive chipset reset
+ `ifdef PITON_BOARD
+     chipset_rst_n = rst_n_rect & clk_locked & (~chip_rst_seq_complete_n);
++`else
++`ifdef PITONSYS_UART_RESET
++    chipset_rst_n = rst_n_rect & clk_locked & (~piton_prsnt_n) & uart_rst_out_n;
+ `else
+     chipset_rst_n = rst_n_rect & clk_locked & (~piton_prsnt_n);
++`endif // PITONSYS_UART_RESET
+ `endif  // PITON_BOARD
+ 
+ end
+@@ -668,6 +683,9 @@ end
+                 `ifdef VCU118_BOARD
+                     assign uart_boot_en    = sw[0];
+                     assign uart_timeout_en = sw[1];
++                `elsif XUPP3R_BOARD
++                    assign uart_boot_en    = 1'b1;
++                    assign uart_timeout_en = 1'b0;
+                 `else 
+                     assign uart_boot_en    = sw[7];
+                     assign uart_timeout_en = sw[6];
+@@ -681,6 +699,9 @@ end
+     `ifdef VCU118_BOARD
+         // only two switches available...
+         assign noc_power_test_hop_count = {2'b0, sw[3:2]};
++    `elsif XUPP3R_BOARD
++        // no switches :(
++        assign noc_power_test_hop_count = 4'b0;
+     `else 
+         assign noc_power_test_hop_count = sw[3:0];
+     `endif    
+@@ -716,6 +737,11 @@ end
+ 
+     // Test points
+     assign tp[7:0] = 8'd0;
++`elsif XUPP3R_BOARD
++    assign leds[0] = ~piton_ready_n;
++    assign leds[1] = init_calib_complete;
++    assign leds[2] = processor_offchip_noc2_valid;
++    assign leds[3] = offchip_processor_noc3_valid;
+ `else   // PITON_BOARD
+     assign leds[0] = clk_locked;
+     assign leds[1] = ~piton_ready_n;
+@@ -1139,6 +1165,7 @@ chipset_impl_noc_power_test  chipset_impl (
+     .piton_ready_n      (piton_ready_n      ),
+ 
+     .test_start         (test_start         ),
++    .uart_rst_out_n     (uart_rst_out_n     ),
+     .invalid_access_o   (invalid_access     ),
+ 
+ `ifdef PITON_NOC_POWER_CHIPSET_TEST
+@@ -1148,12 +1175,12 @@ chipset_impl_noc_power_test  chipset_impl (
+     `ifndef PITONSYS_NO_MC
+     `ifdef PITON_FPGA_MC_DDR3
+         // Memory controller clock
+-        `ifdef VCU118_BOARD
++        `ifdef PITONSYS_DDR4
+             .mc_clk_p(mc_clk_p),
+             .mc_clk_n(mc_clk_n),
+-        `else  // VCU118_BOARD                               
++        `else  // PITONSYS_DDR4                               
+             .mc_clk(mc_clk),
+-        `endif  // VCU118_BOARD                               
++        `endif  // PITONSYS_DDR4                               
+     `endif // endif PITON_FPGA_MC_DDR3
+     `endif // endif PITONSYS_NO_MC
+ 
+@@ -1183,14 +1210,14 @@ chipset_impl_noc_power_test  chipset_impl (
+             ,
+             .init_calib_complete(init_calib_complete),
+             
+-            `ifdef VCU118_BOARD
++            `ifdef PITONSYS_DDR4
+             .ddr_act_n(ddr_act_n),                    
+             .ddr_bg(ddr_bg), 
+-            `else // VCU118_BOARD
++            `else // PITONSYS_DDR4
+             .ddr_cas_n(ddr_cas_n),
+             .ddr_ras_n(ddr_ras_n),
+             .ddr_we_n(ddr_we_n),
+-            `endif
++            `endif // PITONSYS_DDR4
+ 
+             .ddr_addr(ddr_addr),
+             .ddr_ba(ddr_ba),
+@@ -1205,8 +1232,12 @@ chipset_impl_noc_power_test  chipset_impl (
+             `ifndef NEXYSVIDEO_BOARD
+                 .ddr_cs_n(ddr_cs_n),
+             `endif // endif NEXYSVIDEO_BOARD
+-
++            
++            `ifdef XUPP3R_BOARD
++            .ddr_parity(ddr_parity),
++            `else
+             .ddr_dm(ddr_dm),
++            `endif // XUPP3R_BOARD
+             .ddr_odt(ddr_odt)
+         `endif // endif PITON_FPGA_MC_DDR3
+     `endif // endif PITONSYS_NO_MC
+diff --git a/piton/design/include/piton_system.vh b/piton/design/include/piton_system.vh
+index 6154fd99..d68a79e2 100644
+--- a/piton/design/include/piton_system.vh
++++ b/piton/design/include/piton_system.vh
+@@ -118,6 +118,8 @@
+     `define PITON_CHIPSET_DIFF_CLK
+ `elsif VCU118_BOARD
+     `define PITON_CHIPSET_DIFF_CLK
++`elsif XUPP3R_BOARD
++    `define PITON_CHIPSET_DIFF_CLK
+ `elsif GENESYS2_BOARD
+     `define PITON_CHIPSET_DIFF_CLK
+ `elsif PITON_BOARD
+@@ -134,6 +136,11 @@
+     `define PITON_FPGA_RST_ACT_HIGH
+ `endif
+ 
++`ifdef XUPP3R_BOARD
++    `undef PITON_FPGA_SD_BOOT
++    `undef PITONSYS_SPI
++`endif
++
+ // If PITON_FPGA_SD_BOOT is set we should always include SPI
+ `ifdef PITON_FPGA_SD_BOOT
+     `define PITONSYS_SPI
+@@ -152,3 +159,9 @@
+ `ifdef PITON_FPGA_SD_BOOT
+     `define PITONSYS_NON_UART_BOOT
+ `endif // endif PITON_FPGA_SD_BOOT
++
++`ifdef VCU118_BOARD
++    `define PITONSYS_DDR4
++`elsif XUPP3R_BOARD
++    `define PITONSYS_DDR4
++`endif
+diff --git a/piton/design/rtl/system.v b/piton/design/rtl/system.v
+index db113612..dd921a79 100644
+--- a/piton/design/rtl/system.v
++++ b/piton/design/rtl/system.v
+@@ -113,11 +113,11 @@ module system(
+     input                                       chipset_clk_osc,
+ `endif // endif PITON_CHIPSET_DIFF_CLK
+ 
+-// 250MHz diff input ref clock for DDR4 memory controller
+-`ifdef VCU118_BOARD
++// 250MHz(VCU118) or 100 MHz(XUPP3R) diff input ref clock for DDR4 memory controller
++`ifdef PITONSYS_DDR4
+     input                                       mc_clk_p,
+     input                                       mc_clk_n,
+-`endif // VCU118_BOARD
++`endif // PITONSYS_DDR4
+ 
+ `else // ifndef PITON_CHIPSET_CLKS_GEN
+     input                                       chipset_clk,
+@@ -172,6 +172,7 @@ module system(
+ `ifndef VC707_BOARD
+ `ifndef VCU118_BOARD
+ `ifndef NEXYSVIDEO_BOARD
++`ifndef XUPP3R_BOARD
+   input                                         tck_i,
+   input                                         tms_i,
+   input                                         trst_ni,
+@@ -181,6 +182,7 @@ module system(
+ `endif
+ `endif
+ `endif
++`endif
+ `endif
+ 
+     // Asynchronous FIFOs enable
+@@ -196,10 +198,10 @@ module system(
+ `ifdef PITON_FPGA_MC_DDR3
+     // Generalized interface for any FPGA board we support.
+     // Not all signals will be used for all FPGA boards (see constraints)
+-    `ifdef VCU118_BOARD
++    `ifdef PITONSYS_DDR4
+     output                                      ddr_act_n,
+     output [`DDR3_BG_WIDTH-1:0]                 ddr_bg,
+-    `else // VCU118_BOARD
++    `else // PITONSYS_DDR4
+     output                                      ddr_cas_n,
+     output                                      ddr_ras_n,
+     output                                      ddr_we_n,
+@@ -217,12 +219,16 @@ module system(
+     `ifndef NEXYSVIDEO_BOARD
+         output [`DDR3_CS_WIDTH-1:0]             ddr_cs_n,
+     `endif // endif NEXYSVIDEO_BOARD
+-    `ifdef VCU118_BOARD
+-    inout [`DDR3_DM_WIDTH-1:0]                  ddr_dm,
++    `ifdef PITONSYS_DDR4
++    `ifdef XUPP3R_BOARD
++    output                                      ddr_parity,
+     `else
++    inout [`DDR3_DM_WIDTH-1:0]                  ddr_dm,
++    `endif // XUPP3R_BOARD
++    `else // PITONSYS_DDR4
+     output [`DDR3_DM_WIDTH-1:0]                 ddr_dm,
+-    `endif
+-    output                                      ddr_odt,
++    `endif // PITONSYS_DDR4
++    output [`DDR3_ODT_WIDTH-1:0]                ddr_odt,
+ `endif // endif PITON_FPGA_MC_DDR3
+ `endif // endif PITONSYS_NO_MC
+ 
+@@ -309,11 +315,17 @@ module system(
+ `ifdef VCU118_BOARD
+     // we only have 4 gpio dip switches on this board
+     input  [3:0]                                sw,
++`elsif XUPP3R_BOARD
++    // no switches :(
+ `else
+     input  [7:0]                                sw,
+ `endif
+-    output [7:0]                                leds
+ 
++`ifdef XUPP3R_BOARD
++    output [3:0]                                leds
++`else 
++    output [7:0]                                leds
++`endif
+ );
+ 
+ ///////////////////////
+@@ -421,6 +433,9 @@ wire [2:0]          passthru_chipset_credit_back_n;
+ `ifdef PITONSYS_UART_BOOT
+ wire                test_start;
+ `endif
++`ifdef PITONSYS_UART_RESET
++wire                uart_rst_out_n;
++`endif
+ 
+ `ifdef PITON_ARIANE
+ // Debug
+@@ -486,8 +501,11 @@ always @ *
+ begin
+     chip_rst_n = sys_rst_n_rect & passthru_chip_rst_n;
+ `ifdef PITONSYS_UART_BOOT
+-    chip_rst_n = sys_rst_n_rect & passthru_chip_rst_n & test_start;
+-`endif  // PITONSYS_UART_BOOT
++    chip_rst_n = chip_rst_n & test_start;
++`endif
++`ifdef PITONSYS_UART_RESET
++    chip_rst_n = chip_rst_n & uart_rst_out_n;
++`endif
+ 
+ `ifdef PITON_NO_JTAG
+     jtag_rst_n_full = passthru_jtag_rst_n;
+@@ -835,10 +853,10 @@ chipset chipset(
+ `endif // endif PITON_CHIPSET_DIFF_CLK
+ 
+ // 250MHz diff input ref clock for DDR4 memory controller
+-`ifdef VCU118_BOARD
++`ifdef PITONSYS_DDR4
+     .mc_clk_p(mc_clk_p),
+     .mc_clk_n(mc_clk_n),
+-`endif // VCU118_BOARD
++`endif // PITONSYS_DDR4
+ 
+ `else // ifndef PITON_CHIPSET_CLKS_GEN
+     .chipset_clk(chipset_clk),
+@@ -939,14 +957,14 @@ chipset chipset(
+     // DRAM and I/O interfaces
+ `ifndef PITONSYS_NO_MC
+ `ifdef PITON_FPGA_MC_DDR3
+-`ifdef VCU118_BOARD
++`ifdef PITONSYS_DDR4
+     .ddr_act_n(ddr_act_n),
+     .ddr_bg(ddr_bg),
+-`else // VCU118_BOARD
++`else // PITONSYS_DDR4
+     .ddr_cas_n(ddr_cas_n),
+     .ddr_ras_n(ddr_ras_n),
+     .ddr_we_n(ddr_we_n),
+-`endif
++`endif // PITONSYS_DDR4
+     .ddr_addr(ddr_addr),
+     .ddr_ba(ddr_ba),
+     .ddr_ck_n(ddr_ck_n),
+@@ -959,7 +977,11 @@ chipset chipset(
+ `ifndef NEXYSVIDEO_BOARD
+     .ddr_cs_n(ddr_cs_n),
+ `endif // endif NEXYSVIDEO_BOARD
++`ifdef XUPP3R_BOARD
++    .ddr_parity(ddr_parity),
++`else
+     .ddr_dm(ddr_dm),
++`endif
+     .ddr_odt(ddr_odt),
+ `endif // endif PITON_FPGA_MC_DDR3
+ `endif // endif PITONSYS_NO_MC
+@@ -969,10 +991,11 @@ chipset chipset(
+     .uart_tx(uart_tx),
+     .uart_rx(uart_rx),
+ `ifdef PITONSYS_UART_BOOT
+-`ifdef PITONSYS_NON_UART_BOOT
+     .test_start(test_start),
+-`endif // endif PITONSYS_NON_UART_BOOT
+ `endif // endif PITONSYS_UART_BOOT
++`ifdef PITONSYS_UART_RESET
++    .uart_rst_out_n(uart_rst_out_n),
++`endif
+ `endif // endif PITONSYS_UART
+ 
+ `ifdef PITONSYS_SPI
+@@ -1031,7 +1054,9 @@ chipset chipset(
+     .btnc(btnc),
+ `endif
+ 
++`ifndef XUPP3R_BOARD
+     .sw(sw),
++`endif
+     .leds(leds)
+ 
+ `ifdef PITON_ARIANE

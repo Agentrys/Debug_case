@@ -1,0 +1,115 @@
+diff --git a/sci-electronics/litedram/litedram-20180514.ebuild b/sci-electronics/litedram/litedram-20180514.ebuild
+index d983fb66f..6fcf82d85 100644
+--- a/sci-electronics/litedram/litedram-20180514.ebuild
++++ b/sci-electronics/litedram/litedram-20180514.ebuild
+@@ -25,7 +25,6 @@ DEPEND="${RDEPEND}
+ S=${WORKDIR}/${PN}-${MY_COMMIT}
+ 
+ src_prepare(){
+-#	sed -i -e '/test_suite/d' setup.py
+-	rm -r test
++	rm test/__init__.py
+ 	eapply_user
+ }
+diff --git a/sci-electronics/liteeth/liteeth-20180301.ebuild b/sci-electronics/liteeth/liteeth-20180301.ebuild
+index c707be867..37c4a1134 100644
+--- a/sci-electronics/liteeth/liteeth-20180301.ebuild
++++ b/sci-electronics/liteeth/liteeth-20180301.ebuild
+@@ -25,7 +25,6 @@ DEPEND="${RDEPEND}
+ S=${WORKDIR}/${PN}-${MY_COMMIT}
+ 
+ src_prepare(){
+-#	sed -i -e '/test_suite/d' setup.py
+-	rm -r test example_designs
++	rm test/__init__.py example_designs/__init__.py
+ 	eapply_user
+ }
+diff --git a/sci-electronics/litepcie/litepcie-20180530.ebuild b/sci-electronics/litepcie/litepcie-20180530.ebuild
+index a2caf4c34..8e4291711 100644
+--- a/sci-electronics/litepcie/litepcie-20180530.ebuild
++++ b/sci-electronics/litepcie/litepcie-20180530.ebuild
+@@ -25,7 +25,6 @@ DEPEND="${RDEPEND}
+ S=${WORKDIR}/${PN}-${MY_COMMIT}
+ 
+ src_prepare(){
+-#	sed -i -e '/test_suite/d' setup.py
+-	rm -r test example_designs
++	rm test/__init__.py example_designs/__init__.py
+ 	eapply_user
+ }
+diff --git a/sci-electronics/litescope/litescope-20180531.ebuild b/sci-electronics/litescope/litescope-20180531.ebuild
+index ac2b6b9ba..609686185 100644
+--- a/sci-electronics/litescope/litescope-20180531.ebuild
++++ b/sci-electronics/litescope/litescope-20180531.ebuild
+@@ -25,7 +25,6 @@ DEPEND="${RDEPEND}
+ S=${WORKDIR}/${PN}-${MY_COMMIT}
+ 
+ src_prepare(){
+-#	sed -i -e '/test_suite/d' setup.py
+-	rm -r test example_designs
++	rm test/__init__.py example_designs/__init__.py
+ 	eapply_user
+ }
+diff --git a/sci-electronics/liteusb/liteusb-20180301.ebuild b/sci-electronics/liteusb/liteusb-20180301.ebuild
+index b2f38f2f8..06a5dc5eb 100644
+--- a/sci-electronics/liteusb/liteusb-20180301.ebuild
++++ b/sci-electronics/liteusb/liteusb-20180301.ebuild
+@@ -25,7 +25,6 @@ DEPEND="${RDEPEND}
+ S=${WORKDIR}/${PN}-${MY_COMMIT}
+ 
+ src_prepare(){
+-#	sed -i -e '/test_suite/d' setup.py
+-	rm -r test
++	rm test/__init__.py
+ 	eapply_user
+ }
+diff --git a/sci-electronics/litex/litex-20180531.ebuild b/sci-electronics/litex/litex-20180531.ebuild
+index 2e786a2e2..e6a1d28d9 100644
+--- a/sci-electronics/litex/litex-20180531.ebuild
++++ b/sci-electronics/litex/litex-20180531.ebuild
+@@ -24,7 +24,6 @@ DEPEND="${RDEPEND}
+ S=${WORKDIR}/${PN}-${MY_COMMIT}
+ 
+ src_prepare(){
+-#	sed -i -e '/test_suite/d' setup.py
+-	rm -r test
++	rm test/__init__.py
+ 	eapply_user
+ }
+diff --git a/sci-electronics/litex/Manifest b/sci-electronics/litex/Manifest
+index 42e17a42e..311e5e25c 100644
+--- a/sci-electronics/litex/Manifest
++++ b/sci-electronics/litex/Manifest
+@@ -1 +1,2 @@
+ DIST litex-20180531.zip 401778 BLAKE2B d971f44ae543cd656c554228adf2941bd439fd8ecfeaf7baad563ad542aac526908778190bde0cc9816822fe76cde0a3cd4b07bfcf07cb648fd1c4398eb00b6b SHA512 33186c6e3a7275bfac15b4fe1e1394107795a1c6fcc2bdb61d7bbadd50d04588d10330c9159391f5879b4ef6af26691760f5271cbf15fa82f3fe894ad3b39368
++DIST litex-20180718.zip 409532 BLAKE2B ff4b512337ec445de7b44ceaa370e5d39773c2f30ccd758a7079e737931dcd8b6a2ed197b8f51cec95209dbbd308d527cccd88a0c35d769723d239cda748d017 SHA512 70745b0a9a1e42a31f8ed604a55afa032eaa303aa62d83212a5885fe48f367eb34906157b79636da3e902d9d272e00c2a7dcd46228a604651eab9241efd360ec
+diff --git a/sci-electronics/litex/litex-20180718.ebuild b/sci-electronics/litex/litex-20180718.ebuild
+new file mode 100644
+index 000000000..ad056641f
+--- /dev/null
++++ b/sci-electronics/litex/litex-20180718.ebuild
+@@ -0,0 +1,24 @@
++# Copyright 1999-2018 Gentoo Foundation
++# Distributed under the terms of the GNU General Public License v2
++
++EAPI=6
++
++PYTHON_COMPAT=( python3_{5,6} )
++inherit distutils-r1
++
++MY_COMMIT="c314193cc9de483142a65d81ee1517a703bd1851"
++
++DESCRIPTION="Information gathering tool designed for extracting metadata of public documents"
++HOMEPAGE="https://github.com/enjoy-digital/litex"
++SRC_URI="https://github.com/enjoy-digital/litex/archive/${MY_COMMIT}.zip -> ${P}.zip"
++
++LICENSE="BSD"
++SLOT="0"
++KEYWORDS="~amd64 ~arm ~arm64 ~x86"
++IUSE=""
++
++RDEPEND="dev-python/pyserial"
++DEPEND="${RDEPEND}
++	dev-python/setuptools[${PYTHON_USEDEP}]"
++
++S=${WORKDIR}/${PN}-${MY_COMMIT}

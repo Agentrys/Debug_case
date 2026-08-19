@@ -1,0 +1,161 @@
+{
+  "case_id": "chipsalliance.rocket-chip#21",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "f19ab09004912575372f9680251847e3727d3133",
+  "buggy_commit_sha": "40fdac6841b9f273282d0f2b8e6fed761e477bf8",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/chipsalliance.rocket-chip_21.diff",
+  "diff_sha256": "d87bd4a2f6aab42ecc89951f1ecf46d969313ea9000806d321fa5052d8596e7b",
+  "fix_oids_sorted": [
+    "f19ab09004912575372f9680251847e3727d3133",
+    "dbe68056d9629805886e2beaf40a4f68fc80f9b3",
+    "45104ef454437e21c92c05f2bc2d320ec472d162"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/dma.scala",
+    "src/main/scala/rocc.scala",
+    "src/main/scala/tile.scala",
+    "src/main/scala/util.scala",
+    "rocket/src/main/scala/dma.scala",
+    "rocket/src/main/scala/rocc.scala",
+    "rocket/src/main/scala/tile.scala",
+    "rocket/src/main/scala/util.scala",
+    "src/main/scala/devices/debug/SBA.scala",
+    "src/main/scala/jtag/JtagTap.scala",
+    "src/main/scala/jtag/Utils.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/dma.scala": [
+      [
+        0,
+        0
+      ]
+    ],
+    "src/main/scala/rocc.scala": [
+      [
+        50,
+        55
+      ]
+    ],
+    "src/main/scala/tile.scala": [
+      [
+        14,
+        20
+      ],
+      [
+        22,
+        27
+      ],
+      [
+        31,
+        36
+      ],
+      [
+        104,
+        109
+      ],
+      [
+        117,
+        120
+      ]
+    ],
+    "src/main/scala/util.scala": [
+      [
+        21,
+        26
+      ]
+    ],
+    "rocket/src/main/scala/dma.scala": [
+      [
+        0,
+        0
+      ]
+    ],
+    "rocket/src/main/scala/rocc.scala": [
+      [
+        50,
+        55
+      ]
+    ],
+    "rocket/src/main/scala/tile.scala": [
+      [
+        14,
+        20
+      ],
+      [
+        22,
+        27
+      ],
+      [
+        31,
+        36
+      ],
+      [
+        104,
+        109
+      ],
+      [
+        117,
+        120
+      ]
+    ],
+    "rocket/src/main/scala/util.scala": [
+      [
+        21,
+        26
+      ]
+    ],
+    "src/main/scala/devices/debug/SBA.scala": [
+      [
+        179,
+        185
+      ],
+      [
+        248,
+        253
+      ],
+      [
+        350,
+        356
+      ]
+    ],
+    "src/main/scala/jtag/JtagTap.scala": [
+      [
+        73,
+        80
+      ],
+      [
+        92,
+        97
+      ],
+      [
+        111,
+        122
+      ]
+    ],
+    "src/main/scala/jtag/Utils.scala": [
+      [
+        5,
+        10
+      ],
+      [
+        17,
+        29
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/chipsalliance.rocket-chip_21.raw.diff"
+}

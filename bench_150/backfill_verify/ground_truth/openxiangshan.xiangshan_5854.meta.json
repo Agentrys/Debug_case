@@ -1,0 +1,42 @@
+{
+  "case_id": "openxiangshan.xiangshan#5854",
+  "issue_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_oid": "7f1a8e7dceb02eb2fba1c280f489051fd3b94f05",
+  "buggy_commit_sha": "187b74c9519773035527552f1600ecd3c6e1ecec",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openxiangshan.xiangshan_5854.diff",
+  "diff_sha256": "e652259f5def1cb9d6e420ad8735e23ba97ec9d3d2d9e22e38e06ab9aca5b2c8",
+  "fix_oids_sorted": [
+    "7f1a8e7dceb02eb2fba1c280f489051fd3b94f05",
+    "606fbc9d9df50eb74599ef691636324dbaae12f5"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/xiangshan/cache/mmu/L2TLB.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/xiangshan/cache/mmu/L2TLB.scala": [
+      [
+        754,
+        760
+      ],
+      [
+        754,
+        760
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/openxiangshan.xiangshan_5854.raw.diff"
+}

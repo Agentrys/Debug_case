@@ -1,0 +1,193 @@
+diff --git a/.github/workflows/export-safety.yml b/.github/workflows/export-safety.yml
+index 23291290..a0a848ff 100644
+--- a/.github/workflows/export-safety.yml
++++ b/.github/workflows/export-safety.yml
+@@ -72,6 +72,15 @@ jobs:
+         if: github.event_name == 'pull_request' || github.event_name == 'push'
+         run: python3 -m pytest tests/test_verify_public_receipts.py -q
+ 
++      # Export-safety GATE bites (the leak-scanner is subject-under-test): a
++      # committed test is un-gated unless the runner names it, so pin it here
++      # beside the verifier bites. Covers the kairos.<ns> namespace BLOCK, the
++      # case/hyphen-widened ticket WARN, tier-preservation, and the seeded-secret
++      # sole-discriminator bite; a mutation to the gate patterns reds here.
++      - name: Export-safety gate bites (leak scanner is subject-under-test)
++        if: github.event_name == 'pull_request' || github.event_name == 'push'
++        run: python3 -m pytest tests/test_export_safety_gate.py -q
++
+       # PR body + review/issue comments are public surfaces the committed-tree
+       # scan cannot see. Scan them with the SAME BLOCK_ALWAYS set (single source
+       # of truth: export_safety_gate.py --scan-text). Runs on PR events AND on
+diff --git a/athanor/export_safety_gate.py b/athanor/export_safety_gate.py
+index 514fd851..abbd3028 100644
+--- a/athanor/export_safety_gate.py
++++ b/athanor/export_safety_gate.py
+@@ -73,6 +73,16 @@ BLOCK_ALWAYS: list[tuple[str, str]] = [
+     ("internal workdir path", "/work" + "dir"),
+     ("cloud build username", "azure" + "user"),
+     ("internal ops repo", "athanor-" + "kairos-runall"),
++    # Export-safety hardening (Quan): the internal project namespace used as a
++    # schema or module PATH -- e.g. a receipt "schema": "<ns>.<ticket>..." or a
++    # "from <ns>.sub import ..." line. A public fork has no legitimate reason to
++    # carry an internal module/schema path (owner ruling: BLOCK, fail-closed; any
++    # future legit case goes through the audited allowlist, not a weakened
++    # pattern). The repo POINTER "athanor-<ns>" stays WARN below; the
++    # (?<!athanor-) lookbehind keeps this BLOCK from reclassifying the pointer's
++    # dotted forms. Fragment-built so this file holds no verbatim marker and does
++    # not self-trip its own committed-tree scan.
++    ("internal Kairos namespace", r"(?<!athanor-)" + "kai" + r"ros\.[A-Za-z_]"),
+     ("confidential customer name", r"[Nn][Vv][Ii][Dd][Ii][Aa]"),
+     ("confidential customer name", r"[Aa][Nn][Nn][Aa][Pp][Uu][Rr][Nn][Aa]"),
+     ("GitHub token", r"gh[posru]_[A-Za-z0-9]{20,}"),
+@@ -99,7 +109,11 @@ OUR_ADDED_PREFIXES: tuple[str, ...] = (
+ 
+ # --- WARN tier: (label, extended-regex, exclude-regex-or-None). Never blocks.
+ WARN_PATTERNS: list[tuple[str, str, str | None]] = [
+-    ("internal Linear ticket id", r"ATH-[0-9]{4}", None),
++    # Case-insensitive + hyphen-optional (owner ruling: stays WARN): a producer
++    # that emits "ath2852" (lowercase, no hyphen -- the natural machine form in a
++    # schema/module segment) evaded the old case+hyphen-pinned "ATH-[0-9]{4}". The
++    # leading \b keeps it off in-word digits like "datapath2960".
++    ("internal Linear ticket id", r"(?i)\b" + "ath" + r"-?[0-9]{4}", None),
+     # The private-repo pointer is WARN, but the internal ops-repo name is BLOCK;
+     # exclude the ops-repo hits here so they are not double-reported as a warn.
+     ("private Kairos-repo pointer", "athanor-" + "kairos", "athanor-" + "kairos-runall"),
+diff --git a/tests/test_export_safety_gate.py b/tests/test_export_safety_gate.py
+new file mode 100644
+index 00000000..abd8fb9a
+--- /dev/null
++++ b/tests/test_export_safety_gate.py
+@@ -0,0 +1,133 @@
++"""Export-safety gate pattern coverage (ATH-2960 hardening).
++
++Rail for the fail-open Quan found while reviewing openc910 #38: the internal
++project namespace as a schema/module PATH (e.g. a receipt `schema` string or a
++`from <ns>.sub import` line) matched NO pattern, and the ticket-id WARN was
++case+hyphen pinned so `ath2852` (the natural machine form) evaded it.
++
++Every internal-marker literal below is FRAGMENT-BUILT (never contiguous in this
++source) so this committed test file does not self-trip the gate's own
++committed-tree scan; the leak forms are reassembled at runtime and written into
++throwaway temp git repos, which is where we WANT them.
++"""
++import hashlib
++import importlib.util
++import subprocess
++from pathlib import Path
++
++import pytest
++
++_GATE = Path(__file__).resolve().parent.parent / "athanor" / "export_safety_gate.py"
++_spec = importlib.util.spec_from_file_location("export_safety_gate", _GATE)
++esg = importlib.util.module_from_spec(_spec)
++_spec.loader.exec_module(esg)
++
++# --- fragments: the contiguous marker bytes never appear in this file's source
++NS = "kai" + "ros"            # internal project namespace
++WD = "/work" + "dir"         # internal build path
++POINTER = "athanor-" + NS    # internal repo pointer (WARN tier)
++TICKET_DIGITS = "2852"
++
++
++def _git(args, cwd):
++    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
++
++
++def _scan(tmp_path, files):
++    """Commit ``files`` (rel -> content) into a temp repo and byte-scan HEAD.
++
++    Returns (block, warn, skipped) from the SHIPPED ``_scan_committed`` -- the
++    exact path CI runs, isolated from the receipt verifier.
++    """
++    _git(["init", "-q"], tmp_path)
++    _git(["config", "user.email", "t@example.invalid"], tmp_path)
++    _git(["config", "user.name", "t"], tmp_path)
++    for rel, content in files.items():
++        p = tmp_path / rel
++        p.parent.mkdir(parents=True, exist_ok=True)
++        p.write_text(content)
++        _git(["add", rel], tmp_path)
++    _git(["commit", "-q", "-m", "fixture"], tmp_path)
++    return esg._scan_committed("HEAD", tmp_path)
++
++
++def _has(entries, needle):
++    return any(needle in e for e in entries)
++
++
++# --- the fix: namespace schema/module path is BLOCK ------------------------
++
++def test_kairos_namespace_schema_path_is_block(tmp_path):
++    # the REAL #38 leak form: a receipt schema string
++    leak = '  "schema": "' + NS + "." + "ath" + TICKET_DIGITS + '.helper_parent_area_scout.v1"\n'
++    block, warn, _ = _scan(tmp_path, {"athanor/receipt.json": leak})
++    assert _has(block, "Kairos namespace"), block
++
++
++def test_kairos_module_import_path_is_block(tmp_path):
++    leak = "from " + NS + ".sv_bundle_parse import convert\n"
++    block, warn, _ = _scan(tmp_path, {"athanor/helper.py": leak})
++    assert _has(block, "Kairos namespace"), block
++
++
++# --- tier preservation: the repo pointer stays WARN, never upgraded --------
++
++def test_repo_pointer_plain_stays_warn_not_block(tmp_path):
++    block, warn, _ = _scan(tmp_path, {"athanor/notes.md": "see " + POINTER + " internal repo\n"})
++    assert not _has(block, "Kairos namespace"), block
++    assert _has(warn, "Kairos-repo pointer"), warn
++
++
++def test_repo_pointer_dotted_form_is_not_upgraded_to_block(tmp_path):
++    # (?<!athanor-) must keep the dotted repo URL out of the namespace BLOCK
++    block, warn, _ = _scan(tmp_path, {"athanor/notes.md": "clone " + POINTER + ".git\n"})
++    assert not _has(block, "Kairos namespace"), block
++    assert _has(warn, "Kairos-repo pointer"), warn
++
++
++# --- the fix: ticket id is case-insensitive + hyphen-optional (WARN) -------
++
++@pytest.mark.parametrize("ticket", [
++    "A" + "TH-" + TICKET_DIGITS,    # ATH-2852  (original form, still WARN)
++    "a" + "th-" + TICKET_DIGITS,    # ath-2852  (lowercase)
++    "a" + "th" + TICKET_DIGITS,     # ath2852   (lowercase, no hyphen -- the evader)
++    "A" + "th-" + TICKET_DIGITS,    # Ath-2852  (mixed case)
++    "A" + "TH" + TICKET_DIGITS,     # ATH2852   (upper, no hyphen)
++])
++def test_ticket_id_case_and_hyphen_variants_warn(tmp_path, ticket):
++    block, warn, _ = _scan(tmp_path, {"athanor/r.json": '  "ref": "' + ticket + '"\n'})
++    assert _has(warn, "Linear ticket id"), (ticket, warn)
++
++
++def test_datapath_digits_are_not_a_false_ticket(tmp_path):
++    # leading \b keeps the widened ticket pattern off in-word digits
++    block, warn, _ = _scan(tmp_path, {"athanor/rtl.v": "wire " + "datapath" + "2960" + ";\n"})
++    assert not _has(warn, "Linear ticket id"), warn
++
++
++# --- positive controls: unrelated tiers unchanged --------------------------
++
++def test_workdir_path_still_blocks(tmp_path):
++    block, warn, _ = _scan(tmp_path, {"athanor/log.txt": "at " + WD + "/athanor/x\n"})
++    assert _has(block, "workdir"), block
++
++
++def test_clean_tree_is_silent(tmp_path):
++    block, warn, _ = _scan(tmp_path, {"athanor/ok.txt": "a plain public line\n"})
++    assert block == [] and warn == [], (block, warn)
++
++
++# --- scanner is the sole discriminator (seeded secret + valid manifest) ----
++
++def test_scanner_blocks_namespace_independent_of_valid_receipt_manifest(tmp_path):
++    # Seed the namespace into a committed artifact AND give it a VALID SHA256SUMS
++    # entry. The byte-scanner must block regardless of the manifest verifying --
++    # the scanner, not the receipt hash, is the sole discriminator.
++    leak = NS + "." + "ath" + TICKET_DIGITS + ".scout.v1\n"
++    digest = hashlib.sha256(leak.encode()).hexdigest()
++    sums = digest + "  receipt.json\n"
++    block, warn, _ = _scan(tmp_path, {
++        "athanor_artifacts/receipt.json": leak,
++        "athanor_artifacts/SHA256SUMS": sums,
++    })
++    assert _has(block, "Kairos namespace"), block

@@ -1,0 +1,30 @@
+{
+  "case_id": "enjoy-digital.litedram#93",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litedram"
+  },
+  "fix_repo": {
+    "owner": "mithro",
+    "name": "litedram"
+  },
+  "fix_oid": "746329cb4358b1736f995eee15b9ba823b57d9b9",
+  "buggy_commit_sha": "401554f94c5fbfae1a4de98504c5c2994a6f714a",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/enjoy-digital.litedram_93.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "746329cb4358b1736f995eee15b9ba823b57d9b9"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litedram/init.py"
+  ],
+  "raw_diff_path": "ground_truth/enjoy-digital.litedram_93.raw.diff"
+}

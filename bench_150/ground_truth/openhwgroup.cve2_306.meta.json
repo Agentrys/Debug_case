@@ -1,0 +1,99 @@
+{
+  "case_id": "openhwgroup.cve2#306",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cve2"
+  },
+  "fix_repo": {
+    "owner": "openhwgroup",
+    "name": "cve2"
+  },
+  "fix_oid": "810d575ddadf5b24792caa0f6a4804fdfdb76a78",
+  "buggy_commit_sha": "53076d64c97685b1d2f5d07cd7f5cc439cf1f351",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openhwgroup.cve2_306.diff",
+  "diff_sha256": "8470a36ae58d9eb44d5dfbe860d15697adbd8e7824f6a2e55f39a109e762e212",
+  "fix_oids_sorted": [
+    "810d575ddadf5b24792caa0f6a4804fdfdb76a78",
+    "f720d4098bc2a861aef22bddd612bb910d7dc299"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "rtl/cve2_ex_block.sv",
+    "rtl/cve2_id_stage.sv",
+    "rtl/cve2_pkg.sv",
+    "rtl/cve2_controller.sv"
+  ],
+  "ground_truth_hunks": {
+    "rtl/cve2_ex_block.sv": [
+      [
+        166,
+        171
+      ],
+      [
+        166,
+        171
+      ]
+    ],
+    "rtl/cve2_id_stage.sv": [
+      [
+        287,
+        313
+      ],
+      [
+        710,
+        716
+      ],
+      [
+        267,
+        272
+      ],
+      [
+        287,
+        313
+      ],
+      [
+        324,
+        329
+      ],
+      [
+        568,
+        573
+      ],
+      [
+        710,
+        716
+      ]
+    ],
+    "rtl/cve2_pkg.sv": [
+      [
+        657,
+        669
+      ],
+      [
+        657,
+        669
+      ]
+    ],
+    "rtl/cve2_controller.sv": [
+      [
+        28,
+        33
+      ],
+      [
+        447,
+        454
+      ],
+      [
+        467,
+        479
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/openhwgroup.cve2_306.raw.diff"
+}

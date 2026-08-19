@@ -1,0 +1,44 @@
+{
+  "case_id": "microsoft.cheriot-ibex#43",
+  "issue_repo": {
+    "owner": "microsoft",
+    "name": "cheriot-ibex"
+  },
+  "fix_repo": {
+    "owner": "microsoft",
+    "name": "cheriot-ibex"
+  },
+  "fix_oid": "cf1a0f7e7c16bcf8bf6ef47825271941aa823c53",
+  "buggy_commit_sha": "3f0ec8600cb7621c4c952951d211b3515116ea27",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/microsoft.cheriot-ibex_43.diff",
+  "diff_sha256": "e18f09e38f4fdda54b44730195c81ebddb20a977f1112e75ceb6441773ded22e",
+  "fix_oids_sorted": [
+    "cf1a0f7e7c16bcf8bf6ef47825271941aa823c53"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "rtl/cheri_ex.sv",
+    "rtl/ibex_decoder.sv"
+  ],
+  "ground_truth_hunks": {
+    "rtl/cheri_ex.sv": [
+      [
+        897,
+        906
+      ]
+    ],
+    "rtl/ibex_decoder.sv": [
+      [
+        346,
+        352
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/microsoft.cheriot-ibex_43.raw.diff"
+}

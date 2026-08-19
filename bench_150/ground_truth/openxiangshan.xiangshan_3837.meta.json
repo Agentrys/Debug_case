@@ -1,0 +1,37 @@
+{
+  "case_id": "openxiangshan.xiangshan#3837",
+  "issue_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_oid": "088f3ea40565cf65bcc2c892fd0c225ac246e318",
+  "buggy_commit_sha": "dd02bc3f0e1adcf5fbaee614420772a94ccc0226",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openxiangshan.xiangshan_3837.diff",
+  "diff_sha256": "7f88cc590b4bebac574b682eae6734324aeb86e7bccd3404df133768cdf472e9",
+  "fix_oids_sorted": [
+    "088f3ea40565cf65bcc2c892fd0c225ac246e318"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/xiangshan/frontend/BPU.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/xiangshan/frontend/BPU.scala": [
+      [
+        412,
+        419
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/openxiangshan.xiangshan_3837.raw.diff"
+}

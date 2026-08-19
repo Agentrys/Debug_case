@@ -1,0 +1,50 @@
+{
+  "case_id": "ucb-bar.chipyard#27",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_oid": "c884a2fb15bba3f9c9bf3656be3006a01a421b88",
+  "buggy_commit_sha": "e1499fcdc0016697b949cfbef5364daa72f8e6c5",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/ucb-bar.chipyard_27.diff",
+  "diff_sha256": "b46ba7d6097599b251a5277a7144f58d7935ec7bde9cd7ece704734e24b0edd0",
+  "fix_oids_sorted": [
+    "c884a2fb15bba3f9c9bf3656be3006a01a421b88"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "macros/src/main/scala/MacroCompiler.scala"
+  ],
+  "ground_truth_hunks": {
+    "macros/src/main/scala/MacroCompiler.scala": [
+      [
+        91,
+        96
+      ],
+      [
+        103,
+        125
+      ],
+      [
+        204,
+        212
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "macros/src/test/resources/lib-BOOMTest.json",
+    "macros/src/test/scala/MacroCompilerSpec.scala",
+    "macros/src/test/scala/MultiPort.scala",
+    "macros/src/test/scala/SpecificExamples.scala"
+  ],
+  "raw_diff_path": "ground_truth/ucb-bar.chipyard_27.raw.diff"
+}

@@ -1,0 +1,25 @@
+diff --git a/src/main/scala/rocket/DCache.scala b/src/main/scala/rocket/DCache.scala
+index f27b48b30..7f5251e59 100644
+--- a/src/main/scala/rocket/DCache.scala
++++ b/src/main/scala/rocket/DCache.scala
+@@ -115,7 +115,7 @@ class DCacheModule(outer: DCache) extends HellaCacheModule(outer) {
+ 
+   val tl_out_a = Wire(tl_out.a)
+   tl_out.a <> outer.bufferUncachedRequests
+-                .map(_ min maxUncachedInFlight-1)
++                .map(_ min ((maxUncachedInFlight-1) max 1))
+                 .map(Queue(tl_out_a, _, flow = true))
+                 .getOrElse(tl_out_a)
+ 
+diff --git a/src/main/scala/subsystem/RocketSubsystem.scala b/src/main/scala/subsystem/RocketSubsystem.scala
+index b19728134..f4497b311 100644
+--- a/src/main/scala/subsystem/RocketSubsystem.scala
++++ b/src/main/scala/subsystem/RocketSubsystem.scala
+@@ -23,6 +23,7 @@ case class RocketCrossingParams(
+     slave: TileSlavePortParams = TileSlavePortParams()) {
+   def knownRatio: Option[Int] = crossingType match {
+     case RationalCrossing(_) => Some(2)
++    case SynchronousCrossing(BufferParams.none) => Some(1)
+     case _ => None
+   }
+ }

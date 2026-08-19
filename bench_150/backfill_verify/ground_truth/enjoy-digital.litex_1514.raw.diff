@@ -1,0 +1,35 @@
+diff --git a/LICENSE b/LICENSE
+index e81caa0b1..b8504b532 100644
+--- a/LICENSE
++++ b/LICENSE
+@@ -34,15 +34,3 @@ reasonably be considered independently copyrightable, it's yours and we
+ encourage you to claim it with appropriate copyright notices. This submission
+ then falls under the "otherwise noted" category. All submissions are strongly
+ encouraged to use the two-clause BSD license reproduced above.
+-
+-Conditions: The project is shared with a permissive BSD 2-Clause License and we
+-are encouraged to continue sharing it this way thanks to the awesome community
+-and clients willing to support the project!
+-
+-To be able to continue doing so, in addition of the BSD 2-Clause License conditions,
+-we are expecting users to behave with integrity:
+-- Users making useful use of the project have to be coherent in their behaviour
+-on social networks.
+-- Clients using it for commercial use and with unpaid invoices (due to bankruptcy,
+-liquidation or dissagrements) are not allowed to use/re-integrate post-conflict
+-developments unless they want to discuss/regularize the situation.
+diff --git a/README.md b/README.md
+index 2084cb0dd..2891d26a4 100644
+--- a/README.md
++++ b/README.md
+@@ -54,6 +54,10 @@ The framework is also far from perfect and we'll be happy to have your [feedback
+ 
+ Have fun! :wink:
+ 
++**Moral precisions**: The project is shared with a permissive BSD 2-Clause License and we are encouraged to continue sharing it this way thanks to the awesome community and clients willing to support the project!
++If the projet is useful for your research, hobby or commercial projects, we are just asking you to be coherent and behave with integrity: Don't expect free support or that the community will be welcoming if your spent your time complaining about the project (and then direspect developers) or don't pay the custom developments you asked for... (While it's probably natural for 99% of users/clients, it  does seems useful to add this for the 1% remaining that are eating lots of our energy/time).
++
++
+ # Typical LiteX design flow:
+ ```
+                                       +---------------+

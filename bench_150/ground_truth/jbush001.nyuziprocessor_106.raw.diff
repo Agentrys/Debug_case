@@ -1,0 +1,7 @@
+diff --git a/tools/NyuziToolchain b/tools/NyuziToolchain
+index b9c1d514..e4b78ed5 160000
+--- a/tools/NyuziToolchain
++++ b/tools/NyuziToolchain
+@@ -1 +1 @@
+-Subproject commit b9c1d514b8ca263d0550958bebe4b01a663b6759
++Subproject commit e4b78ed5880af2f7161c057a9ad6a9a3e36e2a10

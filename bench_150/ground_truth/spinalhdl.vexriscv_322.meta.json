@@ -1,0 +1,41 @@
+{
+  "case_id": "spinalhdl.vexriscv#322",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_oid": "1179c6551f41e0a4c293fa29da6417bc51984e86",
+  "buggy_commit_sha": "f11c642cd6d16e003aea0a85d004eb89a44ecfd6",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.vexriscv_322.diff",
+  "diff_sha256": "99366ac5b8b852a2576e07bdea1ba2b2459e1f98bee0788b040f2874122d24e4",
+  "fix_oids_sorted": [
+    "1179c6551f41e0a4c293fa29da6417bc51984e86"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/vexriscv/ip/fpu/FpuCore.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/vexriscv/ip/fpu/FpuCore.scala": [
+      [
+        1546,
+        1552
+      ],
+      [
+        1577,
+        1586
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.vexriscv_322.raw.diff"
+}

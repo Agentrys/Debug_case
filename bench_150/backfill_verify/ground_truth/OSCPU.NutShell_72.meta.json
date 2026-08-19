@@ -1,0 +1,45 @@
+{
+  "case_id": "OSCPU.NutShell#72",
+  "issue_repo": {
+    "owner": "OSCPU",
+    "name": "NutShell"
+  },
+  "fix_repo": {
+    "owner": "Jiayuah",
+    "name": "NutShell"
+  },
+  "fix_oid": "f0b6eefcfe313410b5210c60a96cb5d80a26b695",
+  "buggy_commit_sha": "458416478d4ee81fdad06b01a7c5ef06541686fd",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/OSCPU.NutShell_72.diff",
+  "diff_sha256": "5e39bbb908dec4d99263bad6f34ba5415c86b60e36762b9d2618572b18c48b15",
+  "fix_oids_sorted": [
+    "f0b6eefcfe313410b5210c60a96cb5d80a26b695"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/huancun/noninclusive/MSHR.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/huancun/noninclusive/MSHR.scala": [
+      [
+        176,
+        182
+      ],
+      [
+        814,
+        830
+      ],
+      [
+        1270,
+        1275
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/OSCPU.NutShell_72.raw.diff"
+}

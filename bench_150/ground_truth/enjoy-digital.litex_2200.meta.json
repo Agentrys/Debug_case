@@ -1,0 +1,31 @@
+{
+  "case_id": "enjoy-digital.litex#2200",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "benjaminh-13",
+    "name": "litex"
+  },
+  "fix_oid": "4218801596a7f14cd9eecdf452c0d1b70e0f3f08",
+  "buggy_commit_sha": "88258bd347955041af71e00b3e4f8838ace2fbcd",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/enjoy-digital.litex_2200.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "4218801596a7f14cd9eecdf452c0d1b70e0f3f08",
+    "b1eb23bec2ae2c9730b71a740d62d015579fa30c"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "range",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/soc/cores/cpu/naxriscv/core.py"
+  ],
+  "raw_diff_path": "ground_truth/enjoy-digital.litex_2200.raw.diff"
+}

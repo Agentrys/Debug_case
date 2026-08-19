@@ -1,0 +1,41 @@
+{
+  "case_id": "spinalhdl.naxriscv#104",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "NaxRiscv"
+  },
+  "fix_repo": {
+    "owner": "juanmaneo",
+    "name": "NaxRiscv"
+  },
+  "fix_oid": "c5e4d7470c277a8631327e5ca61bfef57b1612a0",
+  "buggy_commit_sha": "9115f1234e771d8af6bc4b5b1f0b8c136581e117",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.naxriscv_104.diff",
+  "diff_sha256": "79c74301feb271103a2a6270b1ba96abbf0d48091b4a1f0fb068bd1fd729edd2",
+  "fix_oids_sorted": [
+    "c5e4d7470c277a8631327e5ca61bfef57b1612a0"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/naxriscv/execute/fpu/FpuWriteback.scala": [
+      [
+        175,
+        180
+      ],
+      [
+        185,
+        195
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.naxriscv_104.raw.diff"
+}

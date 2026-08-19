@@ -1,0 +1,27 @@
+diff --git a/core/cache_subsystem/miss_handler.sv b/core/cache_subsystem/miss_handler.sv
+index f0a49165..2dda9659 100644
+--- a/core/cache_subsystem/miss_handler.sv
++++ b/core/cache_subsystem/miss_handler.sv
+@@ -377,7 +377,8 @@ module miss_handler import ariane_pkg::*; import std_cache_pkg::*; #(
+                 req_fsm_miss_be     = '1;
+                 req_fsm_miss_we     = 1'b1;
+                 req_fsm_miss_wdata  = evict_cl_q.data;
+-                req_fsm_miss_type = ariane_ace::WRITEBACK;
++                req_fsm_miss_type   = ariane_ace::WRITEBACK;
++                flushing_o          = state_q == WB_CACHELINE_FLUSH;
+ 
+                 // we've got a grant --> this is timing critical, think about it
+                 if (gnt_miss_fsm) begin
+diff --git a/core/cache_subsystem/std_nbdcache.sv b/core/cache_subsystem/std_nbdcache.sv
+index 81597b71..1e2fb04d 100644
+--- a/core/cache_subsystem/std_nbdcache.sv
++++ b/core/cache_subsystem/std_nbdcache.sv
+@@ -136,7 +136,7 @@ import std_cache_pkg::*;
+ 
+         .readshared_done_o (readshared_done),
+         .updating_cache_i (|updating_cache),
+-        .flushing_i (serve_amo),
++        .flushing_i (serve_amo | flushing),
+         .*
+     );
+ 

@@ -1,0 +1,65 @@
+{
+  "case_id": "chipsalliance.rocket-chip#3402",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "poemonsense",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "22bfa0b21f66cd2167f560b2e06d3cfb01b47d91",
+  "buggy_commit_sha": "2737d043357f2fc3869cec43776d9fff0d4e7ff6",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/chipsalliance.rocket-chip_3402.diff",
+  "diff_sha256": "42e88cfe00f95bbe0c38d0c96f9da555c9313557be980292ebf40e4813e5688e",
+  "fix_oids_sorted": [
+    "22bfa0b21f66cd2167f560b2e06d3cfb01b47d91",
+    "3af3c91dbedd4da7f6f76b7d5d8033880786d9e9",
+    "ff025a69dbc9b230de9a2ad386c9b333a92ea46c",
+    "c149a60d5dd71c471a7f846bccd2ae494278f1e9",
+    "2a005655d2487fdb0da4e7a526abfff348d2aecb"
+  ],
+  "n_fix_commits": 5,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/rocket/PTW.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/rocket/PTW.scala": [
+      [
+        720,
+        726
+      ],
+      [
+        720,
+        726
+      ],
+      [
+        720,
+        725
+      ],
+      [
+        135,
+        142
+      ],
+      [
+        695,
+        701
+      ],
+      [
+        135,
+        142
+      ],
+      [
+        695,
+        701
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/chipsalliance.rocket-chip_3402.raw.diff"
+}

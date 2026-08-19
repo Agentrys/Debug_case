@@ -1,0 +1,47 @@
+{
+  "case_id": "vortexgpgpu.vortex#4",
+  "issue_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_oid": "435dfc10cb0e6924b7f126277716999a92cfe455",
+  "buggy_commit_sha": "e9e7f3ff40a65e0d8903df34ebc1a58da789bb77",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/vortexgpgpu.vortex_4.diff",
+  "diff_sha256": "2f233ca8429b96c1770e7567ddfecd0f884a2eb84d776d838d29f66f42258fef",
+  "fix_oids_sorted": [
+    "435dfc10cb0e6924b7f126277716999a92cfe455",
+    "585bbdfcd37bcca0c4a6e2e6f8139c98d157136f"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "hw/rtl/libs/VX_mem_streamer.sv"
+  ],
+  "ground_truth_hunks": {
+    "hw/rtl/libs/VX_mem_streamer.sv": [
+      [
+        1,
+        231
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "hw/unit_tests/mem_streamer/mem_streamer/Makefile",
+    "hw/unit_tests/mem_streamer/mem_streamer/memsim.cpp",
+    "hw/unit_tests/mem_streamer/mem_streamer/memsim.h",
+    "hw/unit_tests/mem_streamer/mem_streamer/ram.cpp",
+    "hw/unit_tests/mem_streamer/mem_streamer/ram.h",
+    "hw/unit_tests/mem_streamer/memsim.cpp",
+    "hw/unit_tests/mem_streamer/memsim.h",
+    "sim/simx/tensor_unit.cpp"
+  ],
+  "raw_diff_path": "ground_truth/vortexgpgpu.vortex_4.raw.diff"
+}

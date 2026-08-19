@@ -1,0 +1,31 @@
+{
+  "case_id": "openhwgroup.ariane#1106",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "ThalesSiliconSecurity",
+    "name": "cva6"
+  },
+  "fix_oid": "5a14bfd585b67b24d3c90f24284a667366843849",
+  "buggy_commit_sha": "39d26fb5cb294e17001b85ebf2d170b580777a1c",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/openhwgroup.ariane_1106.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "5a14bfd585b67b24d3c90f24284a667366843849",
+    "758511fd791b8570937d3fc7984a0521daeb485a"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "docs/03_cva6_design/issue_stage.md"
+  ],
+  "raw_diff_path": "ground_truth/openhwgroup.ariane_1106.raw.diff"
+}

@@ -1,0 +1,145 @@
+diff --git a/rtl/verilog/mor1kx_dcache.v b/rtl/verilog/mor1kx_dcache.v
+index 8bea5f9..0c7435c 100644
+--- a/rtl/verilog/mor1kx_dcache.v
++++ b/rtl/verilog/mor1kx_dcache.v
+@@ -27,6 +27,7 @@ module mor1kx_dcache
+     input 			      clk,
+     input 			      rst,
+ 
++    input 			      dc_dbus_err_i,
+     input 			      dc_enable_i,
+     input 			      dc_access_i,
+     output 			      refill_o,
+@@ -344,6 +345,9 @@ module mor1kx_dcache
+       if (rst) begin
+ 	 state <= IDLE;
+ 	 write_pending <= 0;
++      end else if(dc_dbus_err_i) begin
++	 state <= IDLE;
++	 write_pending <= 0;
+       end else begin
+ 	 if (cpu_we_i)
+ 	   write_pending <= 1;
+diff --git a/rtl/verilog/mor1kx_execute_ctrl_cappuccino.v b/rtl/verilog/mor1kx_execute_ctrl_cappuccino.v
+index 8c98384..6e91801 100644
+--- a/rtl/verilog/mor1kx_execute_ctrl_cappuccino.v
++++ b/rtl/verilog/mor1kx_execute_ctrl_cappuccino.v
+@@ -370,7 +370,9 @@ endgenerate
+    // load and mfpsr can stall from ctrl stage, so we have to hold off the
+    // write back on them
+    always @(posedge clk `OR_ASYNC_RST)
+-     if (rst | pipeline_flush_i)
++     if (rst)
++       wb_rf_wb_o <= 0;
++     else if (pipeline_flush_i)
+        wb_rf_wb_o <= 0;
+      else if (ctrl_op_mfspr_o)
+        wb_rf_wb_o <= ctrl_rf_wb_o & ctrl_mfspr_ack_i;
+diff --git a/rtl/verilog/mor1kx_fetch_cappuccino.v b/rtl/verilog/mor1kx_fetch_cappuccino.v
+index 04dd34a..17faed5 100644
+--- a/rtl/verilog/mor1kx_fetch_cappuccino.v
++++ b/rtl/verilog/mor1kx_fetch_cappuccino.v
+@@ -491,8 +491,6 @@ if (FEATURE_INSTRUCTIONCACHE!="NONE") begin : icache_gen
+       end
+    end
+ 
+-   wire ic_rst = rst | imem_err;
+-
+    /* mor1kx_icache AUTO_TEMPLATE (
+     // Outputs
+     .cpu_ack_o			(ic_ack),
+@@ -504,7 +502,8 @@ if (FEATURE_INSTRUCTIONCACHE!="NONE") begin : icache_gen
+     .refill_done_o		(ic_refill_done),
+     .invalidate_o		(ic_invalidate),
+     // Inputs
+-    .rst			(ic_rst),
++    .rst			(rst),
++    .ic_imem_err_i      (imem_err),
+     .ic_access_i		(ic_access),
+     .cpu_adr_i			(ic_addr),
+     .cpu_adr_match_i		(ic_addr_match),
+@@ -534,7 +533,8 @@ if (FEATURE_INSTRUCTIONCACHE!="NONE") begin : icache_gen
+       .spr_bus_ack_o			(spr_bus_ack_ic_o),	 // Templated
+       // Inputs
+       .clk				(clk),
+-      .rst				(ic_rst),		 // Templated
++      .rst				(rst),		 // Templated
++      .ic_imem_err_i    (imem_err), 
+       .ic_access_i			(ic_access),		 // Templated
+       .cpu_adr_i			(ic_addr),		 // Templated
+       .cpu_adr_match_i			(ic_addr_match),	 // Templated
+diff --git a/rtl/verilog/mor1kx_icache.v b/rtl/verilog/mor1kx_icache.v
+index f1f71f1..daebf86 100644
+--- a/rtl/verilog/mor1kx_icache.v
++++ b/rtl/verilog/mor1kx_icache.v
+@@ -26,6 +26,7 @@ module mor1kx_icache
+     input 			      clk,
+     input 			      rst,
+ 
++    input 			      ic_imem_err_i,
+     input 			      ic_access_i,
+     output 			      refill_o,
+     output 			      refill_req_o,
+@@ -316,6 +317,8 @@ module mor1kx_icache
+ 
+       if (rst)
+ 	state <= IDLE;
++      else if(ic_imem_err_i)
++	state <= IDLE;
+    end
+ 
+    integer w2;
+diff --git a/rtl/verilog/mor1kx_immu.v b/rtl/verilog/mor1kx_immu.v
+index ac1ea9f..1cdf394 100644
+--- a/rtl/verilog/mor1kx_immu.v
++++ b/rtl/verilog/mor1kx_immu.v
+@@ -288,9 +288,14 @@ if (FEATURE_IMMU_HW_TLB_RELOAD == "ENABLED") begin
+    assign tlb_reload_pagefault_o = tlb_reload_pagefault &
+ 				    !tlb_reload_pagefault_clear_i;
+ 
++   always @(posedge clk `OR_ASYNC_RST) begin
++      if (rst)
++        tlb_reload_pagefault <= 0;
++      else if(tlb_reload_pagefault_clear_i)
++        tlb_reload_pagefault <= 0;
++   end // @clock
++   
+    always @(posedge clk) begin
+-      if (tlb_reload_pagefault_clear_i | rst)
+-	tlb_reload_pagefault <= 0;
+       itlb_trans_reload_we <= 0;
+       itlb_trans_reload_din <= 0;
+       itlb_match_reload_we <= 0;
+diff --git a/rtl/verilog/mor1kx_lsu_cappuccino.v b/rtl/verilog/mor1kx_lsu_cappuccino.v
+index eda5233..93e6a44 100644
+--- a/rtl/verilog/mor1kx_lsu_cappuccino.v
++++ b/rtl/verilog/mor1kx_lsu_cappuccino.v
+@@ -684,8 +684,6 @@ if (FEATURE_DATACACHE!="NONE") begin : dcache_gen
+       end
+    end
+ 
+-   wire dc_rst = rst | dbus_err;
+-
+    assign dc_bsel = dbus_bsel;
+    assign dc_we = exec_op_lsu_store_i & !exec_op_lsu_atomic_i & padv_execute_i |
+ 		  dbus_atomic & dbus_we_o & !write_done |
+@@ -703,7 +701,8 @@ if (FEATURE_DATACACHE!="NONE") begin : dcache_gen
+             .snoop_hit_o                (dc_snoop_hit),
+ 	    // Inputs
+ 	    .clk			(clk),
+-	    .rst			(dc_rst),
++	    .rst			(rst),
++	    .dc_dbus_err_i		(dbus_err),
+ 	    .dc_enable_i		(dc_enabled),
+ 	    .dc_access_i		(dc_access),
+ 	    .cpu_dat_i			(lsu_sdat),
+@@ -742,7 +741,8 @@ if (FEATURE_DATACACHE!="NONE") begin : dcache_gen
+ 	    .spr_bus_ack_o		(spr_bus_ack_dc_o),	 // Templated
+ 	    // Inputs
+ 	    .clk			(clk),			 // Templated
+-	    .rst			(dc_rst),		 // Templated
++	    .rst			(rst),			 // Templated
++	    .dc_dbus_err_i		(dbus_err),		 // Templated
+ 	    .dc_enable_i		(dc_enabled),		 // Templated
+ 	    .dc_access_i		(dc_access),		 // Templated
+ 	    .cpu_dat_i			(lsu_sdat),		 // Templated

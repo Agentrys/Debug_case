@@ -1,0 +1,158 @@
+{
+  "case_id": "openrisc.mor1kx#146",
+  "issue_repo": {
+    "owner": "openrisc",
+    "name": "mor1kx"
+  },
+  "fix_repo": {
+    "owner": "stffrdhrn",
+    "name": "mor1kx"
+  },
+  "fix_oid": "8ff071fc540d80ac1e89257fc8176ead926bff7f",
+  "buggy_commit_sha": "aca24812520db8e3a0347ac45b0ac18027ccf053",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openrisc.mor1kx_146.diff",
+  "diff_sha256": "6f99b20b479abf5fa49e16e3c1f49a3e24fc4ebc09626338771cd78df2d002e8",
+  "fix_oids_sorted": [
+    "8ff071fc540d80ac1e89257fc8176ead926bff7f",
+    "6fc386eefa7285643f9fec780caf8ef406b96e4c",
+    "82b6b6aa5fb7d5b09e97f16182d0a8b3cbbca097",
+    "fbb349b0e49f006b0e9c0a56a1d9f0b1cf1e625d",
+    "c8456dce06beeb1d3baf0862dac233fe97b56613",
+    "cebcd66b09c32ab10f1378b23cb304cc2ed58502"
+  ],
+  "n_fix_commits": 6,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "rtl/verilog/mor1kx_dcache.v"
+  ],
+  "ground_truth_hunks": {
+    "rtl/verilog/mor1kx_dcache.v": [
+      [
+        339,
+        347
+      ],
+      [
+        377,
+        383
+      ],
+      [
+        440,
+        449
+      ],
+      [
+        474,
+        479
+      ],
+      [
+        496,
+        501
+      ],
+      [
+        514,
+        520
+      ],
+      [
+        525,
+        533
+      ],
+      [
+        575,
+        580
+      ],
+      [
+        339,
+        347
+      ],
+      [
+        377,
+        383
+      ],
+      [
+        440,
+        449
+      ],
+      [
+        474,
+        479
+      ],
+      [
+        496,
+        501
+      ],
+      [
+        514,
+        520
+      ],
+      [
+        525,
+        533
+      ],
+      [
+        575,
+        580
+      ],
+      [
+        339,
+        347
+      ],
+      [
+        377,
+        383
+      ],
+      [
+        440,
+        449
+      ],
+      [
+        474,
+        479
+      ],
+      [
+        496,
+        501
+      ],
+      [
+        514,
+        520
+      ],
+      [
+        525,
+        533
+      ],
+      [
+        575,
+        580
+      ],
+      [
+        513,
+        519
+      ],
+      [
+        854,
+        862
+      ],
+      [
+        899,
+        905
+      ],
+      [
+        930,
+        936
+      ],
+      [
+        513,
+        519
+      ],
+      [
+        513,
+        519
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/openrisc.mor1kx_146.raw.diff"
+}

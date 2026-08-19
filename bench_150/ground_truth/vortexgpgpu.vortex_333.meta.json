@@ -1,0 +1,45 @@
+{
+  "case_id": "vortexgpgpu.vortex#333",
+  "issue_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_repo": {
+    "owner": "hwirys",
+    "name": "vortex"
+  },
+  "fix_oid": "8057dd5b918fe14824a7697985f04868a97e7d1d",
+  "buggy_commit_sha": "f00bb14227c559deba3befe72fdbc6e07b5da3e0",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/vortexgpgpu.vortex_333.diff",
+  "diff_sha256": "1959a8e0ec9e52549d6f0d6c50300b81f99ff8d971965e43c611a518cf633124",
+  "fix_oids_sorted": [
+    "8057dd5b918fe14824a7697985f04868a97e7d1d"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "hw/rtl/libs/VX_axi_adapter.sv"
+  ],
+  "ground_truth_hunks": {
+    "hw/rtl/libs/VX_axi_adapter.sv": [
+      [
+        27,
+        32
+      ],
+      [
+        246,
+        262
+      ],
+      [
+        285,
+        298
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/vortexgpgpu.vortex_333.raw.diff"
+}

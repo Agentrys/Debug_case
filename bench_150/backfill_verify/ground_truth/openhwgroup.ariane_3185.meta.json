@@ -1,0 +1,49 @@
+{
+  "case_id": "openhwgroup.ariane#3185",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "AlexChenIC",
+    "name": "cva6"
+  },
+  "fix_oid": "c007d8943240ad9099da25ebf19a89c00c2e6e53",
+  "buggy_commit_sha": "59f73d27e5840fa5f00d416708e22cee1188da34",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_3185.diff",
+  "diff_sha256": "ee8914cdb97a63cd7d25fdfea44bed5aa1fef427eeca1211b22ffb02bdbb41a2",
+  "fix_oids_sorted": [
+    "c007d8943240ad9099da25ebf19a89c00c2e6e53",
+    "5c508ef1503bae14eda5d127c4f853e75749e904",
+    "a378b95665ccd43977958a6d868d6336163b827c",
+    "2440b19e395d295bb4f767a7a55433c66612d273",
+    "0010c6ab88410331473e07f267cab54d81a0728d"
+  ],
+  "n_fix_commits": 5,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "corev_apu/instr_tracing/rv_tracer-main/rtl/rv_tracer.sv"
+  ],
+  "ground_truth_hunks": {
+    "corev_apu/instr_tracing/rv_tracer-main/rtl/rv_tracer.sv": [
+      [
+        57,
+        63
+      ],
+      [
+        908,
+        911
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "corev_apu/fpga/src/ariane_xilinx.sv",
+    "corev_apu/tb/ariane_testharness.sv",
+    ".gitlab-ci/expected_synth.yml"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_3185.raw.diff"
+}

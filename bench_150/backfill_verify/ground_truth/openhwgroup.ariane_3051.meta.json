@@ -1,0 +1,49 @@
+{
+  "case_id": "openhwgroup.ariane#3051",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "ThalesSiliconSecurity",
+    "name": "cva6"
+  },
+  "fix_oid": "d6daeac3a8b7e4194da4f42961cd1860ea4cd6f6",
+  "buggy_commit_sha": "8202a7f714d708555021598a7baf3f97eda6b468",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_3051.diff",
+  "diff_sha256": "31544baa901c3c4b8489a027a5f841105b52e6867e7d1cc938381d58b9560569",
+  "fix_oids_sorted": [
+    "d6daeac3a8b7e4194da4f42961cd1860ea4cd6f6",
+    "e6867b8f87beb75acb8ec1ae8f68875587267eac",
+    "67b2b4debf1e307ca2bac31990b2f0b1924dcddb"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/compressed_decoder.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/compressed_decoder.sv": [
+      [
+        227,
+        232
+      ],
+      [
+        227,
+        232
+      ],
+      [
+        227,
+        232
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "verif/env/corev-dv/cva6_unsupported_instr.sv"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_3051.raw.diff"
+}

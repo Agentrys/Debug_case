@@ -1,0 +1,32 @@
+{
+  "case_id": "enjoy-digital.litex#2464",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "manmuqingshan",
+    "name": "litex"
+  },
+  "fix_oid": "1a290a20b4faae3abbca5ece45a454cfc5c8c468",
+  "buggy_commit_sha": "6b5216421e129497f151e39022b1a56f922b3364",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/enjoy-digital.litex_2464.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "1a290a20b4faae3abbca5ece45a454cfc5c8c468"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/soc/interconnect/axi/axi_full.py",
+    "litex/soc/software/bios/cmds/cmd_litesdcard.c",
+    "test/test_axi.py"
+  ],
+  "raw_diff_path": "ground_truth/enjoy-digital.litex_2464.raw.diff"
+}

@@ -1,0 +1,289 @@
+{
+  "case_id": "openxiangshan.xiangshan#5725",
+  "issue_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_repo": {
+    "owner": "skyhgzsh",
+    "name": "XiangShan"
+  },
+  "fix_oid": "7a28883591d75d16eaa20d8ed06fd2d990223ee5",
+  "buggy_commit_sha": "bc2fbff8620b848ff14240c66daccb267586e443",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openxiangshan.xiangshan_5725.diff",
+  "diff_sha256": "cab408fb2769b68585f226452eca314ad7c07b40d52c13ac37a1f5d79ccca437",
+  "fix_oids_sorted": [
+    "7a28883591d75d16eaa20d8ed06fd2d990223ee5",
+    "0ebe2b8f147731752f061ad90d6ac2d6056d6a22",
+    "dfd3a3022bc6d6659776197a51e1f136335f6dea",
+    "5c07c3252648c217cfba4fea73db10704b1ae181",
+    "8b0eb758f1ef1dc294facf678ee6b758e2f1b0ba"
+  ],
+  "n_fix_commits": 5,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/xiangshan/backend/decode/VTypeGen.scala",
+    "src/main/scala/xiangshan/backend/fu/FuConfig.scala",
+    "src/main/scala/xiangshan/backend/fu/Vsetu.scala",
+    "src/main/scala/xiangshan/backend/fu/wrapper/VSet.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/xiangshan/backend/decode/VTypeGen.scala": [
+      [
+        7,
+        12
+      ],
+      [
+        72,
+        78
+      ],
+      [
+        7,
+        12
+      ],
+      [
+        72,
+        78
+      ],
+      [
+        7,
+        12
+      ],
+      [
+        72,
+        78
+      ],
+      [
+        7,
+        12
+      ],
+      [
+        72,
+        78
+      ],
+      [
+        7,
+        12
+      ],
+      [
+        72,
+        78
+      ]
+    ],
+    "src/main/scala/xiangshan/backend/fu/FuConfig.scala": [
+      [
+        36,
+        45
+      ],
+      [
+        75,
+        80
+      ],
+      [
+        159,
+        165
+      ],
+      [
+        397,
+        402
+      ],
+      [
+        36,
+        45
+      ],
+      [
+        75,
+        80
+      ],
+      [
+        159,
+        165
+      ],
+      [
+        397,
+        402
+      ],
+      [
+        36,
+        45
+      ],
+      [
+        75,
+        80
+      ],
+      [
+        159,
+        165
+      ],
+      [
+        397,
+        402
+      ],
+      [
+        36,
+        45
+      ],
+      [
+        75,
+        80
+      ],
+      [
+        159,
+        165
+      ],
+      [
+        397,
+        402
+      ],
+      [
+        36,
+        45
+      ],
+      [
+        75,
+        80
+      ],
+      [
+        159,
+        165
+      ],
+      [
+        397,
+        402
+      ]
+    ],
+    "src/main/scala/xiangshan/backend/fu/Vsetu.scala": [
+      [
+        21,
+        34
+      ],
+      [
+        43,
+        50
+      ],
+      [
+        56,
+        61
+      ],
+      [
+        97,
+        103
+      ],
+      [
+        21,
+        34
+      ],
+      [
+        43,
+        50
+      ],
+      [
+        56,
+        61
+      ],
+      [
+        97,
+        103
+      ],
+      [
+        22,
+        34
+      ],
+      [
+        43,
+        50
+      ],
+      [
+        56,
+        61
+      ],
+      [
+        97,
+        103
+      ],
+      [
+        22,
+        34
+      ],
+      [
+        43,
+        50
+      ],
+      [
+        56,
+        61
+      ],
+      [
+        97,
+        103
+      ],
+      [
+        22,
+        34
+      ],
+      [
+        43,
+        50
+      ],
+      [
+        56,
+        61
+      ],
+      [
+        97,
+        103
+      ]
+    ],
+    "src/main/scala/xiangshan/backend/fu/wrapper/VSet.scala": [
+      [
+        17,
+        23
+      ],
+      [
+        100,
+        118
+      ],
+      [
+        17,
+        23
+      ],
+      [
+        100,
+        118
+      ],
+      [
+        17,
+        23
+      ],
+      [
+        100,
+        118
+      ],
+      [
+        17,
+        23
+      ],
+      [
+        100,
+        118
+      ],
+      [
+        17,
+        23
+      ],
+      [
+        100,
+        118
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "src/test/scala/xiangshan/backend/fu/VsetModuleMain.scala",
+    "src/test/scala/xiangshan/backend/fu/VsetTop.scala"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openxiangshan.xiangshan_5725.raw.diff"
+}

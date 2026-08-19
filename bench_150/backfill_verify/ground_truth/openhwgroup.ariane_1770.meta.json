@@ -1,0 +1,65 @@
+{
+  "case_id": "openhwgroup.ariane#1770",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "Gchauvon",
+    "name": "cva6"
+  },
+  "fix_oid": "dda6b8aff4da339b9c712b8260aefe20f8d52dbc",
+  "buggy_commit_sha": "0abb7e27d41bd27160022de6b32a77fb42273211",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_1770.diff",
+  "diff_sha256": "00c48c390a31959decf263b857e7e63049657f5076107daa6126e90d843fe61d",
+  "fix_oids_sorted": [
+    "dda6b8aff4da339b9c712b8260aefe20f8d52dbc"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "cva6/env/uvme/uvme_cva6_cfg.sv",
+    "cva6/env/uvme/uvme_cva6_env.sv"
+  ],
+  "ground_truth_hunks": {
+    "cva6/env/uvme/uvme_cva6_cfg.sv": [
+      [
+        132,
+        138
+      ]
+    ],
+    "cva6/env/uvme/uvme_cva6_env.sv": [
+      [
+        44,
+        49
+      ],
+      [
+        80,
+        85
+      ],
+      [
+        154,
+        159
+      ],
+      [
+        249,
+        254
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "cva6/sim/cva6.py",
+    "cva6/tb/core/tb_components/axi_master_connect.sv",
+    "cva6/tb/uvmt/cva6_tb_wrapper.sv",
+    "cva6/tb/uvmt/uvmt_axi_switch_intf.sv",
+    "cva6/tb/uvmt/uvmt_cva6_dut_wrap.sv",
+    "cva6/tb/uvmt/uvmt_cva6_pkg.sv",
+    "cva6/tb/uvmt/uvmt_cva6_tb.sv",
+    "cva6/tests/uvmt/base-tests/uvmt_cva6_base_test.sv"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_1770.raw.diff"
+}

@@ -1,0 +1,30 @@
+{
+  "case_id": "enjoy-digital.liteeth#162",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "liteeth"
+  },
+  "fix_repo": {
+    "owner": "sensille",
+    "name": "litehm2"
+  },
+  "fix_oid": "9663a32ece4e8f0a225ae6e60afe3ea8fd10e0a8",
+  "buggy_commit_sha": "e2b13586e683fc1cfcd74c249c2c1e31823dd158",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/enjoy-digital.liteeth_162.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "9663a32ece4e8f0a225ae6e60afe3ea8fd10e0a8"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litehm2.py"
+  ],
+  "raw_diff_path": "ground_truth/enjoy-digital.liteeth_162.raw.diff"
+}

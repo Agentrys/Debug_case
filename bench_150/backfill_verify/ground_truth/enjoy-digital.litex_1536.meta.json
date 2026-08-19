@@ -1,0 +1,36 @@
+{
+  "case_id": "enjoy-digital.litex#1536",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "trabucayre",
+    "name": "litex"
+  },
+  "fix_oid": "54b6f29132fae3ceabb0c5be5cf70a2adc47aab5",
+  "buggy_commit_sha": "cb85a8caf1fd150d7a9563e71f553d931157abff",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1536.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "54b6f29132fae3ceabb0c5be5cf70a2adc47aab5",
+    "d17041e07619dc6df01a7d01b4ca5d757394d4ee",
+    "f007f812df15184d2f7e20c071eedc255fd5028f"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/build/nextpnr_wrapper.py",
+    "litex/build/yosys_nextpnr_toolchain.py",
+    "litex/build/yosys_wrapper.py",
+    "litex/build/lattice/radiant.py",
+    "litex/build/xilinx/common.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1536.raw.diff"
+}

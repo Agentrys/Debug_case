@@ -1,0 +1,55 @@
+{
+  "case_id": "vortexgpgpu.vortex#17",
+  "issue_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_oid": "f04142510d3689dd858281a169201f0ea971b522",
+  "buggy_commit_sha": "6c4e4e79f0a330b085b25c736e36ab1ade52c5eb",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/vortexgpgpu.vortex_17.diff",
+  "diff_sha256": "ae72daf0b81fb112b6e01af96b6bacd6bd494d7c59a5b6a3295cfe3a3df06c74",
+  "fix_oids_sorted": [
+    "f04142510d3689dd858281a169201f0ea971b522"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "hw/rtl/raster_unit/VX_raster_mem.sv",
+    "hw/rtl/raster_unit/VX_raster_te_arbiter.sv",
+    "hw/rtl/raster_unit/VX_raster_unit.sv"
+  ],
+  "ground_truth_hunks": {
+    "hw/rtl/raster_unit/VX_raster_mem.sv": [
+      [
+        273,
+        278
+      ],
+      [
+        283,
+        289
+      ]
+    ],
+    "hw/rtl/raster_unit/VX_raster_te_arbiter.sv": [
+      [
+        54,
+        65
+      ]
+    ],
+    "hw/rtl/raster_unit/VX_raster_unit.sv": [
+      [
+        165,
+        171
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/vortexgpgpu.vortex_17.raw.diff"
+}

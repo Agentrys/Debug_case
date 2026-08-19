@@ -1,0 +1,37 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 514c3fe04..912716abd 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -171,7 +171,7 @@ jobs:
+           BOOT_TIMES = {
+               "femtorv":      60, "firev":        60, "serv":         45,
+               "sentinel":    120, "minerva":     120, "lm32":        120,
+-              "marocchino":  120, "microwatt":    240,
++              "marocchino":  120, "microwatt":    300,
+               "vexriscv":    120, "neorv32":     150, "ibex":        150,
+               "naxriscv":    240, "vexiiriscv":  240, "vexriscv_smp":360,
+           }
+diff --git a/test/test_integration.py b/test/test_integration.py
+index 57b3d2cdc..afc2e7080 100644
+--- a/test/test_integration.py
++++ b/test/test_integration.py
+@@ -255,6 +255,9 @@ TESTED_CPUS = [
+     "ibex",         # (riscv   / softcore)
+     "minerva",      # (riscv   / softcore)
+ ]
++TESTED_CPU_VARIANTS = {
++    "microwatt": "standard+irq",
++}
+ UNTESTED_CPUS = [
+     "blackparrot",  # (riscv   / softcore) -> Broken install?
+     "cortex_m1",    # (arm     / softcore) -> Proprietary code.
+@@ -273,7 +276,8 @@ UNTESTED_CPUS = [
+ 
+ @pytest.mark.parametrize("cpu", TESTED_CPUS)
+ def test_cpu(cpu, request, tmp_path):
+-    assert boot_test(cpu_type=cpu, output_dir=str(tmp_path))
++    variant = TESTED_CPU_VARIANTS.get(cpu, "standard")
++    assert boot_test(cpu_type=cpu, cpu_variant=variant, output_dir=str(tmp_path))
+ 
+ BUS_OPTIONS = [
+     ("--bus-standard", ["wishbone", "axi-lite", "axi"]),

@@ -1,0 +1,79 @@
+{
+  "case_id": "openxiangshan.xiangshan#3864",
+  "issue_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_oid": "71b6c42e3aeca685ce6901f71e45118144cfbd1d",
+  "buggy_commit_sha": "e3e0af7def8dee48c58d3c60b7d77fccdf848315",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openxiangshan.xiangshan_3864.diff",
+  "diff_sha256": "1b18eae5f775dba3fefa150a70e4bd5605caba81c46ebd7a6fd1e88c70299b31",
+  "fix_oids_sorted": [
+    "71b6c42e3aeca685ce6901f71e45118144cfbd1d"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/xiangshan/Bundle.scala",
+    "src/main/scala/xiangshan/backend/fu/wrapper/CSR.scala",
+    "src/main/scala/xiangshan/frontend/Frontend.scala",
+    "src/main/scala/xiangshan/frontend/IFU.scala",
+    "src/main/scala/xiangshan/frontend/PreDecode.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/xiangshan/Bundle.scala": [
+      [
+        614,
+        619
+      ]
+    ],
+    "src/main/scala/xiangshan/backend/fu/wrapper/CSR.scala": [
+      [
+        353,
+        358
+      ]
+    ],
+    "src/main/scala/xiangshan/frontend/Frontend.scala": [
+      [
+        105,
+        115
+      ],
+      [
+        151,
+        158
+      ]
+    ],
+    "src/main/scala/xiangshan/frontend/IFU.scala": [
+      [
+        80,
+        85
+      ],
+      [
+        523,
+        529
+      ],
+      [
+        919,
+        925
+      ]
+    ],
+    "src/main/scala/xiangshan/frontend/PreDecode.scala": [
+      [
+        281,
+        292
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "rocket-chip"
+  ],
+  "raw_diff_path": "ground_truth/openxiangshan.xiangshan_3864.raw.diff"
+}

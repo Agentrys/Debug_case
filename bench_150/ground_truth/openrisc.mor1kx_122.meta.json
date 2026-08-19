@@ -1,0 +1,245 @@
+{
+  "case_id": "openrisc.mor1kx#122",
+  "issue_repo": {
+    "owner": "openrisc",
+    "name": "mor1kx"
+  },
+  "fix_repo": {
+    "owner": "stffrdhrn",
+    "name": "mor1kx"
+  },
+  "fix_oid": "a90193d31ceaa70b2ff8a739d44c3866f8ff2e6b",
+  "buggy_commit_sha": "1f21eabf6079b313ef1178c2825c8e1349e6da5a",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openrisc.mor1kx_122.diff",
+  "diff_sha256": "12463f5c7a2914840ae1e9e41a040d334d730f2834f21963fe23ecf64efd49aa",
+  "fix_oids_sorted": [
+    "a90193d31ceaa70b2ff8a739d44c3866f8ff2e6b",
+    "8d7b044e0675817bae0546579e66cf894c372259",
+    "acb43a017dedf28a1b81212c498f37e51c286593",
+    "cd90ff48ba5dd8ee4038e93746fc912223f379d9",
+    "e6a4c704150609c9c5d6532d7a518749996d352d",
+    "3ecdd51bee74dacb19183225a30e4a2dc358475d",
+    "a6110ce3b6aa63ed233ed9a110ee7812770bcda7",
+    "c2334edb09074bf584f85032a3120468bfea4055",
+    "41497c647fc4367f078172c17854538ed690a649",
+    "040a89fa0f7e0c2fdbc09ee6a343e6f05c65204e",
+    "b234f272e1673c6fa3c9bf00a4038ffb3173ef17",
+    "fbb349b0e49f006b0e9c0a56a1d9f0b1cf1e625d",
+    "c8456dce06beeb1d3baf0862dac233fe97b56613",
+    "cebcd66b09c32ab10f1378b23cb304cc2ed58502"
+  ],
+  "n_fix_commits": 14,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "rtl/verilog/mor1kx_immu.v",
+    "rtl/verilog/mor1kx_dcache.v"
+  ],
+  "ground_truth_hunks": {
+    "rtl/verilog/mor1kx_immu.v": [
+      [
+        174,
+        186
+      ],
+      [
+        231,
+        246
+      ],
+      [
+        174,
+        186
+      ],
+      [
+        231,
+        246
+      ],
+      [
+        86,
+        91
+      ],
+      [
+        187,
+        195
+      ],
+      [
+        86,
+        91
+      ],
+      [
+        174,
+        195
+      ],
+      [
+        231,
+        246
+      ],
+      [
+        174,
+        186
+      ],
+      [
+        231,
+        246
+      ],
+      [
+        86,
+        91
+      ],
+      [
+        174,
+        195
+      ],
+      [
+        231,
+        246
+      ],
+      [
+        174,
+        186
+      ],
+      [
+        231,
+        246
+      ],
+      [
+        86,
+        91
+      ],
+      [
+        174,
+        195
+      ],
+      [
+        231,
+        246
+      ]
+    ],
+    "rtl/verilog/mor1kx_dcache.v": [
+      [
+        342,
+        347
+      ],
+      [
+        377,
+        383
+      ],
+      [
+        440,
+        447
+      ],
+      [
+        472,
+        480
+      ],
+      [
+        497,
+        512
+      ],
+      [
+        525,
+        531
+      ],
+      [
+        536,
+        544
+      ],
+      [
+        586,
+        593
+      ],
+      [
+        342,
+        347
+      ],
+      [
+        377,
+        383
+      ],
+      [
+        440,
+        447
+      ],
+      [
+        472,
+        480
+      ],
+      [
+        497,
+        512
+      ],
+      [
+        525,
+        531
+      ],
+      [
+        536,
+        544
+      ],
+      [
+        586,
+        593
+      ],
+      [
+        342,
+        347
+      ],
+      [
+        377,
+        383
+      ],
+      [
+        440,
+        447
+      ],
+      [
+        472,
+        480
+      ],
+      [
+        497,
+        512
+      ],
+      [
+        525,
+        531
+      ],
+      [
+        536,
+        544
+      ],
+      [
+        586,
+        593
+      ],
+      [
+        513,
+        519
+      ],
+      [
+        854,
+        862
+      ],
+      [
+        899,
+        905
+      ],
+      [
+        930,
+        936
+      ],
+      [
+        513,
+        519
+      ],
+      [
+        513,
+        519
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/openrisc.mor1kx_122.raw.diff"
+}

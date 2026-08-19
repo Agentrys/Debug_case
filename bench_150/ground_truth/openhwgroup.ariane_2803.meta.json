@@ -1,0 +1,47 @@
+{
+  "case_id": "openhwgroup.ariane#2803",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "spersvold",
+    "name": "cva6"
+  },
+  "fix_oid": "0e2e5128b240ff069adddff8d20a322df985633e",
+  "buggy_commit_sha": "2b1f45cad96de6dd346b5865bf7a92943429f598",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openhwgroup.ariane_2803.diff",
+  "diff_sha256": "26ce893f174d91a007d075d078255706bde321c7a2de9776901fed6a94b41fa3",
+  "fix_oids_sorted": [
+    "0e2e5128b240ff069adddff8d20a322df985633e",
+    "805deeca7ff7917b731f65be7089b959776cb8c9",
+    "3caa9e0e415ef7f882ae142cb56cb29195182e4f"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/decoder.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/decoder.sv": [
+      [
+        186,
+        191
+      ],
+      [
+        192,
+        197
+      ],
+      [
+        192,
+        197
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/openhwgroup.ariane_2803.raw.diff"
+}

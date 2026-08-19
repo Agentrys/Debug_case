@@ -1,0 +1,64 @@
+{
+  "case_id": "ucb-bar.chipyard#20",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_oid": "7ad088503f1080962561bee5e4ce954af7330888",
+  "buggy_commit_sha": "a13869b6aa5b0c5da00d974c4de7229ad400834a",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/ucb-bar.chipyard_20.diff",
+  "diff_sha256": "2679d19529181d0146a77876724fb0a3b9bb5af002c92c34bd965b2f2360e4e5",
+  "fix_oids_sorted": [
+    "7ad088503f1080962561bee5e4ce954af7330888",
+    "5b5c8c82db910a9a3222aa53cd006b58b334df3a",
+    "eaff48e312c6d10803b6b94f6b3f0863d11b4af1"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "tapeout/src/main/scala/transforms/AnalogAnnotation.scala",
+    "tapeout/src/main/scala/transforms/Generate.scala"
+  ],
+  "ground_truth_hunks": {
+    "tapeout/src/main/scala/transforms/AnalogAnnotation.scala": [
+      [
+        0,
+        0
+      ]
+    ],
+    "tapeout/src/main/scala/transforms/Generate.scala": [
+      [
+        110,
+        115
+      ],
+      [
+        151,
+        162
+      ],
+      [
+        1,
+        81
+      ],
+      [
+        110,
+        116
+      ],
+      [
+        152,
+        179
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "src/main/scala/example/PWM.scala"
+  ],
+  "raw_diff_path": "ground_truth/ucb-bar.chipyard_20.raw.diff"
+}

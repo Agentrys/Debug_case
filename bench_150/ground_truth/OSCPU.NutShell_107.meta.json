@@ -1,0 +1,62 @@
+{
+  "case_id": "OSCPU.NutShell#107",
+  "issue_repo": {
+    "owner": "OSCPU",
+    "name": "NutShell"
+  },
+  "fix_repo": {
+    "owner": "Jiayuah",
+    "name": "NutShell"
+  },
+  "fix_oid": "0fead6eb1a371ba74b52a1ed4b8170777056157a",
+  "buggy_commit_sha": "d5de419c1195eb2243cc500613196c13179902db",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/OSCPU.NutShell_107.diff",
+  "diff_sha256": "b929244516bd138ee51e3e7235819296e57f17e0b79de9bd6ac0e2760b3a9699",
+  "fix_oids_sorted": [
+    "0fead6eb1a371ba74b52a1ed4b8170777056157a"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/huancun/BaseDirectory.scala",
+    "src/main/scala/huancun/DataStorage.scala",
+    "src/main/scala/huancun/noninclusive/Directory.scala",
+    "src/main/scala/huancun/utils/SRAMWrapper.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/huancun/BaseDirectory.scala": [
+      [
+        106,
+        112
+      ],
+      [
+        225,
+        231
+      ]
+    ],
+    "src/main/scala/huancun/DataStorage.scala": [
+      [
+        165,
+        171
+      ]
+    ],
+    "src/main/scala/huancun/noninclusive/Directory.scala": [
+      [
+        251,
+        257
+      ]
+    ],
+    "src/main/scala/huancun/utils/SRAMWrapper.scala": [
+      [
+        42,
+        48
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/OSCPU.NutShell_107.raw.diff"
+}

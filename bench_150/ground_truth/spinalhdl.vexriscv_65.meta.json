@@ -1,0 +1,41 @@
+{
+  "case_id": "spinalhdl.vexriscv#65",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "VexRiscv"
+  },
+  "fix_repo": {
+    "owner": "SpinalHDL",
+    "name": "SpinalHDL"
+  },
+  "fix_oid": "94c4fefa808cd21a502f0ba43b4865eda6f72119",
+  "buggy_commit_sha": "682fba30414384f3bbaabd693457267024a5d4d2",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.vexriscv_65.diff",
+  "diff_sha256": "175a2da0c9518a5ae129c5ebcfc33449fe7c5129c1e01ebd3af235358d53379f",
+  "fix_oids_sorted": [
+    "94c4fefa808cd21a502f0ba43b4865eda6f72119"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "lib/src/main/scala/spinal/lib/com/jtag/JtagTap.scala"
+  ],
+  "ground_truth_hunks": {
+    "lib/src/main/scala/spinal/lib/com/jtag/JtagTap.scala": [
+      [
+        62,
+        83
+      ],
+      [
+        92,
+        98
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.vexriscv_65.raw.diff"
+}

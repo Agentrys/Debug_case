@@ -1,0 +1,54 @@
+{
+  "case_id": "openrisc.mor1kx#69",
+  "issue_repo": {
+    "owner": "openrisc",
+    "name": "mor1kx"
+  },
+  "fix_repo": {
+    "owner": "stffrdhrn",
+    "name": "mor1kx"
+  },
+  "fix_oid": "2344bae2928f3deac3d35f1d0cc0a93b025bf365",
+  "buggy_commit_sha": "75a7b90662089be4bbe3395cc082b0844057f87e",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/openrisc.mor1kx_69.diff",
+  "diff_sha256": "6ca1df6e5bc34833ae451decfa026d40ebfc7e06fea7432ada9aabb8700ece83",
+  "fix_oids_sorted": [
+    "2344bae2928f3deac3d35f1d0cc0a93b025bf365",
+    "71f10d27b9d6b7c99c3c6e406e2473f00abfdca1",
+    "cdd25435edcdb0276af632e0c26ea575ed3e2047"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "rtl/verilog/mor1kx_utils.vh",
+    "rtl/verilog/mor1kx_rf_cappuccino.v"
+  ],
+  "ground_truth_hunks": {
+    "rtl/verilog/mor1kx_utils.vh": [
+      [
+        99,
+        105
+      ],
+      [
+        99,
+        105
+      ],
+      [
+        99,
+        106
+      ]
+    ],
+    "rtl/verilog/mor1kx_rf_cappuccino.v": [
+      [
+        272,
+        285
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/openrisc.mor1kx_69.raw.diff"
+}

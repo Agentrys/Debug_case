@@ -1,0 +1,73 @@
+{
+  "case_id": "ucb-bar.chipyard#86",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_oid": "e6e1ed85f22d2ff27fef5a743c641db6954332c6",
+  "buggy_commit_sha": "f791073f0277a841209c26242bda61aae4c8ea7b",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_86.diff",
+  "diff_sha256": "0b2157228f9e2d438ca227e0352b7d73cdb96b428cfd9cebb5c91ae30c2df3b5",
+  "fix_oids_sorted": [
+    "e6e1ed85f22d2ff27fef5a743c641db6954332c6"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "iocell/src/main/scala/chisel/IOCell.scala"
+  ],
+  "ground_truth_hunks": {
+    "iocell/src/main/scala/chisel/IOCell.scala": [
+      [
+        4,
+        10
+      ],
+      [
+        63,
+        138
+      ],
+      [
+        142,
+        150
+      ],
+      [
+        153,
+        161
+      ],
+      [
+        165,
+        171
+      ],
+      [
+        173,
+        179
+      ],
+      [
+        193,
+        199
+      ],
+      [
+        215,
+        221
+      ],
+      [
+        230,
+        236
+      ],
+      [
+        251,
+        264
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_86.raw.diff"
+}

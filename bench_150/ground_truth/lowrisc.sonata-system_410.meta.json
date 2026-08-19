@@ -1,0 +1,31 @@
+{
+  "case_id": "lowrisc.sonata-system#410",
+  "issue_repo": {
+    "owner": "lowRISC",
+    "name": "sonata-system"
+  },
+  "fix_repo": {
+    "owner": "CHERIoT-Platform",
+    "name": "cheriot-rtos"
+  },
+  "fix_oid": "5a5c04c507161f6cceccb78a48083c073928e830",
+  "buggy_commit_sha": "7a371601a941cb57f150ef257d57a22aae972bd9",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/lowrisc.sonata-system_410.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "5a5c04c507161f6cceccb78a48083c073928e830",
+    "99e34812826ddcab9afa75e6b521224e65f1acb4"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "sdk/include/platform/sunburst/platform-ethernet.hh"
+  ],
+  "raw_diff_path": "ground_truth/lowrisc.sonata-system_410.raw.diff"
+}

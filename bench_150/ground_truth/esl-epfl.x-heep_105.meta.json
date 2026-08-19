@@ -1,0 +1,272 @@
+{
+  "case_id": "esl-epfl.x-heep#105",
+  "issue_repo": {
+    "owner": "x-heep",
+    "name": "x-heep"
+  },
+  "fix_repo": {
+    "owner": "davideschiavone",
+    "name": "x-heep"
+  },
+  "fix_oid": "446d6caea9935465d6961393cfcc2402ef3e02b4",
+  "buggy_commit_sha": "1ef7d4be16445f745aada490a4663a45df490686",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/esl-epfl.x-heep_105.diff",
+  "diff_sha256": "87b36f32d7563f1a52429a1ae28e3ddab78ba468e5ad6725828642396bc5c2d3",
+  "fix_oids_sorted": [
+    "446d6caea9935465d6961393cfcc2402ef3e02b4",
+    "a819a2d0902918eb3409c4447a8ebaec4bdec154"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "hw/core-v-mini-mcu/ao_peripheral_subsystem.sv",
+    "hw/core-v-mini-mcu/core_v_mini_mcu.sv",
+    "hw/core-v-mini-mcu/cpu_subsystem.sv",
+    "hw/core-v-mini-mcu/memory_subsystem.sv",
+    "hw/core-v-mini-mcu/peripheral_subsystem.sv",
+    "hw/core-v-mini-mcu/system_bus.sv",
+    "hw/ip/boot_rom/boot_rom.sv",
+    "hw/ip/dma/rtl/dma.sv",
+    "hw/ip/power_manager/rtl/power_manager.sv",
+    "hw/ip/power_manager/rtl/power_manager_counter_sequence.sv",
+    "hw/ip/power_manager/rtl/power_manager_reg_pkg.sv",
+    "hw/ip/power_manager/rtl/power_manager_reg_top.sv",
+    "hw/ip/power_manager/rtl/reg_to_counter.sv",
+    "hw/ip/soc_ctrl/rtl/soc_ctrl.sv"
+  ],
+  "ground_truth_hunks": {
+    "hw/core-v-mini-mcu/ao_peripheral_subsystem.sv": [
+      [
+        0,
+        0
+      ]
+    ],
+    "hw/core-v-mini-mcu/core_v_mini_mcu.sv": [
+      [
+        14,
+        44
+      ],
+      [
+        46,
+        53
+      ],
+      [
+        60,
+        66
+      ],
+      [
+        72,
+        91
+      ],
+      [
+        108,
+        131
+      ],
+      [
+        133,
+        194
+      ],
+      [
+        202,
+        234
+      ],
+      [
+        236,
+        266
+      ],
+      [
+        273,
+        279
+      ],
+      [
+        305,
+        323
+      ]
+    ],
+    "hw/core-v-mini-mcu/cpu_subsystem.sv": [
+      [
+        7,
+        13
+      ],
+      [
+        32,
+        39
+      ],
+      [
+        64,
+        70
+      ],
+      [
+        118,
+        124
+      ]
+    ],
+    "hw/core-v-mini-mcu/memory_subsystem.sv": [
+      [
+        51,
+        57
+      ],
+      [
+        71,
+        76
+      ]
+    ],
+    "hw/core-v-mini-mcu/peripheral_subsystem.sv": [
+      [
+        11,
+        61
+      ],
+      [
+        64,
+        74
+      ],
+      [
+        78,
+        85
+      ],
+      [
+        87,
+        101
+      ],
+      [
+        104,
+        118
+      ],
+      [
+        160,
+        167
+      ],
+      [
+        197,
+        204
+      ],
+      [
+        212,
+        218
+      ],
+      [
+        225,
+        230
+      ],
+      [
+        250,
+        303
+      ],
+      [
+        352,
+        405
+      ]
+    ],
+    "hw/core-v-mini-mcu/system_bus.sv": [
+      [
+        12,
+        18
+      ],
+      [
+        52,
+        74
+      ],
+      [
+        96,
+        117
+      ]
+    ],
+    "hw/ip/boot_rom/boot_rom.sv": [
+      [
+        21,
+        27
+      ],
+      [
+        29,
+        45
+      ]
+    ],
+    "hw/ip/dma/rtl/dma.sv": [
+      [
+        190,
+        196
+      ],
+      [
+        231,
+        237
+      ],
+      [
+        276,
+        279
+      ]
+    ],
+    "hw/ip/power_manager/rtl/power_manager.sv": [
+      [
+        0,
+        0
+      ]
+    ],
+    "hw/ip/power_manager/rtl/power_manager_counter_sequence.sv": [
+      [
+        0,
+        0
+      ]
+    ],
+    "hw/ip/power_manager/rtl/power_manager_reg_pkg.sv": [
+      [
+        0,
+        0
+      ]
+    ],
+    "hw/ip/power_manager/rtl/power_manager_reg_top.sv": [
+      [
+        0,
+        0
+      ]
+    ],
+    "hw/ip/power_manager/rtl/reg_to_counter.sv": [
+      [
+        0,
+        0
+      ]
+    ],
+    "hw/ip/soc_ctrl/rtl/soc_ctrl.sv": [
+      [
+        8,
+        25
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "sw/linker/link_spiflash.ld",
+    "Makefile",
+    "README.md",
+    "core-v-mini-mcu.core",
+    "core-v-mini-mcu.upf",
+    "hw/core-v-mini-mcu/include/core_v_mini_mcu_pkg.sv.tpl",
+    "hw/ip/boot_rom/boot_rom.S",
+    "hw/ip/boot_rom/boot_rom.dump",
+    "hw/ip/boot_rom/boot_rom.h",
+    "hw/ip/power_manager/data/power_manager.hjson",
+    "hw/ip/power_manager/power_manager.core",
+    "hw/ip/power_manager/power_manager.vlt",
+    "hw/ip/power_manager/power_manager_gen.sh",
+    "hw/vendor/openhwgroup_cv32e20/cve2.core",
+    "hw/vendor/openhwgroup_cv32e40p.core",
+    "hw/vendor/openhwgroup_cve2.vendor.hjson",
+    "hw/vendor/patches/openhwgroup_cv32e20/cve2_core.patch",
+    "hw/vendor/pulp_platform_tech_cells_generic.core",
+    "mcu_cfg.hjson",
+    "scripts/sim/modelsim/patch_modelsim_Makefile.py",
+    "scripts/sim/modelsim/post_build_modelsim_vopt.sh",
+    "sw/Makefile",
+    "sw/applications/example_power_gating_core/example_power_gating_core.c",
+    "sw/device/lib/drivers/power_manager/power_manager.c",
+    "sw/device/lib/drivers/power_manager/power_manager.h",
+    "sw/device/lib/drivers/power_manager/power_manager_regs.h",
+    "sw/device/lib/runtime/core_v_mini_mcu.h.tpl",
+    "tb/tb_util.svh",
+    "tb/testharness.sv",
+    "util/mcu_gen.py"
+  ],
+  "raw_diff_path": "ground_truth/esl-epfl.x-heep_105.raw.diff"
+}

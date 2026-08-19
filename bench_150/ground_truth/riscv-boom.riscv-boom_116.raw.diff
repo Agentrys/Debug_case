@@ -1,0 +1,232 @@
+diff --git a/.circleci/check-commit.sh b/.circleci/check-commit.sh
+index 630bbd08..a282ebfd 100755
+--- a/.circleci/check-commit.sh
++++ b/.circleci/check-commit.sh
+@@ -13,6 +13,7 @@ source $SCRIPT_DIR/defaults.sh
+ cd $LOCAL_CHIPYARD_DIR
+ 
+ # initialize submodules and get the hashes
++git config submodule.vlsi/hammer-cad-plugins.update none
+ git submodule update --init
+ status=$(git submodule status)
+ 
+diff --git a/.gitmodules b/.gitmodules
+index ca80d661..9729ae2e 100644
+--- a/.gitmodules
++++ b/.gitmodules
+@@ -40,3 +40,10 @@
+ [submodule "generators/block-inclusivecache-sifive"]
+ 	path = generators/sifive-cache
+ 	url = https://github.com/sifive/block-inclusivecache-sifive.git
++[submodule "vlsi/hammer"]
++	path = vlsi/hammer
++	url = git@github.com:ucb-bar/hammer.git
++[submodule "vlsi/hammer-cad-plugins"]
++	path = vlsi/hammer-cad-plugins
++	url = git@github.com:ucb-bar/hammer-cad-plugins
++
+diff --git a/scripts/init-submodules-no-riscv-tools.sh b/scripts/init-submodules-no-riscv-tools.sh
+index 8bf6b300..99b1b497 100755
+--- a/scripts/init-submodules-no-riscv-tools.sh
++++ b/scripts/init-submodules-no-riscv-tools.sh
+@@ -16,6 +16,8 @@ git config --global submodule.esp-tools.update none
+ git config --global submodule.experimental-blocks.update none
+ # Disable updates to the FireSim submodule until explicitly requested
+ git config submodule.sims/firesim.update none
++# Disable updates to the hammer-cad-plugins repo
++git config submodule.vlsi/hammer-cad-plugins.update none
+ git submodule update --init --recursive #--jobs 8
+ # unignore riscv-tools,catapult-shell2 globally
+ git config --global --unset submodule.riscv-tools.update
+diff --git a/vlsi/.gitignore b/vlsi/.gitignore
+new file mode 100644
+index 00000000..4cbcfe8f
+--- /dev/null
++++ b/vlsi/.gitignore
+@@ -0,0 +1,6 @@
++inputs.yml
++__pycache__
++hammer*.log
++build
++src/test/output-*.json
++generated-src
+\ No newline at end of file
+diff --git a/vlsi/Makefile b/vlsi/Makefile
+new file mode 100644
+index 00000000..7dc797c6
+--- /dev/null
++++ b/vlsi/Makefile
+@@ -0,0 +1,122 @@
++#########################################################################################
++# vlsi makefile
++#########################################################################################
++
++#########################################################################################
++# general path variables
++#########################################################################################
++base_dir=$(abspath ..)
++vlsi_dir=$(abspath .)
++sim_dir=$(abspath .)
++
++#########################################################################################
++# include shared variables
++#########################################################################################
++include $(base_dir)/variables.mk
++
++#########################################################################################
++# import other necessary rules and variables
++#########################################################################################
++include $(base_dir)/common.mk
++
++#########################################################################################
++# vlsi types and rules
++#########################################################################################
++
++#sim_name is unused, but GenerateSimFiles expects it
++sim_name     ?= vcs
++tech_name    ?= 
++tech_dir     ?= $(vlsi_dir)/hammer-$(tech_name)-plugin/$(tech_name)
++SMEMS_COMP   ?= $(tech_dir)/sram-compiler.json
++SMEMS_HAMMER ?= $(build_dir)/$(long_name).mems.hammer.json
++MACROCOMPILER_MODE ?= -l $(SMEMS_COMP) --use-compiler -hir $(SMEMS_HAMMER)
++OBJ_DIR      ?= $(vlsi_dir)/build
++ENV_YML      ?= $(vlsi_dir)/bwrc-env.yml
++INPUT_CONFS  ?= example.yml $(dir $(tech_dir))/bwrc.yml
++HAMMER_EXEC  ?= ./example-vlsi
++
++ROCKET_SRC_DIR=$(ROCKETCHIP_DIR)/src/main/resources/vsrc
++
++ROCKET_SRCS = \
++	$(ROCKET_SRC_DIR)/ClockDivider2.v \
++	$(ROCKET_SRC_DIR)/ClockDivider3.v \
++	$(ROCKET_SRC_DIR)/AsyncResetReg.v \
++	$(ROCKET_SRC_DIR)/plusarg_reader.v \
++	$(ROCKET_SRC_DIR)/EICG_wrapper.v \
++
++ALL_RTL = $(ROCKET_SRCS) $(VERILOG_FILE) $(SMEMS_FILE)
++
++CLOCK_DOMAINS = $(build_dir)/$(long_name).domains
++
++.PHONY: default
++default: all
++
++all: drc lvs
++
++
++###################################################### SYN ############################################################
++
++SYNTH_CONF = $(OBJ_DIR)/inputs.yml
++
++$(SYNTH_CONF):
++	mkdir -p $(dir $@)
++	echo "synthesis.inputs:" > $@
++	echo "  top_module: $(TOP)" >> $@
++	echo "  input_files:" >> $@
++	for x in $(ALL_RTL); do \
++		echo '    - "'$$x'"' >> $@; \
++	done
++
++GENERATED_CONFS=$(SYNTH_CONF) $(SRAM_CONF)
++
++.PHONY: syn synthesis
++syn: $(OBJ_DIR)/syn-rundir/$(TOP).mapped.v
++synthesis: syn
++
++$(OBJ_DIR)/syn-rundir/$(TOP).mapped.v $(OBJ_DIR)/syn-rundir/syn-output.json: $(ENV_YML) $(INPUT_CONFS) $(GENERATED_CONFS) $(ALL_RTL)
++	mkdir -p $(dir $@)
++	$(HAMMER_EXEC) -e $(ENV_YML) $(foreach x,$(INPUT_CONFS) $(GENERATED_CONFS), -p $(x)) --obj_dir $(OBJ_DIR) syn
++
++$(OBJ_DIR)/par-input.json: $(OBJ_DIR)/syn-rundir/syn-output.json
++	mkdir -p $(dir $@)
++	$(HAMMER_EXEC) -e $(ENV_YML) $(foreach x,$(INPUT_CONFS) $<, -p $(x)) -o $@ syn_to_par
++
++###################################################### PAR ############################################################
++
++.PHONY: par place-and-route
++par: $(OBJ_DIR)/par-rundir/$(TOP).gds
++place-and-route: par
++
++$(OBJ_DIR)/par-rundir/$(TOP).gds $(OBJ_DIR)/par-rundir/par-output.json: $(OBJ_DIR)/par-input.json $(OBJ_DIR)/syn-rundir/$(TOP).mapped.v
++	mkdir -p $(dir $@)
++	$(HAMMER_EXEC) -e $(ENV_YML) -p $< --obj_dir $(OBJ_DIR) par
++
++$(OBJ_DIR)/drc-input.json: $(OBJ_DIR)/par-input.json $(OBJ_DIR)/par-rundir/par-output.json
++	mkdir -p $(dir $@)
++	$(HAMMER_EXEC) -e $(ENV_YML) $(foreach x,$^, -p $(x)) -o $@ --obj_dir $(OBJ_DIR) par_to_drc
++
++###################################################### DRC ############################################################
++# TODO unimplemented
++.PHONY: drc
++drc: $(OBJ_DIR)/drc-rundir/drc_results.db
++
++$(OBJ_DIR)/drc-rundir/drc_results.db: $(OBJ_DIR)/drc-input.json $(OBJ_DIR)/par-rundir/$(TOP).gds
++	mkdir -p $(dir $@)
++	$(HAMMER_EXEC) -e $(ENV_YML) -p $< --obj_dir $(OBJ_DIR) drc
++
++###################################################### LVS ############################################################
++# TODO unimplemented
++$(OBJ_DIR)/lvs-input.json: $(OBJ_DIR)/par-input.json $(OBJ_DIR)/par-rundir/par-output.json
++	mkdir -p $(dir $@)
++	$(HAMMER_EXEC) -e $(ENV_YML) $(foreach x,$^, -p $(x)) -o $@ --obj_dir $(OBJ_DIR) par_to_lvs
++
++.PHONY: lvs
++lvs: $(OBJ_DIR)/lvs-rundir/lvs_results.rpt
++
++$(OBJ_DIR)/lvs-rundir/lvs_results.rpt: $(OBJ_DIR)/lvs-input.json $(OBJ_DIR)/par-rundir/$(TOP).gds
++	mkdir -p $(dir $@)
++	$(HAMMER_EXEC) -e $(ENV_YML) -p $< --obj_dir $(OBJ_DIR) lvs
++
++.PHONY: clean
++clean:
++	rm -rf $(OBJ_DIR) hammer-vlsi*.log __pycache__ output.json $(GENERATED_CONFS) generated-src
+diff --git a/vlsi/README.md b/vlsi/README.md
+new file mode 100644
+index 00000000..d09fb5d8
+--- /dev/null
++++ b/vlsi/README.md
+@@ -0,0 +1,5 @@
++This is the starting point for a vlsi flow from this repository.
++
++This flow will not work without the necessary CAD and technology plugins for HAMMER.
++
++If you are a UCB-affiliate, you may be able to acquire access to the tech-plugins.
+\ No newline at end of file
+diff --git a/vlsi/example-vlsi b/vlsi/example-vlsi
+new file mode 100755
+index 00000000..3f65d9a5
+--- /dev/null
++++ b/vlsi/example-vlsi
+@@ -0,0 +1,19 @@
++#!/usr/bin/env python3
++
++import hammer_vlsi
++from hammer_vlsi import CLIDriver, HammerToolHookAction
++
++from typing import Dict, Callable, Optional, List
++
++def example_place_tap_cells(x: hammer_vlsi.HammerTool) -> bool:
++    x.append('''
++# TODO
++''')
++    return True
++
++class ExampleDriver(CLIDriver):
++    def get_extra_par_hooks(self) -> List[HammerToolHookAction]:
++        return [hammer_vlsi.HammerTool.make_replacement_hook("place_tap_cells", example_place_tap_cells)]
++
++if __name__ == '__main__':
++    ExampleDriver().main()
+diff --git a/vlsi/hammer b/vlsi/hammer
+new file mode 160000
+index 00000000..873b2c1a
+--- /dev/null
++++ b/vlsi/hammer
+@@ -0,0 +1 @@
++Subproject commit 873b2c1af0a54cb339a19a7c8cf3a1e7905feb58
+diff --git a/vlsi/hammer-cad-plugins b/vlsi/hammer-cad-plugins
+new file mode 160000
+index 00000000..72809f53
+--- /dev/null
++++ b/vlsi/hammer-cad-plugins
+@@ -0,0 +1 @@
++Subproject commit 72809f538c4bbe91c103de52e92baad9df6d8f9a

@@ -1,0 +1,121 @@
+diff --git a/litex/tools/litex_json2dts.py b/litex/tools/litex_json2dts.py
+index e9bb56c3..86700828 100755
+--- a/litex/tools/litex_json2dts.py
++++ b/litex/tools/litex_json2dts.py
+@@ -180,9 +180,12 @@ def generate_dts(d):
+                 device_type = "serial";
+                 compatible = "litex,liteuart";
+                 reg = <0x{uart_csr_base:x} 0x100>;
++                interrupts = <{uart_interrupt}>;
+                 status = "okay";
+             }};
+-""".format(uart_csr_base=d["csr_bases"]["uart"])
++""".format(
++    uart_csr_base = d["csr_bases"]["uart"],
++    uart_interrupt = d["constants"]["uart_interrupt"])
+ 
+     # Ethernet -------------------------------------------------------------------------------------
+ 
+@@ -195,13 +198,15 @@ def generate_dts(d):
+                       <0x{ethmac_mem_base:x} 0x2000>;
+                 tx-fifo-depth = <{ethmac_tx_slots}>;
+                 rx-fifo-depth = <{ethmac_rx_slots}>;
++                interrupts = <{ethmac_interrupt}>;
+             }};
+ """.format(
+     ethphy_csr_base = d["csr_bases"]["ethphy"],
+     ethmac_csr_base = d["csr_bases"]["ethmac"],
+     ethmac_mem_base = d["memories"]["ethmac"]["base"],
+     ethmac_tx_slots = d["constants"]["ethmac_tx_slots"],
+-    ethmac_rx_slots = d["constants"]["ethmac_rx_slots"])
++    ethmac_rx_slots = d["constants"]["ethmac_rx_slots"],
++    ethmac_interrupt = d["constants"]["ethmac_interrupt"])
+ 
+    # SPI Flash -------------------------------------------------------------------------------------
+ 
+diff --git a/litex/tools/litex_json2dts.py b/litex/tools/litex_json2dts.py
+index e9bb56c3..5f06db0b 100755
+--- a/litex/tools/litex_json2dts.py
++++ b/litex/tools/litex_json2dts.py
+@@ -133,6 +133,7 @@ def generate_dts(d):
+             bus-frequency  = <{sys_clk_freq}>;
+             compatible = "simple-bus";
+             ranges;
++            interrupt-parent = <&intc0>;
+ """.format(sys_clk_freq=d["constants"]["config_clock_frequency"])
+ 
+     # SoC Controller -------------------------------------------------------------------------------
+@@ -180,9 +181,12 @@ def generate_dts(d):
+                 device_type = "serial";
+                 compatible = "litex,liteuart";
+                 reg = <0x{uart_csr_base:x} 0x100>;
++                interrupts = <{uart_interrupt}>;
+                 status = "okay";
+             }};
+-""".format(uart_csr_base=d["csr_bases"]["uart"])
++""".format(
++    uart_csr_base = d["csr_bases"]["uart"],
++    uart_interrupt = d["constants"]["uart_interrupt"])
+ 
+     # Ethernet -------------------------------------------------------------------------------------
+ 
+@@ -195,13 +199,15 @@ def generate_dts(d):
+                       <0x{ethmac_mem_base:x} 0x2000>;
+                 tx-fifo-depth = <{ethmac_tx_slots}>;
+                 rx-fifo-depth = <{ethmac_rx_slots}>;
++                interrupts = <{ethmac_interrupt}>;
+             }};
+ """.format(
+     ethphy_csr_base = d["csr_bases"]["ethphy"],
+     ethmac_csr_base = d["csr_bases"]["ethmac"],
+     ethmac_mem_base = d["memories"]["ethmac"]["base"],
+     ethmac_tx_slots = d["constants"]["ethmac_tx_slots"],
+-    ethmac_rx_slots = d["constants"]["ethmac_rx_slots"])
++    ethmac_rx_slots = d["constants"]["ethmac_rx_slots"],
++    ethmac_interrupt = d["constants"]["ethmac_interrupt"])
+ 
+    # SPI Flash -------------------------------------------------------------------------------------
+ 
+diff --git a/litex/tools/litex_json2dts.py b/litex/tools/litex_json2dts.py
+index e9bb56c3..ee81a33a 100755
+--- a/litex/tools/litex_json2dts.py
++++ b/litex/tools/litex_json2dts.py
+@@ -28,6 +28,7 @@ def generate_dts(d):
+ / {
+         #address-cells = <1>;
+         #size-cells    = <1>;
++        interrupt-parent = <&intc0>;
+ 
+ """
+ 
+@@ -180,9 +181,12 @@ def generate_dts(d):
+                 device_type = "serial";
+                 compatible = "litex,liteuart";
+                 reg = <0x{uart_csr_base:x} 0x100>;
++                interrupts = <{uart_interrupt}>;
+                 status = "okay";
+             }};
+-""".format(uart_csr_base=d["csr_bases"]["uart"])
++""".format(
++    uart_csr_base = d["csr_bases"]["uart"],
++    uart_interrupt = d["constants"]["uart_interrupt"])
+ 
+     # Ethernet -------------------------------------------------------------------------------------
+ 
+@@ -195,13 +199,15 @@ def generate_dts(d):
+                       <0x{ethmac_mem_base:x} 0x2000>;
+                 tx-fifo-depth = <{ethmac_tx_slots}>;
+                 rx-fifo-depth = <{ethmac_rx_slots}>;
++                interrupts = <{ethmac_interrupt}>;
+             }};
+ """.format(
+     ethphy_csr_base = d["csr_bases"]["ethphy"],
+     ethmac_csr_base = d["csr_bases"]["ethmac"],
+     ethmac_mem_base = d["memories"]["ethmac"]["base"],
+     ethmac_tx_slots = d["constants"]["ethmac_tx_slots"],
+-    ethmac_rx_slots = d["constants"]["ethmac_rx_slots"])
++    ethmac_rx_slots = d["constants"]["ethmac_rx_slots"],
++    ethmac_interrupt = d["constants"]["ethmac_interrupt"])
+ 
+    # SPI Flash -------------------------------------------------------------------------------------
+ 

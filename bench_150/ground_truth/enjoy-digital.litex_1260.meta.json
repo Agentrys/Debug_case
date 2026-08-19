@@ -1,0 +1,31 @@
+{
+  "case_id": "enjoy-digital.litex#1260",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_oid": "de10ffc154a66c1798943f3070101d2825611061",
+  "buggy_commit_sha": "48b832b7e164e2db8079cf379857b5f2578469eb",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/enjoy-digital.litex_1260.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "de10ffc154a66c1798943f3070101d2825611061"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    ".github/workflows/ci.yml",
+    "test/test_integration.py"
+  ],
+  "raw_diff_path": "ground_truth/enjoy-digital.litex_1260.raw.diff"
+}

@@ -1,0 +1,162 @@
+diff --git a/litex/soc/integration/builder.py b/litex/soc/integration/builder.py
+index 7c4abcca..28b653a1 100644
+--- a/litex/soc/integration/builder.py
++++ b/litex/soc/integration/builder.py
+@@ -18,6 +18,8 @@ import subprocess
+ import struct
+ import shutil
+ 
++from packaging.version import Version
++
+ from litex import get_data_mod
+ from litex.gen import colorer
+ 
+@@ -253,20 +255,18 @@ class Builder:
+     def _check_meson(self):
+         # Check Meson install/version.
+         meson_present   = (shutil.which("meson") is not None)
+-        meson_version   = [0, 0, 0]
+-        meson_major_min = 0
+-        meson_minor_min = 59
++        meson_req = '0.59'
+         if meson_present:
+-            meson_version = subprocess.check_output(["meson", "-v"]).decode("utf-8").split(".")
+-        if (not meson_present):
++            meson_version = subprocess.check_output(["meson", "-v"]).decode("utf-8")
++            if not Version(meson_version) >= Version(meson_req):
++                msg = f"Meson version to old. Found: {meson_version}. Required: {meson_req}.\n"
++                msg += "Try updating with:\n"
++                msg += "- pip3 install -U meson.\n"
++                raise OSError(msg)
++        else:
+             msg = "Unable to find valid Meson build system, please install it with:\n"
+             msg += "- pip3 install meson.\n"
+             raise OSError(msg)
+-        if (int(meson_version[0]) < meson_major_min) or (int(meson_version[1]) < meson_minor_min):
+-            msg = f"Meson version to old. Found: {meson_version[0]}.{meson_version[1]}. Required: {meson_major_min}.{meson_minor_min}.\n"
+-            msg += "Try updating with:\n"
+-            msg += "- pip3 install -U meson.\n"
+-            raise OSError(msg)
+ 
+     def _prepare_rom_software(self):
+         # Create directories for all software packages.
+diff --git a/setup.py b/setup.py
+index fe8ba6bc..ca96eac5 100755
+--- a/setup.py
++++ b/setup.py
+@@ -15,6 +15,7 @@ setup(
+     license="BSD",
+     python_requires="~=3.6",
+     install_requires=[
++        "packaging",
+         "pyserial",
+         "requests",
+     ],
+diff --git a/litex/soc/integration/builder.py b/litex/soc/integration/builder.py
+index 7c4abcca..28b653a1 100644
+--- a/litex/soc/integration/builder.py
++++ b/litex/soc/integration/builder.py
+@@ -18,6 +18,8 @@ import subprocess
+ import struct
+ import shutil
+ 
++from packaging.version import Version
++
+ from litex import get_data_mod
+ from litex.gen import colorer
+ 
+@@ -253,20 +255,18 @@ class Builder:
+     def _check_meson(self):
+         # Check Meson install/version.
+         meson_present   = (shutil.which("meson") is not None)
+-        meson_version   = [0, 0, 0]
+-        meson_major_min = 0
+-        meson_minor_min = 59
++        meson_req = '0.59'
+         if meson_present:
+-            meson_version = subprocess.check_output(["meson", "-v"]).decode("utf-8").split(".")
+-        if (not meson_present):
++            meson_version = subprocess.check_output(["meson", "-v"]).decode("utf-8")
++            if not Version(meson_version) >= Version(meson_req):
++                msg = f"Meson version to old. Found: {meson_version}. Required: {meson_req}.\n"
++                msg += "Try updating with:\n"
++                msg += "- pip3 install -U meson.\n"
++                raise OSError(msg)
++        else:
+             msg = "Unable to find valid Meson build system, please install it with:\n"
+             msg += "- pip3 install meson.\n"
+             raise OSError(msg)
+-        if (int(meson_version[0]) < meson_major_min) or (int(meson_version[1]) < meson_minor_min):
+-            msg = f"Meson version to old. Found: {meson_version[0]}.{meson_version[1]}. Required: {meson_major_min}.{meson_minor_min}.\n"
+-            msg += "Try updating with:\n"
+-            msg += "- pip3 install -U meson.\n"
+-            raise OSError(msg)
+ 
+     def _prepare_rom_software(self):
+         # Create directories for all software packages.
+diff --git a/setup.py b/setup.py
+index fe8ba6bc..ca96eac5 100755
+--- a/setup.py
++++ b/setup.py
+@@ -15,6 +15,7 @@ setup(
+     license="BSD",
+     python_requires="~=3.6",
+     install_requires=[
++        "packaging",
+         "pyserial",
+         "requests",
+     ],
+diff --git a/litex/soc/integration/builder.py b/litex/soc/integration/builder.py
+index 2373552b..dd4216dd 100644
+--- a/litex/soc/integration/builder.py
++++ b/litex/soc/integration/builder.py
+@@ -18,6 +18,8 @@ import subprocess
+ import struct
+ import shutil
+ 
++from packaging.version import Version
++
+ from litex import get_data_mod
+ from litex.build.tools import write_to_file
+ from litex.soc.integration import export, soc_core
+@@ -249,20 +251,18 @@ class Builder:
+     def _check_meson(self):
+         # Check Meson install/version.
+         meson_present   = (shutil.which("meson") is not None)
+-        meson_version   = [0, 0, 0]
+-        meson_major_min = 0
+-        meson_minor_min = 59
++        meson_req = '0.59'
+         if meson_present:
+-            meson_version = subprocess.check_output(["meson", "-v"]).decode("utf-8").split(".")
+-        if (not meson_present):
++            meson_version = subprocess.check_output(["meson", "-v"]).decode("utf-8")
++            if not Version(meson_version) >= Version(meson_req):
++                msg = f"Meson version to old. Found: {meson_version}. Required: {meson_req}.\n"
++                msg += "Try updating with:\n"
++                msg += "- pip3 install -U meson.\n"
++                raise OSError(msg)
++        else:
+             msg = "Unable to find valid Meson build system, please install it with:\n"
+             msg += "- pip3 install meson.\n"
+             raise OSError(msg)
+-        if (int(meson_version[0]) < meson_major_min) or (int(meson_version[0]) == meson_major_min and int(meson_version[1]) < meson_minor_min):
+-            msg = f"Meson version to old. Found: {meson_version[0]}.{meson_version[1]}. Required: {meson_major_min}.{meson_minor_min}.\n"
+-            msg += "Try updating with:\n"
+-            msg += "- pip3 install -U meson.\n"
+-            raise OSError(msg)
+ 
+     def _prepare_rom_software(self):
+         # Create directories for all software packages.
+diff --git a/setup.py b/setup.py
+index fe8ba6bc..ca96eac5 100755
+--- a/setup.py
++++ b/setup.py
+@@ -15,6 +15,7 @@ setup(
+     license="BSD",
+     python_requires="~=3.6",
+     install_requires=[
++        "packaging",
+         "pyserial",
+         "requests",
+     ],

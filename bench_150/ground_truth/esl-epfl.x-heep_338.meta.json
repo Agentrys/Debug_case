@@ -1,0 +1,33 @@
+{
+  "case_id": "esl-epfl.x-heep#338",
+  "issue_repo": {
+    "owner": "x-heep",
+    "name": "x-heep"
+  },
+  "fix_repo": {
+    "owner": "davideschiavone",
+    "name": "x-heep"
+  },
+  "fix_oid": "54a29f3577a9ac38a6105afb1ceafa6be8a5e7ad",
+  "buggy_commit_sha": "8f2351053dd240d4e6a01ac90cfcd49fb78a747c",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/esl-epfl.x-heep_338.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "54a29f3577a9ac38a6105afb1ceafa6be8a5e7ad",
+    "312ec1ba11302d618129c3f8553a69c4408f53ab"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "sw/applications/example_dma/main.c",
+    "sw/applications/example_dma_external/main.c",
+    "sw/applications/example_gpio_intr/main.c"
+  ],
+  "raw_diff_path": "ground_truth/esl-epfl.x-heep_338.raw.diff"
+}

@@ -1,0 +1,89 @@
+diff --git a/litex/build/sim/core/veril.cpp b/litex/build/sim/core/veril.cpp
+index fd6f737c7..801b6e0a1 100644
+--- a/litex/build/sim/core/veril.cpp
++++ b/litex/build/sim/core/veril.cpp
+@@ -35,17 +35,26 @@ static bool finalized = false;
+ #if defined(__GNUC__) || defined(__clang__)
+ extern "C" void litex_sim_user_pre_eval(void *vsim, uint64_t time_ps) __attribute__((weak));
+ extern "C" void litex_sim_user_post_eval(void *vsim, uint64_t time_ps) __attribute__((weak));
++extern "C" void litex_sim_user_pre_eval(void *vsim, uint64_t time_ps)
++{
++  (void)vsim;
++  (void)time_ps;
++}
++
++extern "C" void litex_sim_user_post_eval(void *vsim, uint64_t time_ps)
++{
++  (void)vsim;
++  (void)time_ps;
++}
+ 
+ static void litex_sim_call_user_pre_eval(void *vsim, uint64_t time_ps)
+ {
+-  if (litex_sim_user_pre_eval != nullptr)
+-    litex_sim_user_pre_eval(vsim, time_ps);
++  litex_sim_user_pre_eval(vsim, time_ps);
+ }
+ 
+ static void litex_sim_call_user_post_eval(void *vsim, uint64_t time_ps)
+ {
+-  if (litex_sim_user_post_eval != nullptr)
+-    litex_sim_user_post_eval(vsim, time_ps);
++  litex_sim_user_post_eval(vsim, time_ps);
+ }
+ #else
+ static void litex_sim_call_user_pre_eval(void *vsim, uint64_t time_ps)
+diff --git a/litex/build/sim/verilator.py b/litex/build/sim/verilator.py
+index 8f7c6b7fc..2d025e9d0 100644
+--- a/litex/build/sim/verilator.py
++++ b/litex/build/sim/verilator.py
+@@ -129,10 +129,14 @@ def _generate_sim_cpp(platform, trace=False, trace_start=0, trace_end=-1,
+ extern "C" void litex_sim_init_runtime(long load_start, long save_start);
+ #if defined(__GNUC__) || defined(__clang__)
+ extern "C" void litex_sim_user_init(void *vsim) __attribute__((weak));
++extern "C" void litex_sim_user_init(void *vsim)
++{
++    (void)vsim;
++}
++
+ static void litex_sim_call_user_init(void *vsim)
+ {
+-    if (litex_sim_user_init != nullptr)
+-        litex_sim_user_init(vsim);
++    litex_sim_user_init(vsim);
+ }
+ #else
+ static void litex_sim_call_user_init(void *vsim)
+diff --git a/test/build/test_sim_verilator.py b/test/build/test_sim_verilator.py
+index 987369561..cd47461b7 100644
+--- a/test/build/test_sim_verilator.py
++++ b/test/build/test_sim_verilator.py
+@@ -9,6 +9,7 @@ import os
+ import signal
+ import subprocess
+ import unittest
++from pathlib import Path
+ from unittest import mock
+ 
+ from litex.build.sim.config import SimConfig
+@@ -67,6 +68,20 @@ class TestSimVerilatorUserHooks(unittest.TestCase):
+         content = write_to_file.call_args.args[1]
+         self.assertIn("litex_sim_user_init", content)
+         self.assertIn("litex_sim_call_user_init(sim);", content)
++        self.assertIn("extern \"C\" void litex_sim_user_init(void *vsim)", content)
++        self.assertIn("(void)vsim;", content)
++        self.assertIn("litex_sim_user_init(vsim);", content)
++        self.assertNotIn("litex_sim_user_init != nullptr", content)
++
++    def test_veril_cpp_defines_default_user_eval_hooks(self):
++        content = (Path(verilator.core_directory) / "veril.cpp").read_text()
++
++        self.assertIn("extern \"C\" void litex_sim_user_pre_eval", content)
++        self.assertIn("extern \"C\" void litex_sim_user_post_eval", content)
++        self.assertIn("litex_sim_user_pre_eval(vsim, time_ps);", content)
++        self.assertIn("litex_sim_user_post_eval(vsim, time_ps);", content)
++        self.assertNotIn("litex_sim_user_pre_eval != nullptr", content)
++        self.assertNotIn("litex_sim_user_post_eval != nullptr", content)
+ 
+     def test_generate_sim_variables_adds_extra_sources(self):
+         with mock.patch.object(verilator.tools, "write_to_file") as write_to_file:

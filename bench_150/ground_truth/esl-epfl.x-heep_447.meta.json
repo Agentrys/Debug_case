@@ -1,0 +1,39 @@
+{
+  "case_id": "esl-epfl.x-heep#447",
+  "issue_repo": {
+    "owner": "x-heep",
+    "name": "x-heep"
+  },
+  "fix_repo": {
+    "owner": "x-heep",
+    "name": "x-heep"
+  },
+  "fix_oid": "4e9edd2fc0e6ca9796961a419c164e4fadbf49fe",
+  "buggy_commit_sha": "50b823a7268b42eecdd3521eaf54b6c99c76ada5",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/esl-epfl.x-heep_447.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "4e9edd2fc0e6ca9796961a419c164e4fadbf49fe"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "Makefile",
+    "README.md",
+    "docs/source/How_to/ProgramFlash.md",
+    "sw/applications/example_spi_read/main.c",
+    "sw/applications/example_spi_write/buffer.h",
+    "sw/applications/example_spi_write/main.c",
+    "sw/device/bsp/w25q/w25q.c",
+    "sw/device/bsp/w25q/w25q128jw.h",
+    "sw/vendor/patches/yosyshq_icestorm/0001-Add-flash-prgraner-iceprog-custom-for-heep-with-gpio.patch",
+    "sw/vendor/yosyshq_icestorm/iceprog/iceprog.c"
+  ],
+  "raw_diff_path": "ground_truth/esl-epfl.x-heep_447.raw.diff"
+}

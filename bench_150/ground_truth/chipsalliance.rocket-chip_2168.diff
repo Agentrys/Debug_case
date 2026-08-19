@@ -1,0 +1,260 @@
+diff --git a/generated-src/freechips.rocketchip.system.LitexConfig.v b/generated-src/freechips.rocketchip.system.LitexConfig.v
+index 28e80d8..3e08f5b 100644
+--- a/generated-src/freechips.rocketchip.system.LitexConfig.v
++++ b/generated-src/freechips.rocketchip.system.LitexConfig.v
+@@ -94769,6 +94769,7 @@ module AsyncResetRegVec_w32_i0( // @[:freechips.rocketchip.system.LitexConfig.fi
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -94790,6 +94791,7 @@ initial begin
+     reg_ = 32'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 32'h0;
+@@ -94827,6 +94829,7 @@ module AsyncResetRegVec_w1_i0( // @[:freechips.rocketchip.system.LitexConfig.fir
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -94848,6 +94851,7 @@ initial begin
+     reg_ = 1'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 1'h0;
+@@ -141875,6 +141879,7 @@ module AsyncResetRegVec_w2_i0( // @[:freechips.rocketchip.system.LitexConfig.fir
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -141896,6 +141901,7 @@ initial begin
+     reg_ = 2'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 2'h0;
+diff --git a/generated-src/freechips.rocketchip.system.LitexFullConfig.v b/generated-src/freechips.rocketchip.system.LitexFullConfig.v
+index d224a01..bdd8fbe 100644
+--- a/generated-src/freechips.rocketchip.system.LitexFullConfig.v
++++ b/generated-src/freechips.rocketchip.system.LitexFullConfig.v
+@@ -94910,6 +94910,7 @@ module AsyncResetRegVec_w32_i0( // @[:freechips.rocketchip.system.LitexFullConfi
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -94931,6 +94932,7 @@ initial begin
+     reg_ = 32'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 32'h0;
+@@ -94968,6 +94970,7 @@ module AsyncResetRegVec_w1_i0( // @[:freechips.rocketchip.system.LitexFullConfig
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -94989,6 +94992,7 @@ initial begin
+     reg_ = 1'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 1'h0;
+@@ -182942,6 +182946,7 @@ module AsyncResetRegVec_w2_i0( // @[:freechips.rocketchip.system.LitexFullConfig
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -182963,6 +182968,7 @@ initial begin
+     reg_ = 2'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 2'h0;
+diff --git a/generated-src/freechips.rocketchip.system.LitexLinuxConfig.v b/generated-src/freechips.rocketchip.system.LitexLinuxConfig.v
+index 5fc25a1..6b68c9e 100644
+--- a/generated-src/freechips.rocketchip.system.LitexLinuxConfig.v
++++ b/generated-src/freechips.rocketchip.system.LitexLinuxConfig.v
+@@ -94910,6 +94910,7 @@ module AsyncResetRegVec_w32_i0( // @[:freechips.rocketchip.system.LitexLinuxConf
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -94931,6 +94932,7 @@ initial begin
+     reg_ = 32'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 32'h0;
+@@ -94968,6 +94970,7 @@ module AsyncResetRegVec_w1_i0( // @[:freechips.rocketchip.system.LitexLinuxConfi
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -94989,6 +94992,7 @@ initial begin
+     reg_ = 1'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 1'h0;
+@@ -152766,6 +152770,7 @@ module AsyncResetRegVec_w2_i0( // @[:freechips.rocketchip.system.LitexLinuxConfi
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -152787,6 +152792,7 @@ initial begin
+     reg_ = 2'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 2'h0;
+diff --git a/generated-src/freechips.rocketchip.system.LitexLinuxDWConfig.v b/generated-src/freechips.rocketchip.system.LitexLinuxDWConfig.v
+index 6d86be9..e735ce8 100644
+--- a/generated-src/freechips.rocketchip.system.LitexLinuxDWConfig.v
++++ b/generated-src/freechips.rocketchip.system.LitexLinuxDWConfig.v
+@@ -96541,6 +96541,7 @@ module AsyncResetRegVec_w32_i0( // @[:freechips.rocketchip.system.LitexLinuxDWCo
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -96562,6 +96563,7 @@ initial begin
+     reg_ = 32'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 32'h0;
+@@ -96599,6 +96601,7 @@ module AsyncResetRegVec_w1_i0( // @[:freechips.rocketchip.system.LitexLinuxDWCon
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -96620,6 +96623,7 @@ initial begin
+     reg_ = 1'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 1'h0;
+@@ -154397,6 +154401,7 @@ module AsyncResetRegVec_w2_i0( // @[:freechips.rocketchip.system.LitexLinuxDWCon
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -154418,6 +154423,7 @@ initial begin
+     reg_ = 2'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 2'h0;
+diff --git a/generated-src/freechips.rocketchip.system.LitexLinuxWConfig.v b/generated-src/freechips.rocketchip.system.LitexLinuxWConfig.v
+index bd00533..977ce54 100644
+--- a/generated-src/freechips.rocketchip.system.LitexLinuxWConfig.v
++++ b/generated-src/freechips.rocketchip.system.LitexLinuxWConfig.v
+@@ -95587,6 +95587,7 @@ module AsyncResetRegVec_w32_i0( // @[:freechips.rocketchip.system.LitexLinuxWCon
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -95608,6 +95609,7 @@ initial begin
+     reg_ = 32'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 32'h0;
+@@ -95645,6 +95647,7 @@ module AsyncResetRegVec_w1_i0( // @[:freechips.rocketchip.system.LitexLinuxWConf
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -95666,6 +95669,7 @@ initial begin
+     reg_ = 1'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 1'h0;
+@@ -153443,6 +153447,7 @@ module AsyncResetRegVec_w2_i0( // @[:freechips.rocketchip.system.LitexLinuxWConf
+ `ifdef RANDOMIZE_MEM_INIT
+   integer initvar;
+ `endif
++`ifndef SYNTHESIS
+ initial begin
+   `ifdef RANDOMIZE
+     `ifdef INIT_RANDOM
+@@ -153464,6 +153469,7 @@ initial begin
+     reg_ = 2'h0;
+   end
+ end
++`endif // SYNTHESIS
+   always @(posedge clock or posedge _T) begin
+     if (_T) begin
+       reg_ <= 2'h0;

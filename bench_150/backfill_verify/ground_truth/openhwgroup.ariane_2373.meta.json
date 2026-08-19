@@ -1,0 +1,37 @@
+{
+  "case_id": "openhwgroup.ariane#2373",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "Moschn",
+    "name": "ariane"
+  },
+  "fix_oid": "1e48237a7a2b0cbb678f6c011fba19b51f4393a1",
+  "buggy_commit_sha": "3deb95af21cd1dd3741f6c39caaca1b311758220",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_2373.diff",
+  "diff_sha256": "9ffc3281e385cb36a32365274a4609e691261d2896708288f919609f7dfc83ae",
+  "fix_oids_sorted": [
+    "1e48237a7a2b0cbb678f6c011fba19b51f4393a1"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/csr_regfile.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/csr_regfile.sv": [
+      [
+        2247,
+        2253
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_2373.raw.diff"
+}

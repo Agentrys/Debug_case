@@ -1,0 +1,42 @@
+{
+  "case_id": "pulp-platform.riscv-dbg#69",
+  "issue_repo": {
+    "owner": "pulp-platform",
+    "name": "riscv-dbg"
+  },
+  "fix_repo": {
+    "owner": "Silabs-ArjanB",
+    "name": "riscv-dbg"
+  },
+  "fix_oid": "c969384bbbf1bc30adb9d3377e5a20020ce3e51b",
+  "buggy_commit_sha": "f9cf9c40923151afe743fc06b2953731291eae17",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/pulp-platform.riscv-dbg_69.diff",
+  "diff_sha256": "6bd3c0bdc77488180b1e0989d7e20b9db8f9fed74bf1cede2cdeaabf7b2fd7f7",
+  "fix_oids_sorted": [
+    "c969384bbbf1bc30adb9d3377e5a20020ce3e51b",
+    "a4b343a56a1019ddf0f8db6f31a92cf4e3ff6ae2"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/dm_pkg.sv"
+  ],
+  "ground_truth_hunks": {
+    "src/dm_pkg.sv": [
+      [
+        62,
+        67
+      ],
+      [
+        62,
+        67
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/pulp-platform.riscv-dbg_69.raw.diff"
+}

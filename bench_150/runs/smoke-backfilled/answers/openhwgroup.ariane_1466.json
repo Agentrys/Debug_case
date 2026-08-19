@@ -1,0 +1,40 @@
+{
+  "case_id": "openhwgroup.ariane#1466",
+  "agent_answer": {
+    "root_cause": "stub agent: cannot analyse without an LLM.",
+    "localization": [
+      {
+        "file": "unknown",
+        "start_line": 1,
+        "end_line": 1
+      }
+    ],
+    "patch": "",
+    "confidence": 0.0,
+    "needs_waveform": true,
+    "unresolved_questions": [
+      "stub provider — no analysis performed"
+    ]
+  },
+  "policy_violation": null,
+  "termination": "submitted",
+  "tool_calls": 2,
+  "wall_clock_s": 0.001,
+  "provider": "stub",
+  "model": "stub-model",
+  "prompt_len": 2108,
+  "error": null,
+  "trace": [
+    {
+      "provider_step": 1,
+      "action": "list_dir",
+      "args": {
+        "path": "."
+      }
+    },
+    {
+      "provider_step": 2,
+      "action": "submit_answer"
+    }
+  ]
+}

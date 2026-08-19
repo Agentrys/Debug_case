@@ -1,0 +1,87 @@
+{
+  "case_id": "spinalhdl.naxriscv#68",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "NaxRiscv"
+  },
+  "fix_repo": {
+    "owner": "SpinalHDL",
+    "name": "NaxRiscv"
+  },
+  "fix_oid": "189a72f91ce906a972278df01df4b3cacae91751",
+  "buggy_commit_sha": "4cf12f6992ceca193ff378dde33e63e2fe7ea7b3",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.naxriscv_68.diff",
+  "diff_sha256": "5ac683318c656b952f24f52ad8fe1e131838c289f6ab7ea42dd021e71d888152",
+  "fix_oids_sorted": [
+    "189a72f91ce906a972278df01df4b3cacae91751"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/naxriscv/platform/NaxriscvProbe.scala",
+    "src/main/scala/naxriscv/platform/TilelinkNaxRiscvFiber.scala",
+    "src/main/scala/naxriscv/platform/tilelinkdemo/SocDemo.scala",
+    "src/main/scala/naxriscv/platform/tilelinkdemo/SocSim.scala",
+    "src/main/scala/spinal/lib/misc/Elf.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/naxriscv/platform/NaxriscvProbe.scala": [
+      [
+        154,
+        161
+      ]
+    ],
+    "src/main/scala/naxriscv/platform/TilelinkNaxRiscvFiber.scala": [
+      [
+        52,
+        58
+      ],
+      [
+        60,
+        66
+      ]
+    ],
+    "src/main/scala/naxriscv/platform/tilelinkdemo/SocDemo.scala": [
+      [
+        16,
+        24
+      ]
+    ],
+    "src/main/scala/naxriscv/platform/tilelinkdemo/SocSim.scala": [
+      [
+        56,
+        66
+      ],
+      [
+        81,
+        87
+      ],
+      [
+        185,
+        192
+      ]
+    ],
+    "src/main/scala/spinal/lib/misc/Elf.scala": [
+      [
+        6,
+        12
+      ],
+      [
+        35,
+        41
+      ],
+      [
+        85,
+        91
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "ext/SpinalHDL"
+  ],
+  "raw_diff_path": "ground_truth/spinalhdl.naxriscv_68.raw.diff"
+}

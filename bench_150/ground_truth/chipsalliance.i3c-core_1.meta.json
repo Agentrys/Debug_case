@@ -1,0 +1,30 @@
+{
+  "case_id": "chipsalliance.i3c-core#1",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "i3c-core"
+  },
+  "fix_repo": {
+    "owner": "tenstorrent",
+    "name": "tt-i3c-core"
+  },
+  "fix_oid": "2b7d5c5ad9bc556fa5b514a78c5d7f96aaa00a57",
+  "buggy_commit_sha": "fe92fac8be478d8b2496c4d8216da9f97ab0832f",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/chipsalliance.i3c-core_1.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "2b7d5c5ad9bc556fa5b514a78c5d7f96aaa00a57"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "Bender.yml"
+  ],
+  "raw_diff_path": "ground_truth/chipsalliance.i3c-core_1.raw.diff"
+}

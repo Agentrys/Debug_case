@@ -1,0 +1,14 @@
+diff --git a/tools/barstools b/tools/barstools
+index 5198b388..5fcae018 160000
+--- a/tools/barstools
++++ b/tools/barstools
+@@ -1 +1 @@
+-Subproject commit 5198b3883c8dfb744c24e7586eec5c9e80a8dd68
++Subproject commit 5fcae018256a5f9992ce95f514928b61a988c83b
+diff --git a/tools/barstools b/tools/barstools
+index 5198b388..63d74bc1 160000
+--- a/tools/barstools
++++ b/tools/barstools
+@@ -1 +1 @@
+-Subproject commit 5198b3883c8dfb744c24e7586eec5c9e80a8dd68
++Subproject commit 63d74bc177cb070126eb0e662ff0ea500722a8d7

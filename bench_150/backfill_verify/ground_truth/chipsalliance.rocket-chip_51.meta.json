@@ -1,0 +1,45 @@
+{
+  "case_id": "chipsalliance.rocket-chip#51",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "0adef3a29f41207f7a430513c9aa58d9323b44ab",
+  "buggy_commit_sha": "205f9213c31ee0ee8065ca73dcdb0b2187cf8b53",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_51.diff",
+  "diff_sha256": "2d915f347990a4e782a78791866ad2a17b671bef3e5746c7b7e9c3549d889699",
+  "fix_oids_sorted": [
+    "0adef3a29f41207f7a430513c9aa58d9323b44ab"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/regmapper/RegField.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/regmapper/RegField.scala": [
+      [
+        11,
+        16
+      ],
+      [
+        47,
+        56
+      ],
+      [
+        61,
+        66
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_51.raw.diff"
+}

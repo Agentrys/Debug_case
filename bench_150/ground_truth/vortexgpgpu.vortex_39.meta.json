@@ -1,0 +1,141 @@
+{
+  "case_id": "vortexgpgpu.vortex#39",
+  "issue_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_oid": "6c1044941b96e9ecaff48e353d9c3ee7cc1f7bad",
+  "buggy_commit_sha": "68ef0ede8047f4b9074cde7c5140edbf8f1dc251",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/vortexgpgpu.vortex_39.diff",
+  "diff_sha256": "11bfea0f94e48fbb704e71f453f4fb50c8bd6e30c8587cad202e2143a3fcd887",
+  "fix_oids_sorted": [
+    "6c1044941b96e9ecaff48e353d9c3ee7cc1f7bad"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "hw/rtl/raster_unit/VX_raster_be.sv",
+    "hw/rtl/raster_unit/VX_raster_qe.sv",
+    "hw/rtl/raster_unit/VX_raster_slice.sv",
+    "hw/rtl/raster_unit/VX_raster_te.sv",
+    "hw/rtl/raster_unit/VX_raster_unit.sv"
+  ],
+  "ground_truth_hunks": {
+    "hw/rtl/raster_unit/VX_raster_be.sv": [
+      [
+        41,
+        51
+      ],
+      [
+        63,
+        78
+      ],
+      [
+        81,
+        95
+      ],
+      [
+        102,
+        108
+      ],
+      [
+        116,
+        125
+      ],
+      [
+        149,
+        155
+      ]
+    ],
+    "hw/rtl/raster_unit/VX_raster_qe.sv": [
+      [
+        5,
+        10
+      ],
+      [
+        17,
+        41
+      ]
+    ],
+    "hw/rtl/raster_unit/VX_raster_slice.sv": [
+      [
+        50,
+        60
+      ],
+      [
+        72,
+        77
+      ],
+      [
+        107,
+        116
+      ],
+      [
+        133,
+        138
+      ],
+      [
+        144,
+        150
+      ],
+      [
+        154,
+        166
+      ],
+      [
+        216,
+        222
+      ],
+      [
+        232,
+        238
+      ],
+      [
+        247,
+        254
+      ],
+      [
+        297,
+        302
+      ]
+    ],
+    "hw/rtl/raster_unit/VX_raster_te.sv": [
+      [
+        11,
+        16
+      ],
+      [
+        28,
+        87
+      ],
+      [
+        89,
+        92
+      ]
+    ],
+    "hw/rtl/raster_unit/VX_raster_unit.sv": [
+      [
+        56,
+        61
+      ],
+      [
+        68,
+        77
+      ],
+      [
+        85,
+        99
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/vortexgpgpu.vortex_39.raw.diff"
+}

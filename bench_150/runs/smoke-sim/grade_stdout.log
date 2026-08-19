@@ -1,0 +1,37 @@
+{"case_id": "openhwgroup.ariane#1466", "score": 0.15, "file_loc": 0.0, "hunk_loc": 0.0, "patch_func": 0.3, "rationale": 0.3, "abstained": true, "sim_status": "no_patch", "sim_bonus": false, "policy_violation": null}
+{"case_id": "ucb-bar.chipyard#27", "score": 0.07, "file_loc": 0.0, "hunk_loc": 0.0, "patch_func": 0.1, "rationale": 0.3, "abstained": true, "sim_status": "no_patch", "sim_bonus": false, "policy_violation": null}
+── summary ──
+{
+  "n": 2,
+  "overall": 0.11,
+  "per_difficulty": {
+    "easy": {
+      "n": 2,
+      "mean": 0.11
+    }
+  },
+  "per_bug_type": {
+    "decode/ISA": {
+      "n": 1,
+      "weighted_mean": 0.15
+    },
+    "reset/clock": {
+      "n": 1,
+      "weighted_mean": 0.07
+    }
+  },
+  "localization_component_mean": 0.0,
+  "patch_functional_mean": 0.2,
+  "abstention": {
+    "count": 2,
+    "correct": 1,
+    "rate": 1.0,
+    "precision": 0.5
+  },
+  "simulation": {
+    "run": 2,
+    "passed": 0,
+    "bonus_applied": 0
+  },
+  "policy_violations": 0
+}

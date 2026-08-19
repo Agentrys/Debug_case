@@ -1,0 +1,86 @@
+diff --git a/hw/rtl/VX_cluster.sv b/hw/rtl/VX_cluster.sv
+index b03f8c522..6870e4960 100644
+--- a/hw/rtl/VX_cluster.sv
++++ b/hw/rtl/VX_cluster.sv
+@@ -70,7 +70,8 @@ module VX_cluster #(
+     VX_raster_unit #(
+         .CLUSTER_ID  (CLUSTER_ID),
+         .NUM_SLICES  (1),
+-        .RASTER_TILE_SIZE ((1 << `RASTER_TILE_LOGSIZE)),
++        .RASTER_TILE_SIZE (1 << `RASTER_TILE_LOGSIZE),
++        .RASTER_BLOCK_SIZE(1 << `RASTER_BLOCK_LOGSIZE),
+         .NUM_OUTPUTS (`NUM_THREADS)
+     ) raster_unit (
+         .clk           (clk),
+diff --git a/hw/rtl/raster_unit/VX_raster_be.sv b/hw/rtl/raster_unit/VX_raster_be.sv
+index db83891ba..e45f4e262 100644
+--- a/hw/rtl/raster_unit/VX_raster_be.sv
++++ b/hw/rtl/raster_unit/VX_raster_be.sv
+@@ -180,7 +180,7 @@ module VX_raster_be #(
+         if (pop) begin
+             for (int i = 0; i < RASTER_QUAD_OUTPUT_RATE; ++i) begin
+                 if (valid[i]) begin
+-                    dpi_trace(1, "raster-quad: %d: x_loc = %0d, y_loc = %0d, pid=%0d, mask=%d\nbcoords=%d %d %d %d, %d %d %d %d, %d %d %d %d\n", 
++                    dpi_trace(1, "raster-quad: %d: x_loc = %0d, y_loc = %0d, pid = %0d, mask = %0d, bcoords=%d %d %d %d, %d %d %d %d, %d %d %d %d\n",
+                         $time, out_quad_x_loc[i], out_quad_y_loc[i], out_pid[i], out_quad_masks[i],
+                         out_quad_bcoords[i][0][0], out_quad_bcoords[i][0][1], out_quad_bcoords[i][0][2], out_quad_bcoords[i][0][3],
+                         out_quad_bcoords[i][1][0], out_quad_bcoords[i][1][1], out_quad_bcoords[i][1][2], out_quad_bcoords[i][1][3],
+diff --git a/hw/rtl/raster_unit/VX_raster_svc.sv b/hw/rtl/raster_unit/VX_raster_svc.sv
+index 2a957e1b0..1bac2a6e0 100644
+--- a/hw/rtl/raster_unit/VX_raster_svc.sv
++++ b/hw/rtl/raster_unit/VX_raster_svc.sv
+@@ -65,4 +65,21 @@ module VX_raster_svc #(
+ 
+     assign raster_svc_rsp_if.eop  = 1'b1;
+ 
++
++`ifdef DBG_TRACE_CORE_PIPELINE
++    always @(posedge clk) begin
++        if (csr_write_enable) begin
++            for (integer i = 0; i < `NUM_THREADS; ++i) begin
++                dpi_trace(1, "raster-quad-csr-write: %d: empty=%b, x_loc = %0d, y_loc = %0d, pid = %0d, mask = %0d bcoords = %0d %0d %0d %0d, %0d %0d %0d %0d, %0d %0d %0d %0d\n", 
++                    $time, raster_req_if.empty,
++                    raster_req_if.stamps[i].pos_x,  raster_req_if.stamps[i].pos_y, raster_req_if.stamps[i].pid, raster_req_if.stamps[i].mask,
++                    raster_req_if.stamps[i].bcoord_x[0], raster_req_if.stamps[i].bcoord_x[1], raster_req_if.stamps[i].bcoord_x[2], raster_req_if.stamps[i].bcoord_x[3],
++                    raster_req_if.stamps[i].bcoord_y[0], raster_req_if.stamps[i].bcoord_y[1], raster_req_if.stamps[i].bcoord_y[2], raster_req_if.stamps[i].bcoord_y[3],
++                    raster_req_if.stamps[i].bcoord_z[0], raster_req_if.stamps[i].bcoord_z[1], raster_req_if.stamps[i].bcoord_z[2], raster_req_if.stamps[i].bcoord_z[3]
++                );
++            end
++        end
++    end
++`endif
++
+ endmodule
+\ No newline at end of file
+diff --git a/sim/simx/raster_unit.cpp b/sim/simx/raster_unit.cpp
+index 0c2115982..7d79d8aed 100644
+--- a/sim/simx/raster_unit.cpp
++++ b/sim/simx/raster_unit.cpp
+@@ -98,6 +98,14 @@ private:
+     uint32_t mask = 0;
+     std::array<vec3_fx_t, 4> bcoords;
+ 
++    fixed16_t zero(0);
++    for (int i = 0; i < 4; ++i)
++    {
++      bcoords[i].x = zero;
++      bcoords[i].y = zero;
++      bcoords[i].z = zero;
++    }
++
+     for (uint32_t j = 0; j < 2; ++j) {
+       auto ee0 = e0;
+       auto ee1 = e1;
+@@ -129,7 +137,11 @@ private:
+       // add stamp to queue
+       auto pos_x = x >> 1;
+       auto pos_y = y >> 1;
+-      // printf("*** raster-quad: x=%d, y=%d, mask=%d, pid=%d\n", pos_x, pos_y, mask, pid_);
++      // printf("raster-quad: x_loc = %d, y_loc = %d, pid = %d, mask=%d, bcoords = %d %d %d %d, %d %d %d %d, %d %d %d %d\n",
++      //   pos_x, pos_y, pid_, mask,
++      //   bcoords[0].x.data(), bcoords[1].x.data(), bcoords[2].x.data(), bcoords[3].x.data(),
++      //   bcoords[0].y.data(), bcoords[1].y.data(), bcoords[2].y.data(), bcoords[3].y.data(),
++      //   bcoords[0].z.data(), bcoords[1].z.data(), bcoords[2].z.data(), bcoords[3].z.data());
+       this->stamps_push(new RasterUnit::Stamp(pos_x, pos_y, mask, bcoords, pid_));
+     }
+   }

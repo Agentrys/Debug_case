@@ -1,0 +1,88 @@
+{
+  "case_id": "YosysHQ.picorv32#1",
+  "issue_repo": {
+    "owner": "YosysHQ",
+    "name": "picorv32"
+  },
+  "fix_repo": {
+    "owner": "YosysHQ",
+    "name": "picorv32"
+  },
+  "fix_oid": "9d13c05dd210252e540179c8f1d120c89a26289a",
+  "buggy_commit_sha": "72158ba4a589cf838b9c474798e4dce9315fa47c",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/YosysHQ.picorv32_1.diff",
+  "diff_sha256": "6d5ddc6b96e8edd78d81353a0d6e72621b312610915e6ac3d6ae7fbfa0fca968",
+  "fix_oids_sorted": [
+    "9d13c05dd210252e540179c8f1d120c89a26289a",
+    "82b44105a025cb611b4f641aebb1e585848a12a8"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "picorv32.v"
+  ],
+  "ground_truth_hunks": {
+    "picorv32.v": [
+      [
+        31,
+        38
+      ],
+      [
+        54,
+        59
+      ],
+      [
+        111,
+        117
+      ],
+      [
+        205,
+        211
+      ],
+      [
+        248,
+        255
+      ],
+      [
+        257,
+        263
+      ],
+      [
+        454,
+        517
+      ],
+      [
+        1668,
+        1679
+      ],
+      [
+        1820,
+        1825
+      ],
+      [
+        1923,
+        1928
+      ],
+      [
+        2030,
+        2035
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "Makefile",
+    "README.md",
+    "firmware/irq.c",
+    "scripts/smtbmc/.gitignore",
+    "scripts/smtbmc/notrap_validop.sh",
+    "scripts/smtbmc/notrap_validop.v",
+    "scripts/smtbmc/opcode.v",
+    "scripts/smtbmc/tracecmp.gtkw",
+    "scripts/smtbmc/tracecmp.sh"
+  ],
+  "raw_diff_path": "ground_truth/YosysHQ.picorv32_1.raw.diff"
+}

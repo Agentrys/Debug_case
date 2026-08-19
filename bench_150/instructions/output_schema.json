@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentrys/rtl-debug-150/output_schema.json",
+  "title": "RTL-Debug-150 agent answer",
+  "description": "The single JSON object the agent must return for one case. No prose outside this object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "root_cause",
+    "localization",
+    "patch",
+    "confidence",
+    "needs_waveform",
+    "unresolved_questions"
+  ],
+  "properties": {
+    "root_cause": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "description": "One-paragraph explanation of the bug in the voice of a commit message. Say what is wrong, where, and why the fix works. No apologies. No restating the question."
+    },
+    "localization": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "description": "Which file/line ranges the agent believes are the root cause. Multiple entries allowed if the fix genuinely spans several places.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "start_line", "end_line"],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Repo-root-relative POSIX path, e.g. src/main/scala/foo/Bar.scala or rtl/core/decode.v"
+          },
+          "start_line": {"type": "integer", "minimum": 1},
+          "end_line":   {"type": "integer", "minimum": 1},
+          "symbol": {
+            "type": "string",
+            "description": "Optional: module / signal / function name at that location."
+          }
+        }
+      }
+    },
+    "patch": {
+      "type": "string",
+      "description": "A unified diff (as produced by `git diff` / `diff -u`) that applies cleanly at the buggy commit. Empty string \"\" means the agent is abstaining (see needs_waveform / unresolved_questions).",
+      "maxLength": 40000
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "The agent's own probability that its patch is functionally correct. 0.0 = pure guess, 1.0 = certain. Used for calibration analysis, not for the headline score."
+    },
+    "needs_waveform": {
+      "type": "boolean",
+      "description": "True if the agent believes the root cause cannot be pinned down from source alone and requires a waveform / attached artifact / running simulation. Honest True is scored higher than a confidently wrong fix (see grading.md §Abstention)."
+    },
+    "unresolved_questions": {
+      "type": "array",
+      "maxItems": 10,
+      "description": "Specific things the agent could not verify from source (missing artifact, ambiguous spec, unclear timing). Free-form strings, one question per entry.",
+      "items": {"type": "string", "minLength": 1, "maxLength": 500}
+    }
+  }
+}

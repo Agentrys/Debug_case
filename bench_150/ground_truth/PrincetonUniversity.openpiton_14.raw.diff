@@ -1,0 +1,14 @@
+diff --git a/piton/design/chipset/meep-memtile b/piton/design/chipset/meep-memtile
+index f4e75bab..0d703425 160000
+--- a/piton/design/chipset/meep-memtile
++++ b/piton/design/chipset/meep-memtile
+@@ -1 +1 @@
+-Subproject commit f4e75bab095bc99f6dd75d0f84c692ab65488faf
++Subproject commit 0d703425ccb9b930cfd121daac2612ab5a92c824
+diff --git a/piton/design/chip/tile/sargantana b/piton/design/chip/tile/sargantana
+index efac0f9b..4731471e 160000
+--- a/piton/design/chip/tile/sargantana
++++ b/piton/design/chip/tile/sargantana
+@@ -1 +1 @@
+-Subproject commit efac0f9bc643a2f1db650bd55a02153ea61c88f4
++Subproject commit 4731471e1009bbd0adbcf9134dd60ec65abddbb8

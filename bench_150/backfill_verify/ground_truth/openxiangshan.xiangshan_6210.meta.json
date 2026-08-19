@@ -1,0 +1,69 @@
+{
+  "case_id": "openxiangshan.xiangshan#6210",
+  "issue_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_repo": {
+    "owner": "OpenXiangShan",
+    "name": "XiangShan"
+  },
+  "fix_oid": "ec493a5f649b0c7b7789a76915b3d99a85c29dfc",
+  "buggy_commit_sha": "f5b8e4a66c522dae9e6429b4480dd9f9b39b7c3d",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openxiangshan.xiangshan_6210.diff",
+  "diff_sha256": "17dd3b58d12491e2000481f6b9715c5c32abfd9a3216c4cbe21f2650fd1ab9fa",
+  "fix_oids_sorted": [
+    "ec493a5f649b0c7b7789a76915b3d99a85c29dfc",
+    "b0fed0e996949bd5e3b2df16109a9d765d67ca3f"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/xiangshan/Bundle.scala",
+    "src/main/scala/xiangshan/frontend/ftq/Ftq.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/xiangshan/Bundle.scala": [
+      [
+        228,
+        233
+      ],
+      [
+        228,
+        233
+      ]
+    ],
+    "src/main/scala/xiangshan/frontend/ftq/Ftq.scala": [
+      [
+        93,
+        105
+      ],
+      [
+        138,
+        157
+      ],
+      [
+        331,
+        343
+      ],
+      [
+        93,
+        105
+      ],
+      [
+        138,
+        157
+      ],
+      [
+        331,
+        343
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/openxiangshan.xiangshan_6210.raw.diff"
+}

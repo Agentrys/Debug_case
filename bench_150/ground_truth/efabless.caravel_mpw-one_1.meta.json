@@ -1,0 +1,31 @@
+{
+  "case_id": "efabless.caravel_mpw-one#1",
+  "issue_repo": {
+    "owner": "efabless",
+    "name": "caravel_mpw-one"
+  },
+  "fix_repo": {
+    "owner": "efabless",
+    "name": "caravel_mpw-one"
+  },
+  "fix_oid": "0893d0149699cdcc4052eb1d3b8c919e5faed4cb",
+  "buggy_commit_sha": "7f70d6fbfd455f2b8d8206e0bf3395bb1d92192e",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/efabless.caravel_mpw-one_1.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "0893d0149699cdcc4052eb1d3b8c919e5faed4cb"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "README.md",
+    "mpw-one-a.md"
+  ],
+  "raw_diff_path": "ground_truth/efabless.caravel_mpw-one_1.raw.diff"
+}

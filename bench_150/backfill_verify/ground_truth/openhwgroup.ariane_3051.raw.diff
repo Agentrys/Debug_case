@@ -1,0 +1,100 @@
+diff --git a/core/compressed_decoder.sv b/core/compressed_decoder.sv
+index 26c0289a..76385e5e 100644
+--- a/core/compressed_decoder.sv
++++ b/core/compressed_decoder.sv
+@@ -227,6 +227,7 @@ module compressed_decoder #(
+                     1'b0,
+                     riscv::OpcodeStore
+                   };
++                  if (instr_i[6] == 1'b1) illegal_instr_o = 1'b1;
+                 end
+ 
+                 default: begin
+diff --git a/core/compressed_decoder.sv b/core/compressed_decoder.sv
+index 26c0289a..76385e5e 100644
+--- a/core/compressed_decoder.sv
++++ b/core/compressed_decoder.sv
+@@ -227,6 +227,7 @@ module compressed_decoder #(
+                     1'b0,
+                     riscv::OpcodeStore
+                   };
++                  if (instr_i[6] == 1'b1) illegal_instr_o = 1'b1;
+                 end
+ 
+                 default: begin
+diff --git a/verif/env/corev-dv/cva6_unsupported_instr.sv b/verif/env/corev-dv/cva6_unsupported_instr.sv
+index fabd89fd..8e075d62 100644
+--- a/verif/env/corev-dv/cva6_unsupported_instr.sv
++++ b/verif/env/corev-dv/cva6_unsupported_instr.sv
+@@ -268,6 +268,15 @@ class cva6_unsupported_instr_c extends uvm_object;
+                  instr_bin[6:2] == 5'b0;
+                  instr_bin[12] == 1'b0;
+               }
++              if (c_msb == 3'b101) {
++                 if (instr_bin[12]) {
++                    !(instr_bin[11:8] inside {4'b1000, 4'b1010, 4'b1100, 4'b1110});
++                 }
++                 else {
++                    instr_bin[11:10] != 2'b11;
++                    !(instr_bin[6:5] inside {2'b01, 2'b11});
++                 }
++              }
+            }
+       }
+     }
+@@ -291,7 +300,10 @@ class cva6_unsupported_instr_c extends uvm_object;
+          c_op inside {2'b00, 2'b01};
+          c_msb == 3'b100;
+          if (c_op == 2'b00) {
+-            !(instr_bin[12:10] inside {3'b000, 3'b001, 3'b010, 3'b011});
++            !(instr_bin[12:10] inside {3'b000, 3'b001, 3'b010});
++            if (instr_bin[12:10] == 3'b011) {
++               instr_bin[6] == 1'b1;
++            }
+          }
+          if (c_op == 2'b01) {
+             instr_bin[12:10] == 3'b111;
+diff --git a/core/compressed_decoder.sv b/core/compressed_decoder.sv
+index 26c0289a..76385e5e 100644
+--- a/core/compressed_decoder.sv
++++ b/core/compressed_decoder.sv
+@@ -227,6 +227,7 @@ module compressed_decoder #(
+                     1'b0,
+                     riscv::OpcodeStore
+                   };
++                  if (instr_i[6] == 1'b1) illegal_instr_o = 1'b1;
+                 end
+ 
+                 default: begin
+diff --git a/verif/env/corev-dv/cva6_unsupported_instr.sv b/verif/env/corev-dv/cva6_unsupported_instr.sv
+index fabd89fd..8e075d62 100644
+--- a/verif/env/corev-dv/cva6_unsupported_instr.sv
++++ b/verif/env/corev-dv/cva6_unsupported_instr.sv
+@@ -268,6 +268,15 @@ class cva6_unsupported_instr_c extends uvm_object;
+                  instr_bin[6:2] == 5'b0;
+                  instr_bin[12] == 1'b0;
+               }
++              if (c_msb == 3'b101) {
++                 if (instr_bin[12]) {
++                    !(instr_bin[11:8] inside {4'b1000, 4'b1010, 4'b1100, 4'b1110});
++                 }
++                 else {
++                    instr_bin[11:10] != 2'b11;
++                    !(instr_bin[6:5] inside {2'b01, 2'b11});
++                 }
++              }
+            }
+       }
+     }
+@@ -291,7 +300,10 @@ class cva6_unsupported_instr_c extends uvm_object;
+          c_op inside {2'b00, 2'b01};
+          c_msb == 3'b100;
+          if (c_op == 2'b00) {
+-            !(instr_bin[12:10] inside {3'b000, 3'b001, 3'b010, 3'b011});
++            !(instr_bin[12:10] inside {3'b000, 3'b001, 3'b010});
++            if (instr_bin[12:10] == 3'b011) {
++               instr_bin[6] == 1'b1;
++            }
+          }
+          if (c_op == 2'b01) {
+             instr_bin[12:10] == 3'b111;

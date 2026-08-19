@@ -1,0 +1,2 @@
+{"case_id": "openhwgroup.ariane#1466", "status": "done", "started_at": "2026-08-19T03:58:33+00:00", "reason": null, "termination": "submitted", "tool_calls": 2, "wall_clock_s": 0.001, "policy_violation": null, "sim_status": "no_patch", "elapsed_s": 0.546}
+{"case_id": "ucb-bar.chipyard#27", "status": "done", "started_at": "2026-08-19T03:58:33+00:00", "reason": null, "termination": "submitted", "tool_calls": 2, "wall_clock_s": 0.001, "policy_violation": null, "sim_status": "no_patch", "elapsed_s": 0.068}

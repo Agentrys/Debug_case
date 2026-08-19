@@ -1,0 +1,15 @@
+diff --git a/rtl/cve2_cs_registers.sv b/rtl/cve2_cs_registers.sv
+index 1097adeb..34f30a6d 100644
+--- a/rtl/cve2_cs_registers.sv
++++ b/rtl/cve2_cs_registers.sv
+@@ -743,8 +743,8 @@ module cve2_cs_registers #(
+ 
+   // MSTATUS
+   localparam status_t MSTATUS_RST_VAL = '{mie:  1'b0,
+-                                          mpie: 1'b1,
+-                                          mpp:  PRIV_LVL_U,
++                                          mpie: 1'b0,
++                                          mpp:  PRIV_LVL_M,
+                                           mprv: 1'b0,
+                                           tw:   1'b0};
+   cve2_csr #(

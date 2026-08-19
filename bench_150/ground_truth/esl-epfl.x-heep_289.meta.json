@@ -1,0 +1,83 @@
+{
+  "case_id": "esl-epfl.x-heep#289",
+  "issue_repo": {
+    "owner": "x-heep",
+    "name": "x-heep"
+  },
+  "fix_repo": {
+    "owner": "davideschiavone",
+    "name": "x-heep"
+  },
+  "fix_oid": "9be20d143364376d485af5995902d585ba3b5d77",
+  "buggy_commit_sha": "9100136e3653b0b8f4fc30ea959477a3a5d3db92",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/esl-epfl.x-heep_289.diff",
+  "diff_sha256": "d40b92505caafe6a856b1103c80b9150af70cbe171d64665f441d706d794449a",
+  "fix_oids_sorted": [
+    "9be20d143364376d485af5995902d585ba3b5d77",
+    "9d46124df7b7b560ba744353b4fe7b4caf43a33f"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "hw/core-v-mini-mcu/core_v_mini_mcu.sv",
+    "hw/ip_examples/memcopy_periph/rtl/memcopy_periph.sv",
+    "hw/ip_examples/memcopy_periph/rtl/memcopy_periph_reg_pkg.sv",
+    "hw/ip_examples/memcopy_periph/rtl/memcopy_periph_reg_top.sv"
+  ],
+  "ground_truth_hunks": {
+    "hw/core-v-mini-mcu/core_v_mini_mcu.sv": [
+      [
+        271,
+        278
+      ],
+      [
+        1,
+        230
+      ],
+      [
+        1,
+        71
+      ],
+      [
+        1,
+        259
+      ],
+      [
+        271,
+        278
+      ],
+      [
+        1,
+        230
+      ],
+      [
+        1,
+        71
+      ],
+      [
+        1,
+        259
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "hw/core-v-mini-mcu/core_v_mini_mcu.sv.tpl",
+    "hw/ip_examples/memcopy_periph/data/memcopy_periph.hjson",
+    "hw/ip_examples/memcopy_periph/example_memcopy_periph.core",
+    "hw/ip_examples/memcopy_periph/memcopy_periph.vlt",
+    "hw/ip_examples/memcopy_periph/memcopy_periph_gen.sh",
+    "hw/ip_examples/memcopy_periph/memcopy_periph_regs.h",
+    "sw/applications/example_external_peripheral/main.c",
+    "sw/applications/example_external_peripheral/memcopy_periph.c",
+    "sw/applications/example_external_peripheral/memcopy_periph.h",
+    "sw/applications/example_external_peripheral/memcopy_periph_regs.h",
+    "tb/testharness.sv",
+    "tb/testharness_pkg.sv",
+    "x-heep-tb-utils.core"
+  ],
+  "raw_diff_path": "ground_truth/esl-epfl.x-heep_289.raw.diff"
+}

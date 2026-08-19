@@ -1,0 +1,51 @@
+{
+  "case_id": "riscv-boom.riscv-boom#37",
+  "issue_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_oid": "eebc0ddabd0213f490a851d622d8129de44eb5a3",
+  "buggy_commit_sha": "3eb9560e93b6491cac9e4b1fc7fba499c02ba340",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/riscv-boom.riscv-boom_37.diff",
+  "diff_sha256": "bb150e6105f6db6091cd3acdf61b08315cad6622958ddef298877ae11c9a3585",
+  "fix_oids_sorted": [
+    "eebc0ddabd0213f490a851d622d8129de44eb5a3",
+    "502cd7e8e79d08d03a44ba623841472a407c208e"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/core.scala",
+    "src/main/scala/decode.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/core.scala": [
+      [
+        362,
+        368
+      ]
+    ],
+    "src/main/scala/decode.scala": [
+      [
+        336,
+        355
+      ],
+      [
+        357,
+        363
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "README.md"
+  ],
+  "raw_diff_path": "ground_truth/riscv-boom.riscv-boom_37.raw.diff"
+}

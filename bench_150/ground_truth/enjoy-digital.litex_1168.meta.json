@@ -1,0 +1,35 @@
+{
+  "case_id": "enjoy-digital.litex#1168",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "troibe",
+    "name": "litex"
+  },
+  "fix_oid": "884ee45c289e1a1650937355c6356b3f64ee0c3a",
+  "buggy_commit_sha": "f565bec7f17a7f9d920776686e1bbdfd4161a845",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/enjoy-digital.litex_1168.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "884ee45c289e1a1650937355c6356b3f64ee0c3a"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/soc/cores/cpu/rocket/core.py",
+    "litex/soc/software/bios/Makefile",
+    "litex/soc/software/demo/Makefile",
+    "litex/soc/software/demo/isr.c",
+    "litex/soc/software/libbase/Makefile",
+    "litex/soc/software/libbase/isr.c"
+  ],
+  "raw_diff_path": "ground_truth/enjoy-digital.litex_1168.raw.diff"
+}

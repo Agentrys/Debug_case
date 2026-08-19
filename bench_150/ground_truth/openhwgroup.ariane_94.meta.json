@@ -1,0 +1,30 @@
+{
+  "case_id": "openhwgroup.ariane#94",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "sld-columbia",
+    "name": "ariane"
+  },
+  "fix_oid": "0e0ab3be8a24b9b7674a607901d9c2df578be876",
+  "buggy_commit_sha": "57804de0988834c5ff325b1b2c0698819a16ebb3",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/openhwgroup.ariane_94.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "0e0ab3be8a24b9b7674a607901d9c2df578be876"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "utils/make/vivado.mk"
+  ],
+  "raw_diff_path": "ground_truth/openhwgroup.ariane_94.raw.diff"
+}

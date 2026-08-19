@@ -1,0 +1,32 @@
+{
+  "case_id": "enjoy-digital.litex#2495",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "manmuqingshan",
+    "name": "litex"
+  },
+  "fix_oid": "b3ec7c359400ce04f6b3971b39cda2c68a0f9ecf",
+  "buggy_commit_sha": "76e0f4226edb45b3110e7a6d6d5990cb6d5c2c86",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_2495.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "b3ec7c359400ce04f6b3971b39cda2c68a0f9ecf"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/build/sim/core/veril.cpp",
+    "litex/build/sim/verilator.py",
+    "test/build/test_sim_verilator.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_2495.raw.diff"
+}

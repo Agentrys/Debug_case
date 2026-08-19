@@ -1,0 +1,104 @@
+diff --git a/tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala b/tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala
+index d5e887c6..4a447cb7 100644
+--- a/tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala
++++ b/tapeout/src/main/scala/transforms/clkgen/ClkSrcTransform.scala
+@@ -21,7 +21,7 @@ class ClkSrcTransform extends Transform with SimpleRun {
+           InferTypes,
+           new CreateClkConstraints(clkModAnnos, clkPortAnnos, targetDir)
+         )
+-        state.copy(state = runPasses(state.circuit, passSeq), outputForm = outputForm)
++        state.copy(circuit = runPasses(state.circuit, passSeq))
+     }
+   }
+ }
+diff --git a/tapeout/src/main/scala/transforms/clkgen/CreateClkConstraints.scala b/tapeout/src/main/scala/transforms/clkgen/CreateClkConstraints.scala
+index 2e5021de..ea2ba22f 100644
+--- a/tapeout/src/main/scala/transforms/clkgen/CreateClkConstraints.scala
++++ b/tapeout/src/main/scala/transforms/clkgen/CreateClkConstraints.scala
+@@ -89,7 +89,7 @@ class CreateClkConstraints(
+     }).toSet
+ 
+     val inlineTransform = new InlineInstances
+-    val inlinedCircuit = inlineTransform.run(onlyClockCircuit, modulesToInline, Set()).circuit
++    val inlinedCircuit = inlineTransform.run(onlyClockCircuit, modulesToInline, Set(), None).circuit
+ 
+     val topModule = inlinedCircuit.modules.find(_.name == top).getOrElse(throwInternalError)
+ 
+diff --git a/tapeout/src/main/scala/transforms/pads/AddIOPadsTransform.scala b/tapeout/src/main/scala/transforms/pads/AddIOPadsTransform.scala
+index 2531a632..df4536a5 100644
+--- a/tapeout/src/main/scala/transforms/pads/AddIOPadsTransform.scala
++++ b/tapeout/src/main/scala/transforms/pads/AddIOPadsTransform.scala
+@@ -16,7 +16,7 @@ class AddIOPadsTransform extends Transform with SimpleRun {
+     val collectedAnnos = HasPadAnnotation(getMyAnnotations(state))
+     collectedAnnos match {
+       // Transform not used
+-      case None => CircuitState(state.circuit, LowForm)
++      case None => state
+       case Some(x) => 
+         val techLoc = (new TechnologyLocation).get(state)
+         // Get foundry pad templates from yaml
+@@ -45,11 +45,10 @@ class AddIOPadsTransform extends Transform with SimpleRun {
+         )
+         // Expects BlackBox helper to be run after to inline pad Verilog!
+         val prevAnnos = state.annotations.getOrElse(AnnotationMap(Seq.empty)).annotations
+-        val cs = CircuitState(
+-          runPasses(circuitWithBBs, passSeq), 
+-          LowForm, 
+-          Some(AnnotationMap(prevAnnos ++ bbAnnotations))
+-        )
++        val cs = state.copy(
++          circuit = runPasses(circuitWithBBs, passSeq), 
++          annotations = Some(AnnotationMap(prevAnnos ++ bbAnnotations)))
++       
+         // TODO: *.f file is overwritten on subsequent executions, but it doesn't seem to be used anywhere?
+         (new firrtl.transforms.BlackBoxSourceHelper).execute(cs)
+     }
+diff --git a/tapeout/src/main/scala/transforms/utils/ProgrammaticBundle.scala b/tapeout/src/main/scala/transforms/utils/ProgrammaticBundle.scala
+index 7df199ba..17197c80 100644
+--- a/tapeout/src/main/scala/transforms/utils/ProgrammaticBundle.scala
++++ b/tapeout/src/main/scala/transforms/utils/ProgrammaticBundle.scala
+@@ -3,22 +3,24 @@ package barstools.tapeout.transforms
+ import chisel3._
+ import scala.collection.immutable.ListMap
+ 
+-final class CustomBundle(elts: (String, Data)*) extends Record {
++final class CustomBundle[T <: Data](elts: (String, T)*) extends Record {
+   val elements = ListMap(elts map { case (field, elt) => field -> elt.chiselCloneType }: _*)
+-  def apply(elt: String): Data = elements(elt)
++  def apply(elt: String): T = elements(elt)
++  def apply(elt: Int): T = elements(elt.toString)
+   override def cloneType = (new CustomBundle(elements.toList: _*)).asInstanceOf[this.type]
+ }
+ 
+-final class CustomIndexedBundle(elts: (Int, Data)*) extends Record {
++final class CustomIndexedBundle[T <: Data](elts: (Int, T)*) extends Record {
+   // Must be String, Data
+   val elements = ListMap(elts map { case (field, elt) => field.toString -> elt.chiselCloneType }: _*)
+-  def indexedElements = ListMap(elts map { case (field, elt) => field -> elt.chiselCloneType }: _*)
+-  def apply(elt: Int): Data = elements(elt.toString)
++  // TODO: Make an equivalent to the below work publicly
++  private def indexedElements = ListMap(elts map { case (field, elt) => field -> elt.chiselCloneType }: _*)
++  def apply(elt: Int): T = elements(elt.toString)
+   override def cloneType = (new CustomIndexedBundle(indexedElements.toList: _*)).asInstanceOf[this.type]
+ }
+ 
+ object CustomIndexedBundle {
+-  def apply(gen: Data, idxs: Seq[Int]) = new CustomIndexedBundle(idxs.map(_ -> gen): _*)
++  def apply[T <: Data](gen: T, idxs: Seq[Int]) = new CustomIndexedBundle(idxs.map(_ -> gen): _*)
+   // Allows Vecs of elements of different types/widths
+-  def apply(gen: Seq[Data]) = new CustomIndexedBundle(gen.zipWithIndex.map{ case (elt, field) => field -> elt }: _*)
++  def apply[T <: Data](gen: Seq[T]) = new CustomIndexedBundle(gen.zipWithIndex.map{ case (elt, field) => field -> elt }: _*)
+ }
+\ No newline at end of file
+diff --git a/tapeout/src/test/scala/transforms/ResetInverterSpec.scala b/tapeout/src/test/scala/transforms/ResetInverterSpec.scala
+index fd49435e..0ae41dc1 100644
+--- a/tapeout/src/test/scala/transforms/ResetInverterSpec.scala
++++ b/tapeout/src/test/scala/transforms/ResetInverterSpec.scala
+@@ -3,7 +3,6 @@
+ package barstools.tapeout.transforms
+ 
+ import chisel3._
+-import chisel3.util.RegInit
+ import firrtl._
+ import org.scalatest.{FreeSpec, Matchers}
+ 

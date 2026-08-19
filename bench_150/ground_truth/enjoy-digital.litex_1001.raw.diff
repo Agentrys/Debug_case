@@ -1,0 +1,231 @@
+diff --git a/litex/soc/cores/dma.py b/litex/soc/cores/dma.py
+index 2cdb15018..3f8169426 100644
+--- a/litex/soc/cores/dma.py
++++ b/litex/soc/cores/dma.py
+@@ -17,8 +17,12 @@ from litex.soc.interconnect import wishbone
+ 
+ # Helpers ------------------------------------------------------------------------------------------
+ 
+-def format_bytes(s, endianness):
+-    return {"big": s, "little": reverse_bytes(s)}[endianness]
++def format_bytes(s, endianness, with_byteswap=None):
++    if endianness not in ["big", "little"]:
++        raise ValueError("endianness must be big or little.")
++    if with_byteswap is None:
++        with_byteswap = {"big": False, "little": True}[endianness]
++    return reverse_bytes(s) if with_byteswap else s
+ 
+ def add_wishbone_burst_cti(module, bus, last, bursting):
+     """Optionally add Wishbone CTI/BTE burst tagging.
+@@ -68,7 +72,15 @@ class WishboneDMAReader(LiteXModule):
+     source : Record("data")
+         Source for MMAP word results from reading.
+     """
+-    def __init__(self, bus, endianness="little", fifo_depth=16, with_csr=False, bursting=None):
++    def __init__(self, bus, endianness="little", fifo_depth=16, with_csr=False, bursting=None,
++        with_byteswap=None):
++        """Create a Wishbone DMA reader.
++
++        ``endianness`` preserves the legacy behavior: ``"little"`` byte-swaps the Wishbone word
++        before presenting it on the stream, while ``"big"`` leaves it unchanged. Raw word users
++        can set ``with_byteswap=False`` explicitly to keep the Wishbone word order independent of
++        CPU endianness.
++        """
+         if not isinstance(bus, wishbone.Interface):
+             raise TypeError("DMAReader requires a Wishbone bus.")
+         if "r" not in bus.mode:
+@@ -90,7 +102,7 @@ class WishboneDMAReader(LiteXModule):
+             bus.sel.eq(2**(bus.data_width//8)-1),
+             bus.adr.eq(sink.address),
+             fifo.sink.last.eq(sink.last),
+-            fifo.sink.data.eq(format_bytes(bus.dat_r, endianness)),
++            fifo.sink.data.eq(format_bytes(bus.dat_r, endianness, with_byteswap)),
+             If(bus.stb & bus.ack,
+                 sink.ready.eq(1),
+                 fifo.sink.valid.eq(1),
+@@ -192,7 +204,14 @@ class WishboneDMAWriter(LiteXModule):
+     sink : Record("address", "data")
+         Sink for MMAP addresses/datas to be written.
+     """
+-    def __init__(self, bus, endianness="little", with_csr=False, bursting=None):
++    def __init__(self, bus, endianness="little", with_csr=False, bursting=None, with_byteswap=None):
++        """Create a Wishbone DMA writer.
++
++        ``endianness`` preserves the legacy behavior: ``"little"`` byte-swaps stream words before
++        writing them to Wishbone, while ``"big"`` leaves them unchanged. Raw word users can set
++        ``with_byteswap=False`` explicitly to keep the stream word order independent of CPU
++        endianness.
++        """
+         if not isinstance(bus, wishbone.Interface):
+             raise TypeError("DMAWriter requires a Wishbone bus.")
+         if "w" not in bus.mode:
+@@ -210,7 +229,7 @@ class WishboneDMAWriter(LiteXModule):
+             bus.we.eq(1),
+             bus.sel.eq(2**(bus.data_width//8)-1),
+             bus.adr.eq(sink.address),
+-            bus.dat_w.eq(format_bytes(sink.data, endianness)),
++            bus.dat_w.eq(format_bytes(sink.data, endianness, with_byteswap)),
+             sink.ready.eq(bus.ack),
+         ]
+ 
+diff --git a/test/test_dma.py b/test/test_dma.py
+index 93bad03a8..f53e7c2e7 100644
+--- a/test/test_dma.py
++++ b/test/test_dma.py
+@@ -25,6 +25,10 @@ def burst_ctis(length):
+     return [wishbone.CTI_BURST_INCREMENTING]*(length - 1) + [wishbone.CTI_BURST_END]
+ 
+ 
++def reverse32(v):
++    return int.from_bytes(v.to_bytes(4, byteorder="little"), byteorder="big")
++
++
+ @passive
+ def wb_read_slave(bus, mem, bus_cycles=None):
+     """Passive Wishbone read slave answering with mem[adr] (word-addressed).
+@@ -62,10 +66,14 @@ def wb_write_slave(bus, captures, bus_cycles=None):
+ # DMA Reader ---------------------------------------------------------------------------------------
+ 
+ class _ReaderDUT(LiteXModule):
+-    def __init__(self, bus_bursting=False, dma_bursting=None):
++    def __init__(self, bus_bursting=False, dma_bursting=None, endianness="big", with_byteswap=None):
+         self.bus = make_bus(bursting=bus_bursting)
+-        # endianness="big" leaves bus.dat_r unmodified so the stream data matches mem[] directly.
+-        self.dma = WishboneDMAReader(bus=self.bus, endianness="big", bursting=dma_bursting)
++        self.dma = WishboneDMAReader(
++            bus           = self.bus,
++            endianness    = endianness,
++            bursting      = dma_bursting,
++            with_byteswap = with_byteswap,
++        )
+         self.dma.add_ctrl()
+ 
+ 
+@@ -172,13 +180,62 @@ class TestDMAReader(unittest.TestCase):
+         self.assertEqual(outputs, mem)
+         self.assertEqual([cti for _, cti, _ in bus_cycles], [wishbone.CTI_BURST_NONE]*len(mem))
+ 
++    def test_little_endian_reads_byteswapped_word(self):
++        mem     = [0xcafef00d]
++        dut     = _ReaderDUT(endianness="little")
++        outputs = []
++
++        def driver(dut):
++            yield dut.dma.base.eq(0)
++            yield dut.dma.length.eq(4)
++            yield dut.dma.source.ready.eq(1)
++            yield dut.dma.enable.eq(1)
++
++            timeout = 0
++            while len(outputs) < 1:
++                if (yield dut.dma.source.valid) and (yield dut.dma.source.ready):
++                    outputs.append((yield dut.dma.source.data))
++                yield
++                timeout += 1
++                self.assertLess(timeout, 10_000)
++
++        run_simulation(dut, [driver(dut), wb_read_slave(dut.bus, mem)])
++        self.assertEqual(outputs, [reverse32(mem[0])])
++
++    def test_explicit_no_byteswap_reads_raw_word(self):
++        mem     = [0xcafef00d]
++        dut     = _ReaderDUT(endianness="little", with_byteswap=False)
++        outputs = []
++
++        def driver(dut):
++            yield dut.dma.base.eq(0)
++            yield dut.dma.length.eq(4)
++            yield dut.dma.source.ready.eq(1)
++            yield dut.dma.enable.eq(1)
++
++            timeout = 0
++            while len(outputs) < 1:
++                if (yield dut.dma.source.valid) and (yield dut.dma.source.ready):
++                    outputs.append((yield dut.dma.source.data))
++                yield
++                timeout += 1
++                self.assertLess(timeout, 10_000)
++
++        run_simulation(dut, [driver(dut), wb_read_slave(dut.bus, mem)])
++        self.assertEqual(outputs, mem)
++
+ 
+ # DMA Writer ---------------------------------------------------------------------------------------
+ 
+ class _WriterDUT(LiteXModule):
+-    def __init__(self, bus_bursting=False, dma_bursting=None):
++    def __init__(self, bus_bursting=False, dma_bursting=None, endianness="big", with_byteswap=None):
+         self.bus = make_bus(bursting=bus_bursting)
+-        self.dma = WishboneDMAWriter(bus=self.bus, endianness="big", bursting=dma_bursting)
++        self.dma = WishboneDMAWriter(
++            bus           = self.bus,
++            endianness    = endianness,
++            bursting      = dma_bursting,
++            with_byteswap = with_byteswap,
++        )
+         self.dma.add_ctrl()
+ 
+ 
+@@ -250,6 +307,62 @@ class TestDMAWriter(unittest.TestCase):
+         self.assertEqual([cti for _, cti, _ in bus_cycles], burst_ctis(len(payload)))
+         self.assertEqual([bte for _, _, bte in bus_cycles], [0]*len(payload))
+ 
++    def test_little_endian_writes_byteswapped_word(self):
++        payload  = [0xcafef00d]
++        dut      = _WriterDUT(endianness="little")
++        captures = []
++
++        def driver(dut):
++            yield dut.dma.base.eq(0)
++            yield dut.dma.length.eq(4)
++            yield dut.dma.enable.eq(1)
++            for _ in range(4):
++                yield
++
++            yield dut.dma.sink.data.eq(payload[0])
++            yield dut.dma.sink.valid.eq(1)
++            yield
++            while not (yield dut.dma.sink.ready):
++                yield
++            yield dut.dma.sink.valid.eq(0)
++
++            timeout = 0
++            while not (yield dut.dma.done):
++                yield
++                timeout += 1
++                self.assertLess(timeout, 200)
++
++        run_simulation(dut, [driver(dut), wb_write_slave(dut.bus, captures)])
++        self.assertEqual([v for _, v in captures], [reverse32(payload[0])])
++
++    def test_explicit_no_byteswap_writes_raw_word(self):
++        payload  = [0xcafef00d]
++        dut      = _WriterDUT(endianness="little", with_byteswap=False)
++        captures = []
++
++        def driver(dut):
++            yield dut.dma.base.eq(0)
++            yield dut.dma.length.eq(4)
++            yield dut.dma.enable.eq(1)
++            for _ in range(4):
++                yield
++
++            yield dut.dma.sink.data.eq(payload[0])
++            yield dut.dma.sink.valid.eq(1)
++            yield
++            while not (yield dut.dma.sink.ready):
++                yield
++            yield dut.dma.sink.valid.eq(0)
++
++            timeout = 0
++            while not (yield dut.dma.done):
++                yield
++                timeout += 1
++                self.assertLess(timeout, 200)
++
++        run_simulation(dut, [driver(dut), wb_write_slave(dut.bus, captures)])
++        self.assertEqual([v for _, v in captures], payload)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

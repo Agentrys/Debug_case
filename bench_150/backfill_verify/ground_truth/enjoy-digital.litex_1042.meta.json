@@ -1,0 +1,32 @@
+{
+  "case_id": "enjoy-digital.litex#1042",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "danc86",
+    "name": "litex"
+  },
+  "fix_oid": "8ce6596a628cd59d46355d60604af5a20794fb13",
+  "buggy_commit_sha": "c43132f81f1113e83780571b10d004974fe361de",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1042.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "8ce6596a628cd59d46355d60604af5a20794fb13",
+    "148e734982719ca55f3e40314a2bed430d933c38"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/soc/software/bios/linker.ld",
+    "litex/soc/software/common.mak"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1042.raw.diff"
+}

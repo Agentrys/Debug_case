@@ -1,0 +1,84 @@
+{
+  "case_id": "riscv-boom.riscv-boom#18",
+  "issue_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_repo": {
+    "owner": "SmartAgentPrefetcher",
+    "name": "riscv-boom"
+  },
+  "fix_oid": "b1864328466856836d543f2e8057f982d7438a8f",
+  "buggy_commit_sha": "d779397b117a712860b3377541c4a54caf16ca5b",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/riscv-boom.riscv-boom_18.diff",
+  "diff_sha256": "ad2957a20ae6bb960364b1ebfd37e8f8bf866158900ca20ff0514b576ca375af",
+  "fix_oids_sorted": [
+    "b1864328466856836d543f2e8057f982d7438a8f"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/resources/vsrc/SimTMACounterDump.v",
+    "src/main/scala/v3/common/BoomPerfCounterDevice.scala",
+    "src/main/scala/v3/common/tile.scala",
+    "src/main/scala/v3/exu/core.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/resources/vsrc/SimTMACounterDump.v": [
+      [
+        2,
+        8
+      ],
+      [
+        122,
+        132
+      ],
+      [
+        244,
+        249
+      ]
+    ],
+    "src/main/scala/v3/common/BoomPerfCounterDevice.scala": [
+      [
+        127,
+        142
+      ],
+      [
+        229,
+        235
+      ]
+    ],
+    "src/main/scala/v3/common/tile.scala": [
+      [
+        159,
+        165
+      ],
+      [
+        266,
+        276
+      ],
+      [
+        284,
+        294
+      ]
+    ],
+    "src/main/scala/v3/exu/core.scala": [
+      [
+        1303,
+        1309
+      ],
+      [
+        1326,
+        1331
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "src/main/resources/csrc/SimTMACounterDump.cc"
+  ],
+  "raw_diff_path": "ground_truth/riscv-boom.riscv-boom_18.raw.diff"
+}

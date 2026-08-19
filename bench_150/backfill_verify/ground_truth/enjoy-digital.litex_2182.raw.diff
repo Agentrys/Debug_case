@@ -1,0 +1,13 @@
+diff --git a/litex/soc/cores/cpu/naxriscv/core.py b/litex/soc/cores/cpu/naxriscv/core.py
+index e362fbf0a..ea46eb750 100755
+--- a/litex/soc/cores/cpu/naxriscv/core.py
++++ b/litex/soc/cores/cpu/naxriscv/core.py
+@@ -138,7 +138,7 @@ class NaxRiscv(CPU):
+             xlen = int(args.xlen)
+             NaxRiscv.xlen                 = xlen
+             NaxRiscv.data_width           = xlen
+-            NaxRiscv.gcc_triple           = CPU_GCC_TRIPLE_RISCV64
++            NaxRiscv.gcc_triple           = CPU_GCC_TRIPLE_RISCV64 if xlen == 64 else CPU_GCC_TRIPLE_RISCV32
+             NaxRiscv.linker_output_format = f"elf{xlen}-littleriscv"
+         if args.cpu_count:
+             NaxRiscv.cpu_count = args.cpu_count

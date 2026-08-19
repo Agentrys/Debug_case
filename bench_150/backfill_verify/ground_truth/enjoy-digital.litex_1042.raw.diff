@@ -1,0 +1,52 @@
+diff --git a/litex/soc/software/bios/linker.ld b/litex/soc/software/bios/linker.ld
+index a29795b1..fcf931e2 100644
+--- a/litex/soc/software/bios/linker.ld
++++ b/litex/soc/software/bios/linker.ld
+@@ -78,6 +78,8 @@ SECTIONS
+ 		_end = .;
+ 	} > sram
+ 
++	.note.gnu.build-id (NOLOAD) : { *(.note.gnu.build-id) }
++
+ 	/DISCARD/ :
+ 	{
+ 		*(.eh_frame)
+diff --git a/litex/soc/software/common.mak b/litex/soc/software/common.mak
+index 6d8f3f11..f2129197 100644
+--- a/litex/soc/software/common.mak
++++ b/litex/soc/software/common.mak
+@@ -53,7 +53,7 @@ INCLUDES = -I$(SOC_DIRECTORY)/software/include/base \
+ COMMONFLAGS = $(DEPFLAGS) -Os $(CPUFLAGS) -g3 -fomit-frame-pointer -Wall -fno-builtin -nostdinc -fno-stack-protector $(INCLUDES)
+ CFLAGS = $(COMMONFLAGS) -fexceptions -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes
+ CXXFLAGS = $(COMMONFLAGS) -std=c++11 -I$(SOC_DIRECTORY)/software/include/basec++ -fexceptions -fno-rtti -ffreestanding
+-LDFLAGS = -nostdlib -nodefaultlibs -Wl,--no-dynamic-linker -Wl,--build-id=none -L$(BUILDINC_DIRECTORY)
++LDFLAGS = -nostdlib -nodefaultlibs -Wl,--no-dynamic-linker -L$(BUILDINC_DIRECTORY)
+ 
+ define compilexx
+ $(CX) -c $(CXXFLAGS) $(1) $< -o $@
+diff --git a/litex/soc/software/bios/linker.ld b/litex/soc/software/bios/linker.ld
+index a29795b1..fcf931e2 100644
+--- a/litex/soc/software/bios/linker.ld
++++ b/litex/soc/software/bios/linker.ld
+@@ -78,6 +78,8 @@ SECTIONS
+ 		_end = .;
+ 	} > sram
+ 
++	.note.gnu.build-id (NOLOAD) : { *(.note.gnu.build-id) }
++
+ 	/DISCARD/ :
+ 	{
+ 		*(.eh_frame)
+diff --git a/litex/soc/software/common.mak b/litex/soc/software/common.mak
+index fb973543..d1ec523c 100644
+--- a/litex/soc/software/common.mak
++++ b/litex/soc/software/common.mak
+@@ -56,7 +56,7 @@ INCLUDES = -I$(PICOLIBC_DIRECTORY)/newlib/libc/tinystdio \
+ COMMONFLAGS = $(DEPFLAGS) -Os $(CPUFLAGS) -g3 -fomit-frame-pointer -Wall -fno-builtin -fno-stack-protector -flto $(INCLUDES)
+ CFLAGS = $(COMMONFLAGS) -fexceptions -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes
+ CXXFLAGS = $(COMMONFLAGS) -std=c++11 -I$(SOC_DIRECTORY)/software/include/basec++ -fexceptions -fno-rtti -ffreestanding
+-LDFLAGS = -nostdlib -nodefaultlibs -Wl,--no-dynamic-linker -Wl,--build-id=none $(CFLAGS) -L$(BUILDINC_DIRECTORY)
++LDFLAGS = -nostdlib -nodefaultlibs -Wl,--no-dynamic-linker $(CFLAGS) -L$(BUILDINC_DIRECTORY)
+ 
+ define compilexx
+ $(CX) -c $(CXXFLAGS) $(1) $< -o $@

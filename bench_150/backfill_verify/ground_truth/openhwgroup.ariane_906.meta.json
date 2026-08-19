@@ -1,0 +1,52 @@
+{
+  "case_id": "openhwgroup.ariane#906",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "Moschn",
+    "name": "ariane"
+  },
+  "fix_oid": "078225d7e016755d6af04c66078a6a59b23f3ea7",
+  "buggy_commit_sha": "909d85a56cc5ace65765a63d7ed56b7ac2026f99",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_906.diff",
+  "diff_sha256": "d715cee95e7dc841d2ec165228643031d4a6099f1a8baaefed41673312e8cf4f",
+  "fix_oids_sorted": [
+    "078225d7e016755d6af04c66078a6a59b23f3ea7",
+    "904acc856e7bcdb5e3a5e73523e938ecb47a4c44",
+    "011edf49bdbc08b3ef62283406cf129d48c29372",
+    "3ada23062cd10eb92de903dd6a47540e638d3bf6"
+  ],
+  "n_fix_commits": 4,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/mmu_sv39/mmu.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/mmu_sv39/mmu.sv": [
+      [
+        397,
+        404
+      ],
+      [
+        397,
+        404
+      ],
+      [
+        397,
+        404
+      ],
+      [
+        397,
+        404
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_906.raw.diff"
+}

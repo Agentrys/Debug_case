@@ -1,0 +1,30 @@
+{
+  "case_id": "jbush001.nyuziprocessor#5",
+  "issue_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_oid": "f148ad74061af91ed5549cc31558ea53fc557535",
+  "buggy_commit_sha": "21290d1b72992e640278cff46bf021760c5ddb5d",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/jbush001.nyuziprocessor_5.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "f148ad74061af91ed5549cc31558ea53fc557535"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "README.md"
+  ],
+  "raw_diff_path": "ground_truth/jbush001.nyuziprocessor_5.raw.diff"
+}

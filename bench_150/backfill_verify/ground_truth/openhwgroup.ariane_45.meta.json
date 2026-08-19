@@ -1,0 +1,314 @@
+{
+  "case_id": "openhwgroup.ariane#45",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "alaaibrah97",
+    "name": "cva6"
+  },
+  "fix_oid": "d8d41f9eef32ec975b758436ebfb6f9ccd75f8ae",
+  "buggy_commit_sha": "590ef563c4b75c262615e1e8b0db2e5d73604fcd",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_45.diff",
+  "diff_sha256": "9baad6e76c781ba1625ffd01685b76dba256a1bd8d4aeca3a85ca5115c0a9374",
+  "fix_oids_sorted": [
+    "d8d41f9eef32ec975b758436ebfb6f9ccd75f8ae",
+    "876c325c27c42fab8f87a1a6c9ada792cd53a3e0",
+    "844c9946c408924a00e597ffe8a6cbf0c1466b97"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "piton/design/chipset/io_ctrl/rtl/uart_reseter.v",
+    "piton/design/chipset/io_ctrl/rtl/uart_top.v",
+    "piton/design/chipset/mc/rtl/mc_top.v",
+    "piton/design/chipset/mc/rtl/memory_zeroer.v",
+    "piton/design/chipset/mc/rtl/noc_mig_bridge.v",
+    "piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_read.v",
+    "piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_write.v",
+    "piton/design/chipset/rtl/chipset.v",
+    "piton/design/include/piton_system.vh",
+    "piton/design/rtl/system.v"
+  ],
+  "ground_truth_hunks": {
+    "piton/design/chipset/io_ctrl/rtl/uart_reseter.v": [
+      [
+        0,
+        0
+      ]
+    ],
+    "piton/design/chipset/io_ctrl/rtl/uart_top.v": [
+      [
+        44,
+        49
+      ],
+      [
+        309,
+        314
+      ]
+    ],
+    "piton/design/chipset/mc/rtl/mc_top.v": [
+      [
+        43,
+        62
+      ],
+      [
+        70,
+        85
+      ],
+      [
+        478,
+        484
+      ],
+      [
+        503,
+        509
+      ],
+      [
+        524,
+        533
+      ],
+      [
+        593,
+        601
+      ],
+      [
+        610,
+        616
+      ],
+      [
+        618,
+        624
+      ],
+      [
+        632,
+        657
+      ],
+      [
+        665,
+        671
+      ],
+      [
+        673,
+        679
+      ],
+      [
+        687,
+        712
+      ],
+      [
+        885,
+        890
+      ],
+      [
+        966,
+        974
+      ]
+    ],
+    "piton/design/chipset/mc/rtl/memory_zeroer.v": [
+      [
+        61,
+        67
+      ]
+    ],
+    "piton/design/chipset/mc/rtl/noc_mig_bridge.v": [
+      [
+        51,
+        74
+      ],
+      [
+        80,
+        90
+      ],
+      [
+        105,
+        121
+      ],
+      [
+        123,
+        129
+      ],
+      [
+        136,
+        142
+      ],
+      [
+        561,
+        567
+      ],
+      [
+        686,
+        699
+      ]
+    ],
+    "piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_read.v": [
+      [
+        273,
+        279
+      ]
+    ],
+    "piton/design/chipset/noc_axi4_bridge/rtl/noc_axi4_bridge_write.v": [
+      [
+        240,
+        246
+      ]
+    ],
+    "piton/design/chipset/rtl/chipset.v": [
+      [
+        95,
+        104
+      ],
+      [
+        217,
+        230
+      ],
+      [
+        237,
+        248
+      ],
+      [
+        252,
+        263
+      ],
+      [
+        391,
+        401
+      ],
+      [
+        640,
+        647
+      ],
+      [
+        668,
+        673
+      ],
+      [
+        681,
+        686
+      ],
+      [
+        716,
+        721
+      ],
+      [
+        1139,
+        1144
+      ],
+      [
+        1148,
+        1159
+      ],
+      [
+        1183,
+        1196
+      ],
+      [
+        1205,
+        1212
+      ]
+    ],
+    "piton/design/include/piton_system.vh": [
+      [
+        118,
+        123
+      ],
+      [
+        134,
+        139
+      ],
+      [
+        152,
+        154
+      ]
+    ],
+    "piton/design/rtl/system.v": [
+      [
+        113,
+        123
+      ],
+      [
+        172,
+        177
+      ],
+      [
+        181,
+        186
+      ],
+      [
+        196,
+        205
+      ],
+      [
+        217,
+        228
+      ],
+      [
+        309,
+        319
+      ],
+      [
+        421,
+        426
+      ],
+      [
+        486,
+        493
+      ],
+      [
+        835,
+        844
+      ],
+      [
+        939,
+        952
+      ],
+      [
+        959,
+        965
+      ],
+      [
+        969,
+        978
+      ],
+      [
+        1031,
+        1037
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "piton/design/chip/xilinx/xupp3r/ip_cores/clk_mmcm_chip/clk_mmcm_chip.xci",
+    "piton/design/chipset/include/mc_define.h",
+    "piton/design/chipset/io_ctrl/xilinx/xupp3r/ip_cores/atg_uart_init/atg_uart_init.xci",
+    "piton/design/chipset/io_ctrl/xilinx/xupp3r/ip_cores/atg_uart_init/uart_addr.coe",
+    "piton/design/chipset/io_ctrl/xilinx/xupp3r/ip_cores/atg_uart_init/uart_data.coe",
+    "piton/design/chipset/io_ctrl/xilinx/xupp3r/ip_cores/bram_16384x512/bram_16384x512.xci",
+    "piton/design/chipset/io_ctrl/xilinx/xupp3r/ip_cores/bram_256x512/bram_256x512.xci",
+    "piton/design/chipset/io_ctrl/xilinx/xupp3r/ip_cores/uart_16550/uart_16550.xci",
+    "piton/design/chipset/mc/xilinx/xupp3r/ip_cores/ddr4_0/ddr4_0.xci",
+    "piton/design/chipset/mc/xilinx/xupp3r/ip_cores/ddr4_axi4/ddr4_axi4.xci",
+    "piton/design/chipset/mc/xilinx/xupp3r/ip_cores/hynix_mem.csv",
+    "piton/design/chipset/rtl/chipset_impl.v.pyv",
+    "piton/design/chipset/xilinx/xupp3r/ip_cores/afifo_w64_d128_std/afifo_w64_d128_std.xci",
+    "piton/design/chipset/xilinx/xupp3r/ip_cores/clk_mmcm/clk_mmcm.xci",
+    "piton/design/include/define.h.pyv",
+    "piton/design/xilinx/xupp3r/constraints.xdc",
+    "piton/design/xilinx/xupp3r/devices.xml",
+    "piton/design/xilinx/xupp3r/devices_ariane.xml",
+    "piton/tools/bin/piton_reset",
+    "piton/tools/src/proto/block.list",
+    "piton/tools/src/proto/board.list",
+    "piton/tools/src/proto/common/rtl_setup.tcl",
+    "piton/tools/src/proto/fpga_lib.py",
+    "piton/tools/src/proto/protosyn,2.5",
+    "piton/tools/src/proto/xupp3r/board.tcl",
+    ".github/workflows/stale.yml",
+    ".github/workflows/verible.yml"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_45.raw.diff"
+}

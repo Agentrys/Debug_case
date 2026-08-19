@@ -1,0 +1,31 @@
+{
+  "case_id": "sld-columbia.esp#62",
+  "issue_repo": {
+    "owner": "sld-columbia",
+    "name": "esp"
+  },
+  "fix_repo": {
+    "owner": "sld-columbia",
+    "name": "esp"
+  },
+  "fix_oid": "58a2d0748b6e942a1d7d4de1946b832205fc2d98",
+  "buggy_commit_sha": "ed3e453c4b286a7f4a3298ed92bba453d5fa642a",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/sld-columbia.esp_62.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "58a2d0748b6e942a1d7d4de1946b832205fc2d98",
+    "78ace9ac95af13f0523a2c2a5abe5d9610fa427b"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "utils/scripts/init_accelerator.sh"
+  ],
+  "raw_diff_path": "ground_truth/sld-columbia.esp_62.raw.diff"
+}

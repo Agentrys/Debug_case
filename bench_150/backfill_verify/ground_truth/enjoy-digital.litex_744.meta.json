@@ -1,0 +1,32 @@
+{
+  "case_id": "enjoy-digital.litex#744",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "stffrdhrn",
+    "name": "litex"
+  },
+  "fix_oid": "5811f0ab12b174abd811c4055064847e52107cee",
+  "buggy_commit_sha": "bddb170650242e3f993b882806474ca3480a6a7c",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_744.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "5811f0ab12b174abd811c4055064847e52107cee",
+    "df18532aa6d8bef879174a29cc93205c168ac4f1",
+    "5cc2c4aaf710fe95441ae99486ca178bc1cbe1bc"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/tools/litex_json2dts.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_744.raw.diff"
+}

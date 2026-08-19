@@ -1,0 +1,32 @@
+{
+  "case_id": "openhwgroup.ariane#1427",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "10x-Engineers",
+    "name": "cva6"
+  },
+  "fix_oid": "8f9e8e03b50ee846e80de837f3bca21432715e84",
+  "buggy_commit_sha": "0ebe51510c41201f2776502bc7bdafb460518843",
+  "is_merge": true,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_1427.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "8f9e8e03b50ee846e80de837f3bca21432715e84"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "cva6/sim/Makefile",
+    "cva6/sim/init_run_uvm_fsdb.do",
+    "cva6/sim/init_run_uvm_vpd.do"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_1427.raw.diff"
+}

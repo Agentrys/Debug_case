@@ -1,0 +1,76 @@
+{
+  "case_id": "vortexgpgpu.vortex#262",
+  "issue_repo": {
+    "owner": "vortexgpgpu",
+    "name": "vortex"
+  },
+  "fix_repo": {
+    "owner": "hwirys",
+    "name": "vortex"
+  },
+  "fix_oid": "8057dd5b918fe14824a7697985f04868a97e7d1d",
+  "buggy_commit_sha": "f00bb14227c559deba3befe72fdbc6e07b5da3e0",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/vortexgpgpu.vortex_262.diff",
+  "diff_sha256": "ffe5e949710df27bb65a5bc0eb43a7a4e845653b138ee64b9048ff7b04960299",
+  "fix_oids_sorted": [
+    "8057dd5b918fe14824a7697985f04868a97e7d1d",
+    "c7dda7d096932c85c2dd3f726f9bb95995cc83e9",
+    "5a9e2a4752dce2922057b620139bb733c9184c7d",
+    "5e936727e44e5a0da6ba7c6d2309209938da51d0"
+  ],
+  "n_fix_commits": 4,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "hw/rtl/libs/VX_axi_adapter.sv",
+    "hw/rtl/afu/xrt/VX_afu_wrap.sv",
+    "hw/rtl/afu/xrt/vortex_afu.vh"
+  ],
+  "ground_truth_hunks": {
+    "hw/rtl/libs/VX_axi_adapter.sv": [
+      [
+        27,
+        32
+      ],
+      [
+        246,
+        262
+      ],
+      [
+        285,
+        298
+      ]
+    ],
+    "hw/rtl/afu/xrt/VX_afu_wrap.sv": [
+      [
+        287,
+        295
+      ],
+      [
+        351,
+        359
+      ]
+    ],
+    "hw/rtl/afu/xrt/vortex_afu.vh": [
+      [
+        18,
+        23
+      ],
+      [
+        18,
+        23
+      ],
+      [
+        22,
+        27
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "hw/syn/xilinx/xrt/platforms.mk"
+  ],
+  "raw_diff_path": "ground_truth/vortexgpgpu.vortex_262.raw.diff"
+}

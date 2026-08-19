@@ -1,0 +1,41 @@
+{
+  "case_id": "spinalhdl.naxriscv#105",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "NaxRiscv"
+  },
+  "fix_repo": {
+    "owner": "juanmaneo",
+    "name": "NaxRiscv"
+  },
+  "fix_oid": "9115f1234e771d8af6bc4b5b1f0b8c136581e117",
+  "buggy_commit_sha": "ed2df8287a488f09bca247516c27b08509152d25",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.naxriscv_105.diff",
+  "diff_sha256": "4af8a28ef74e0daa257bda3540eaa99ee32dbf287fdd3b690ebe3116e2b7ff2c",
+  "fix_oids_sorted": [
+    "9115f1234e771d8af6bc4b5b1f0b8c136581e117"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/naxriscv/lsu2/Lsu2Plugin.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/naxriscv/lsu2/Lsu2Plugin.scala": [
+      [
+        1664,
+        1670
+      ],
+      [
+        1787,
+        1792
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.naxriscv_105.raw.diff"
+}

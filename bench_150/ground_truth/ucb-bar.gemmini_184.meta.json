@@ -1,0 +1,63 @@
+{
+  "case_id": "ucb-bar.gemmini#184",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "gemmini"
+  },
+  "fix_repo": {
+    "owner": "ucb-bar",
+    "name": "gemmini"
+  },
+  "fix_oid": "5d85c726c161781c197fb4741e5b23dd98028e9f",
+  "buggy_commit_sha": "96011d1711c5c897ba86017b4a6273d8107321b9",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/ucb-bar.gemmini_184.diff",
+  "diff_sha256": "08d90dcbaf7a433cde3cf2d688ece9dda01451b7bcd86e5c820f12d357d7aa6d",
+  "fix_oids_sorted": [
+    "5d85c726c161781c197fb4741e5b23dd98028e9f"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/gemmini/Controller.scala",
+    "src/main/scala/gemmini/ExecuteController.scala",
+    "src/main/scala/gemmini/ReservationStation.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/gemmini/Controller.scala": [
+      [
+        325,
+        332
+      ]
+    ],
+    "src/main/scala/gemmini/ExecuteController.scala": [
+      [
+        43,
+        49
+      ],
+      [
+        70,
+        77
+      ]
+    ],
+    "src/main/scala/gemmini/ReservationStation.scala": [
+      [
+        47,
+        54
+      ],
+      [
+        108,
+        118
+      ],
+      [
+        383,
+        388
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/ucb-bar.gemmini_184.raw.diff"
+}

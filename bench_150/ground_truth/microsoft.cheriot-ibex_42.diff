@@ -1,0 +1,123 @@
+diff --git a/rtl/cheri_regfile.sv b/rtl/cheri_regfile.sv
+index 12b83d6c..31f1b339 100644
+--- a/rtl/cheri_regfile.sv
++++ b/rtl/cheri_regfile.sv
+@@ -53,13 +53,13 @@ module cheri_regfile import cheri_pkg::*; #(
+   localparam logic [6:0] TrvkParIncr = 7'h15;
+   localparam logic [6:0] NullParBits = 7'h2a;           // 7-bit parity for 32'h0
+ 
+-  logic [31:0] rf_reg   [NREGS-1:0];
++  logic [31:0] rf_reg   [31:0];
+   logic [31:0] rf_reg_q [NREGS-1:1];
+   
+-  logic [6:0]  rf_reg_par   [NREGS-1:0];
++  logic [6:0]  rf_reg_par   [31:0];
+   logic [6:0]  rf_reg_par_q [NREGS-1:0];
+   
+-  reg_cap_t         rf_cap   [NCAPS-1:0];
++  reg_cap_t         rf_cap   [31:0];
+   reg_cap_t         rf_cap_q [NCAPS-1:1];
+ 
+   reg_cap_t         rcap_a, rcap_b;
+@@ -115,9 +115,14 @@ module cheri_regfile import cheri_pkg::*; #(
+ 
+   assign rf_reg[0]     = 32'h0;
+   assign rf_reg_par[0] = DefParBits[0];
+-  for (genvar i=1; i<NREGS ; i++) begin
+-    assign rf_reg[i]     = rf_reg_q[i];         
+-    assign rf_reg_par[i] = rf_reg_par_q[i];     
++  for (genvar i=1; i<32 ; i++) begin
++    if (i < NREGS) begin
++      assign rf_reg[i]     = rf_reg_q[i];         
++      assign rf_reg_par[i] = rf_reg_par_q[i];     
++    end else begin
++      assign rf_reg[i]     = 0;
++      assign rf_reg_par[i] = DefParBits[i];
++    end
+   end
+ 
+   assign rdata_a_o = DataWidth'({rf_reg_par[raddr_a_i], rf_reg[raddr_a_i]});
+@@ -138,12 +143,16 @@ module cheri_regfile import cheri_pkg::*; #(
+   end
+ 
+   assign rf_cap[0] = NULL_REG_CAP;
+-  for (genvar i=1; i<NCAPS ; i++) begin
+-    assign rf_cap[i] = rf_cap_q[i];
++  for (genvar i=1; i<32 ; i++) begin
++    if (i < NCAPS) begin 
++      assign rf_cap[i] = rf_cap_q[i];
++    end else begin
++      assign rf_cap[i] = NULL_REG_CAP;
++    end
+   end
+ 
+-  assign rcap_a = (raddr_a_i < NCAPS) ? rf_cap[raddr_a_i] : NULL_REG_CAP;
+-  assign rcap_b = (raddr_b_i < NCAPS) ? rf_cap[raddr_b_i] : NULL_REG_CAP;
++  assign rcap_a = rf_cap[raddr_a_i];
++  assign rcap_b = rf_cap[raddr_b_i];
+ 
+   if (CheriPPLBC) begin : g_regrdy
+ 
+diff --git a/rtl/ibex_decoder.sv b/rtl/ibex_decoder.sv
+index 082509f9..80772f1f 100644
+--- a/rtl/ibex_decoder.sv
++++ b/rtl/ibex_decoder.sv
+@@ -230,25 +230,26 @@ module ibex_decoder import cheri_pkg::*; #(
+   ////////////////////
+   // Register check //
+   ////////////////////
++
++  // rf_we from decoder doesn't cover memory load case (where regfile write signal comes from LSU response)
++  logic rf_we_or_load;
++  assign rf_we_or_load = rf_we | (opcode == OPCODE_LOAD);
++ 
+   if (RV32E) begin : gen_rv32e_reg_check_active
+     //assign illegal_reg_rv32e = ((rf_raddr_a_o[4] & (alu_op_a_mux_sel_o == OP_A_REG_A)) |
+     //                            (rf_raddr_b_o[4] & (alu_op_b_mux_sel_o == OP_B_REG_B)) |
+     assign illegal_reg_rv32e = ((rf_raddr_a_o[4] & rf_ren_a_o) |
+                                 (rf_raddr_b_o[4] & rf_ren_b_o) |
+-                                (rf_waddr_o[4]   & rf_we));
++                                (rf_waddr_o[4]   & rf_we_or_load));
+   end else begin : gen_rv32e_reg_check_inactive
+     assign illegal_reg_rv32e = 1'b0;
+   end
+ 
+   if (CheriLimit16Regs) begin : gen_cheri_reg_check_active
+-                               // ((raddr_a[4]  & (alu_op_a_mux_sel_o == OP_A_REG_A)) |
+-                               //  (raddr_a[4]  & cheri_rf_ren_a & cheri_opcode_en) | 
+-                               // (raddr_b[4]  & (alu_op_b_mux_sel_o == OP_B_REG_B)) |
+-                               // (raddr_b[4]  & cheri_rf_ren_b & cheri_opcode_en) | 
+     assign illegal_reg_cheri = cheri_pmode_i & 
+                                ((raddr_a[4]  & rf_ren_a_o) |
+                                 (raddr_b[4]  & rf_ren_b_o) |
+-                                (instr_rd[4] & rf_we));
++                                (instr_rd[4] & rf_we_or_load ));
+   end else begin : gen_cheri_reg_check_inactive
+     assign illegal_reg_cheri = 1'b0;
+   end
+diff --git a/rtl/ibex_top.sv b/rtl/ibex_top.sv
+index 713e06c3..b62f7d05 100644
+--- a/rtl/ibex_top.sv
++++ b/rtl/ibex_top.sv
+@@ -437,7 +437,7 @@ module ibex_top import ibex_pkg::*; import cheri_pkg::*; #(
+   if (CHERIoTEn) begin : gen_regfile_cheriot
+ 
+     localparam int unsigned NRegs = RV32E? 16 : 32;
+-    localparam int unsigned NCaps = RV32E? 16 : 32;
++    localparam int unsigned NCaps = 16;
+ 
+     cheri_regfile #(
+       .NREGS     (NRegs),
+diff --git a/rtl/ibexc_top.sv b/rtl/ibexc_top.sv
+index b63af9f4..7395d542 100644
+--- a/rtl/ibexc_top.sv
++++ b/rtl/ibexc_top.sv
+@@ -429,7 +429,7 @@ module ibex_top import ibex_pkg::*; import cheri_pkg::*; #(
+   end else begin
+     cheri_regfile #(
+       .NREGS(32),
+-      .NCAPS(32),
++      .NCAPS(16),
+       .CheriPPLBC(CheriPPLBC)
+     ) register_file_i (
+       .clk_i         (clk),

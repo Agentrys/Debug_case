@@ -1,0 +1,347 @@
+{
+  "case_id": "chipsalliance.rocket-chip#1",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "b8d0376d3f3812114348a3dd031fe5387a8362d0",
+  "buggy_commit_sha": "4858ca9a60e63894997292a317e395d513d7eaa5",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/chipsalliance.rocket-chip_1.diff",
+  "diff_sha256": "40e9b3d3c87cfea1a3bbb39d44e498e64367ff1bc0bf2ecdaeda1ec5786116cb",
+  "fix_oids_sorted": [
+    "b8d0376d3f3812114348a3dd031fe5387a8362d0",
+    "5653d7afcd8666fa49b57b17402b69275aaf6476"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "groundtest/src/main/scala/cachetest.scala",
+    "groundtest/src/main/scala/dmatest.scala",
+    "groundtest/src/main/scala/generator.scala",
+    "groundtest/src/main/scala/regression.scala",
+    "groundtest/src/main/scala/tile.scala",
+    "src/main/resources/vsrc/TestDriver.v",
+    "src/main/scala/devices/tilelink/BootROM.scala",
+    "src/main/scala/rocket/CSR.scala",
+    "src/main/scala/rocket/IDecode.scala",
+    "src/main/scala/rocket/Instructions.scala",
+    "src/main/scala/rocket/Interface.scala",
+    "src/main/scala/rocket/RocketCore.scala",
+    "src/main/scala/rocket/VER.scala",
+    "src/main/scala/subsystem/Configs.scala",
+    "src/main/scala/system/Configs.scala",
+    "src/main/scala/tile/BaseTile.scala",
+    "src/main/scala/tile/Core.scala",
+    "src/main/scala/tile/FPU.scala"
+  ],
+  "ground_truth_hunks": {
+    "groundtest/src/main/scala/cachetest.scala": [
+      [
+        4,
+        10
+      ],
+      [
+        14,
+        19
+      ],
+      [
+        39,
+        43
+      ]
+    ],
+    "groundtest/src/main/scala/dmatest.scala": [
+      [
+        0,
+        0
+      ]
+    ],
+    "groundtest/src/main/scala/generator.scala": [
+      [
+        151,
+        178
+      ]
+    ],
+    "groundtest/src/main/scala/regression.scala": [
+      [
+        386,
+        391
+      ]
+    ],
+    "groundtest/src/main/scala/tile.scala": [
+      [
+        12,
+        19
+      ],
+      [
+        37,
+        42
+      ],
+      [
+        67,
+        86
+      ],
+      [
+        88,
+        91
+      ]
+    ],
+    "src/main/resources/vsrc/TestDriver.v": [
+      [
+        25,
+        30
+      ],
+      [
+        47,
+        69
+      ],
+      [
+        73,
+        80
+      ],
+      [
+        92,
+        97
+      ],
+      [
+        105,
+        112
+      ],
+      [
+        161,
+        166
+      ]
+    ],
+    "src/main/scala/devices/tilelink/BootROM.scala": [
+      [
+        14,
+        23
+      ]
+    ],
+    "src/main/scala/rocket/CSR.scala": [
+      [
+        297,
+        302
+      ],
+      [
+        308,
+        317
+      ],
+      [
+        957,
+        962
+      ]
+    ],
+    "src/main/scala/rocket/IDecode.scala": [
+      [
+        16,
+        21
+      ],
+      [
+        49,
+        54
+      ],
+      [
+        59,
+        71
+      ],
+      [
+        74,
+        135
+      ],
+      [
+        138,
+        151
+      ],
+      [
+        154,
+        247
+      ],
+      [
+        249,
+        263
+      ],
+      [
+        265,
+        448
+      ],
+      [
+        452,
+        564
+      ],
+      [
+        566,
+        749
+      ]
+    ],
+    "src/main/scala/rocket/Instructions.scala": [
+      [
+        362,
+        367
+      ],
+      [
+        809,
+        814
+      ]
+    ],
+    "src/main/scala/rocket/Interface.scala": [
+      [
+        0,
+        0
+      ]
+    ],
+    "src/main/scala/rocket/RocketCore.scala": [
+      [
+        14,
+        19
+      ],
+      [
+        70,
+        75
+      ],
+      [
+        257,
+        262
+      ],
+      [
+        276,
+        281
+      ],
+      [
+        641,
+        646
+      ],
+      [
+        674,
+        680
+      ],
+      [
+        686,
+        691
+      ],
+      [
+        699,
+        704
+      ],
+      [
+        709,
+        714
+      ],
+      [
+        727,
+        732
+      ],
+      [
+        743,
+        748
+      ],
+      [
+        752,
+        757
+      ],
+      [
+        760,
+        774
+      ],
+      [
+        785,
+        791
+      ],
+      [
+        852,
+        858
+      ],
+      [
+        893,
+        899
+      ],
+      [
+        906,
+        912
+      ],
+      [
+        961,
+        979
+      ],
+      [
+        991,
+        996
+      ],
+      [
+        1068,
+        1073
+      ],
+      [
+        1160,
+        1165
+      ]
+    ],
+    "src/main/scala/rocket/VER.scala": [
+      [
+        0,
+        0
+      ]
+    ],
+    "src/main/scala/subsystem/Configs.scala": [
+      [
+        114,
+        119
+      ]
+    ],
+    "src/main/scala/system/Configs.scala": [
+      [
+        20,
+        26
+      ]
+    ],
+    "src/main/scala/tile/BaseTile.scala": [
+      [
+        53,
+        58
+      ],
+      [
+        93,
+        99
+      ]
+    ],
+    "src/main/scala/tile/Core.scala": [
+      [
+        68,
+        77
+      ],
+      [
+        139,
+        144
+      ],
+      [
+        157,
+        163
+      ],
+      [
+        175,
+        179
+      ]
+    ],
+    "src/main/scala/tile/FPU.scala": [
+      [
+        205,
+        215
+      ],
+      [
+        791,
+        796
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "vsim/Makefrag"
+  ],
+  "raw_diff_path": "ground_truth/chipsalliance.rocket-chip_1.raw.diff"
+}

@@ -1,0 +1,31 @@
+{
+  "case_id": "chipsalliance.rocket-chip#3579",
+  "issue_repo": {
+    "owner": "chipsalliance",
+    "name": "rocket-chip"
+  },
+  "fix_repo": {
+    "owner": "tymcauley",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "cc57dccc02d9c10348308f3c5f377b5447b93a4d",
+  "buggy_commit_sha": "35a69e798d636d12b7996eb62fa77f2a85c0940b",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_3579.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "cc57dccc02d9c10348308f3c5f377b5447b93a4d",
+    "3dc91843a36c3162ca16721fb84800deb9b32f35"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "src/main/resources/META-INF/services/firrtl.options.RegisteredLibrary"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/chipsalliance.rocket-chip_3579.raw.diff"
+}

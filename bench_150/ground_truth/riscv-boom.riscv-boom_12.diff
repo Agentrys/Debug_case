@@ -1,0 +1,519 @@
+diff --git a/src/main/scala/exu/rename/column-arbiter.scala b/src/main/scala/exu/rename/column-arbiter.scala
+index 330cb5bf..d9c2650f 100644
+--- a/src/main/scala/exu/rename/column-arbiter.scala
++++ b/src/main/scala/exu/rename/column-arbiter.scala
+@@ -33,8 +33,8 @@ class ColumnArbiter(implicit p: Parameters) extends BoomModule
+     b2  : Bool,
+     rnd : UInt) =
+   {
+-    RotateLeft(Mux(b2, col2,
+-               Mux(b1, col1, rnd)))
++    RotateLeft(Mux(b1, col1,
++               Mux(b2, col2, rnd)))
+   }
+ 
+   val rnd = RegInit(1.U(coreWidth.W))
+diff --git a/src/main/scala/exu/rename/ring-rename.scala b/src/main/scala/exu/rename/ring-rename.scala
+index 8baa12c4..bcbf53c2 100644
+--- a/src/main/scala/exu/rename/ring-rename.scala
++++ b/src/main/scala/exu/rename/ring-rename.scala
+@@ -279,7 +279,7 @@ class RingRename(implicit p: Parameters) extends BoomModule
+     io.ren2_uops(w) := GetNewUopAndBrMask(bypassed_uop, io.brupdate)
+ 
+     // Need to know which prs was used to decide on a column. A bit of a hack.
+-    io.ren2_uops(w).busy_operand_sel := bypassed_uop.prs2_busy
++    io.ren2_uops(w).busy_operand_sel := !bypassed_uop.prs1_busy
+   }
+ 
+   //----------------------------------------------------------------------------------------------------
+diff --git a/src/main/resources/vsrc/SimTMACounterDump.v b/src/main/resources/vsrc/SimTMACounterDump.v
+index 3e15418b..e6cb1005 100644
+--- a/src/main/resources/vsrc/SimTMACounterDump.v
++++ b/src/main/resources/vsrc/SimTMACounterDump.v
+@@ -47,7 +47,7 @@ module SimTMACounterDump #(
+     input [63:0] counters_37,
+     input [63:0] counters_38,
+     input [63:0] counters_39,
+-    // L2 cache counters (40-56)
++    // New core counters (40-59)
+     input [63:0] counters_40,
+     input [63:0] counters_41,
+     input [63:0] counters_42,
+@@ -65,27 +65,48 @@ module SimTMACounterDump #(
+     input [63:0] counters_54,
+     input [63:0] counters_55,
+     input [63:0] counters_56,
+-    // Memory ordering counters (57-64)
+     input [63:0] counters_57,
+     input [63:0] counters_58,
+     input [63:0] counters_59,
++    // Memory ordering counters (60-67)
+     input [63:0] counters_60,
+     input [63:0] counters_61,
+     input [63:0] counters_62,
+     input [63:0] counters_63,
+     input [63:0] counters_64,
+-    // Data dependency counters (65-71)
+     input [63:0] counters_65,
+     input [63:0] counters_66,
+     input [63:0] counters_67,
++    // Data dependency counters (68-74)
+     input [63:0] counters_68,
+     input [63:0] counters_69,
+     input [63:0] counters_70,
+-    input [63:0] counters_71
++    input [63:0] counters_71,
++    input [63:0] counters_72,
++    input [63:0] counters_73,
++    input [63:0] counters_74,
++    // L2 cache counters (75-91)
++    input [63:0] counters_75,
++    input [63:0] counters_76,
++    input [63:0] counters_77,
++    input [63:0] counters_78,
++    input [63:0] counters_79,
++    input [63:0] counters_80,
++    input [63:0] counters_81,
++    input [63:0] counters_82,
++    input [63:0] counters_83,
++    input [63:0] counters_84,
++    input [63:0] counters_85,
++    input [63:0] counters_86,
++    input [63:0] counters_87,
++    input [63:0] counters_88,
++    input [63:0] counters_89,
++    input [63:0] counters_90,
++    input [63:0] counters_91
+ );
+ 
+     reg enabled;
+-    wire [63:0] ctr_array [0:71];
++    wire [63:0] ctr_array [0:91];
+ 
+     assign ctr_array[0]  = counters_0;
+     assign ctr_array[1]  = counters_1;
+@@ -127,7 +148,7 @@ module SimTMACounterDump #(
+     assign ctr_array[37] = counters_37;
+     assign ctr_array[38] = counters_38;
+     assign ctr_array[39] = counters_39;
+-    // L2 cache counters
++    // New core counters
+     assign ctr_array[40] = counters_40;
+     assign ctr_array[41] = counters_41;
+     assign ctr_array[42] = counters_42;
+@@ -148,19 +169,41 @@ module SimTMACounterDump #(
+     assign ctr_array[57] = counters_57;
+     assign ctr_array[58] = counters_58;
+     assign ctr_array[59] = counters_59;
++    // Memory ordering counters
+     assign ctr_array[60] = counters_60;
+     assign ctr_array[61] = counters_61;
+     assign ctr_array[62] = counters_62;
+     assign ctr_array[63] = counters_63;
+     assign ctr_array[64] = counters_64;
+-    // Data dependency counters
+     assign ctr_array[65] = counters_65;
+     assign ctr_array[66] = counters_66;
+     assign ctr_array[67] = counters_67;
++    // Data dependency counters
+     assign ctr_array[68] = counters_68;
+     assign ctr_array[69] = counters_69;
+     assign ctr_array[70] = counters_70;
+     assign ctr_array[71] = counters_71;
++    assign ctr_array[72] = counters_72;
++    assign ctr_array[73] = counters_73;
++    assign ctr_array[74] = counters_74;
++    // L2 cache counters
++    assign ctr_array[75] = counters_75;
++    assign ctr_array[76] = counters_76;
++    assign ctr_array[77] = counters_77;
++    assign ctr_array[78] = counters_78;
++    assign ctr_array[79] = counters_79;
++    assign ctr_array[80] = counters_80;
++    assign ctr_array[81] = counters_81;
++    assign ctr_array[82] = counters_82;
++    assign ctr_array[83] = counters_83;
++    assign ctr_array[84] = counters_84;
++    assign ctr_array[85] = counters_85;
++    assign ctr_array[86] = counters_86;
++    assign ctr_array[87] = counters_87;
++    assign ctr_array[88] = counters_88;
++    assign ctr_array[89] = counters_89;
++    assign ctr_array[90] = counters_90;
++    assign ctr_array[91] = counters_91;
+ 
+     initial begin
+         enabled = $test$plusargs("dump-tma-counters");
+diff --git a/src/main/scala/v3/common/BoomPerfCounterDevice.scala b/src/main/scala/v3/common/BoomPerfCounterDevice.scala
+index df222c4f..3488caea 100644
+--- a/src/main/scala/v3/common/BoomPerfCounterDevice.scala
++++ b/src/main/scala/v3/common/BoomPerfCounterDevice.scala
+@@ -51,48 +51,69 @@ import midas.targetutils.SynthesizePrintf
+ //   0x130: jalr_mispredict
+ //   0x138: br_mispredict_bpd
+ //   0x140: br_mispredict_btb
++// --- New Core Counters (Pipeline/Execution, Branch Prediction, Fetch/Decode) ---
++//   0x148: dispatch_slots_valid
++//   0x150: issued_int_total
++//   0x158: issued_mem_total
++//   0x160: issued_mul_total
++//   0x168: issued_div_total
++//   0x170: flush_xcpt_events
++//   0x178: flush_eret_events
++//   0x180: flush_refetch_events
++//   0x188: flush_next_events
++//   0x190: dis_stall_cycles
++//   0x198: br_cond_mispredict
++//   0x1A0: br_indirect_mispredict
++//   0x1A8: br_ret_mispredict
++//   0x1B0: br_no_prediction
++//   0x1B8: fetch_bubble_raw
++//   0x1C0: fetch_slots_delivered
++//   0x1C8: decode_backend_stall
++//   0x1D0: int_iq_empty_cycles
++//   0x1D8: mem_iq_empty_cycles
++//   0x1E0: sfb_opt_events
++// --- Memory Ordering Counters ---
++//   0x1E8: stld_fwd_stall_cycles
++//   0x1F0: stld_fwd_success
++//   0x1F8: stld_fwd_wakeup_retries
++//   0x200: stld_fwd_block_load_wakeup_cycles
++//   0x208: mem_order_failures
++//   0x210: load_ordering_failures
++//   0x218: load_spec_mispredict
++//   0x220: load_nack_retries
++// --- Data Dependency Counters ---
++//   0x228: dep_stall_cycles
++//   0x230: operand_wait_slot_cycles
++//   0x238: iq_dispatched_ready
++//   0x240: iq_dispatched_not_ready
++//   0x248: issued_with_poison
++//   0x250: ldspec_squash_grants
++//   0x258: spec_ld_wakeup_events
+ // --- L2 Cache Counters (from InclusiveCache) ---
+-//   0x148: l2_pf_hint_req_accepted
+-//   0x150: l2_pf_hint_req_blocked_cycles
+-//   0x158: l2_pf_hint_alloc_dir_miss
+-//   0x160: l2_pf_hint_alloc_dir_hit
+-//   0x168: l2_demand_alloc_dir_miss
+-//   0x170: l2_demand_alloc_dir_hit_on_prefetched
+-//   0x178: l2_demand_alloc_dir_hit_on_pf_brought
+-//   0x180: l2_demand_queued_behind_prefetch
+-//   0x188: l2_demand_alloc_dir_hit_regular
+-//   0x190: l2_secondary_misses
+-//   0x198: l2_evictions_dirty
+-//   0x1A0: l2_evictions_clean
+-//   0x1A8: l2_evictions_prefetched
+-//   0x1B0: l2_mshr_occupancy_sum
+-//   0x1B8: l2_mshr_full_cycles
+-//   0x1C0: l2_set_conflict_stall_cycles
+-//   0x1C8: l2_bank_conflict_cycles
+-// --- Memory ordering counters (57-64) ---
+-//   0x1D0: stld_fwd_stall_cycles
+-//   0x1D8: stld_fwd_success
+-//   0x1E0: stld_fwd_wakeup_retries
+-//   0x1E8: stld_fwd_block_load_wakeup_cycles
+-//   0x1F0: mem_order_failures
+-//   0x1F8: load_ordering_failures
+-//   0x200: load_spec_mispredict
+-//   0x208: load_nack_retries
+-// --- Data dependency counters (65-71) ---
+-//   0x210: dep_stall_cycles
+-//   0x218: operand_wait_slot_cycles
+-//   0x220: iq_dispatched_ready
+-//   0x228: iq_dispatched_not_ready
+-//   0x230: issued_with_poison
+-//   0x238: ldspec_squash_grants
+-//   0x240: spec_ld_wakeup_events
++//   0x260: l2_pf_hint_req_accepted
++//   0x268: l2_pf_hint_req_blocked_cycles
++//   0x270: l2_pf_hint_alloc_dir_miss
++//   0x278: l2_pf_hint_alloc_dir_hit
++//   0x280: l2_demand_alloc_dir_miss
++//   0x288: l2_demand_alloc_dir_hit_on_prefetched
++//   0x290: l2_demand_alloc_dir_hit_on_pf_brought
++//   0x298: l2_demand_queued_behind_prefetch
++//   0x2A0: l2_demand_alloc_dir_hit_regular
++//   0x2A8: l2_secondary_misses
++//   0x2B0: l2_evictions_dirty
++//   0x2B8: l2_evictions_clean
++//   0x2C0: l2_evictions_prefetched
++//   0x2C8: l2_mshr_occupancy_sum
++//   0x2D0: l2_mshr_full_cycles
++//   0x2D8: l2_set_conflict_stall_cycles
++//   0x2E0: l2_bank_conflict_cycles
+ 
+ object BoomPerfCounterConsts {
+-  val CORE_NUM_COUNTERS = 40
++  val CORE_NUM_COUNTERS = 60
+   val L2_NUM_COUNTERS = 17
+   val MEM_ORDER_NUM_COUNTERS = 8
+   val DATA_DEP_NUM_COUNTERS = 7
+-  val NUM_COUNTERS = CORE_NUM_COUNTERS + L2_NUM_COUNTERS + MEM_ORDER_NUM_COUNTERS + DATA_DEP_NUM_COUNTERS // 72
++  val NUM_COUNTERS = CORE_NUM_COUNTERS + MEM_ORDER_NUM_COUNTERS + DATA_DEP_NUM_COUNTERS + L2_NUM_COUNTERS // 92
+ }
+ 
+ case class BoomPerfCounterParams(
+@@ -154,12 +175,14 @@ class BoomPerfCounterDevice(params: BoomPerfCounterParams, beatBytes: Int)(impli
+         "icache_miss", "dcache_miss", "dcache_release",
+         "itlb_miss", "dtlb_miss", "l2tlb_miss",
+         "br_mispredict", "br_resolve", "jalr_mispredict", "br_mispred_bpd", "br_mispred_btb",
+-        // L2 cache counters
+-        "l2_pf_hint_req_accepted", "l2_pf_hint_req_blocked", "l2_pf_alloc_dir_miss", "l2_pf_alloc_dir_hit",
+-        "l2_demand_alloc_dir_miss", "l2_demand_hit_prefetched", "l2_demand_hit_pf_brought",
+-        "l2_demand_queued_behind_pf", "l2_demand_hit_regular",
+-        "l2_secondary_misses", "l2_evict_dirty", "l2_evict_clean", "l2_evict_prefetched",
+-        "l2_mshr_occ_sum", "l2_mshr_full", "l2_set_conflict_stall", "l2_bank_conflict",
++        // New core counters
++        "dispatch_slots_valid",
++        "issued_int_total", "issued_mem_total", "issued_mul_total", "issued_div_total",
++        "flush_xcpt", "flush_eret", "flush_refetch", "flush_next",
++        "dis_stall",
++        "br_cond_mispredict", "br_indirect_mispredict", "br_ret_mispredict", "br_no_prediction",
++        "fetch_bubble_raw", "fetch_slots_delivered", "decode_backend_stall",
++        "int_iq_empty", "mem_iq_empty", "sfb_opt_events",
+         // Memory ordering counters
+         "stld_fwd_stall_cycles", "stld_fwd_success", "stld_fwd_wakeup_retries",
+         "stld_fwd_block_load_wakeup_cycles", "mem_order_failures",
+@@ -167,7 +190,13 @@ class BoomPerfCounterDevice(params: BoomPerfCounterParams, beatBytes: Int)(impli
+         // Data dependency counters
+         "dep_stall_cycles", "operand_wait_slot_cycles",
+         "iq_dispatched_ready", "iq_dispatched_not_ready",
+-        "issued_with_poison", "ldspec_squash_grants", "spec_ld_wakeup_events")
++        "issued_with_poison", "ldspec_squash_grants", "spec_ld_wakeup_events",
++        // L2 cache counters
++        "l2_pf_hint_req_accepted", "l2_pf_hint_req_blocked", "l2_pf_alloc_dir_miss", "l2_pf_alloc_dir_hit",
++        "l2_demand_alloc_dir_miss", "l2_demand_hit_prefetched", "l2_demand_hit_pf_brought",
++        "l2_demand_queued_behind_pf", "l2_demand_hit_regular",
++        "l2_secondary_misses", "l2_evict_dirty", "l2_evict_clean", "l2_evict_prefetched",
++        "l2_mshr_occ_sum", "l2_mshr_full", "l2_set_conflict_stall", "l2_bank_conflict")
+       SynthesizePrintf(printf("===== TMA PERFORMANCE COUNTERS =====\n"))
+       for (i <- 0 until BoomPerfCounterConsts.NUM_COUNTERS) {
+         SynthesizePrintf(printf(s"  %24s = %%d\n".format(names(i)), io.counters(i)))
+diff --git a/src/main/scala/v3/common/tile.scala b/src/main/scala/v3/common/tile.scala
+index fb409716..e07332d2 100644
+--- a/src/main/scala/v3/common/tile.scala
++++ b/src/main/scala/v3/common/tile.scala
+@@ -266,10 +266,10 @@ class BoomTileModuleImp(outer: BoomTile) extends BaseTileModuleImp(outer){
+   outer.perfCounterDevice.foreach { dev =>
+     core.io.tma_counters.foreach { ctrs =>
+       dev.module.io.counters := ctrs
+-      // Override L2 counter slots (40-56) with actual L2 counter values
++      // Override L2 counter slots (75-91) with actual L2 counter values
+       l2PerfCounters.foreach { l2ctrs =>
+         for (i <- 0 until BoomPerfCounterConsts.L2_NUM_COUNTERS) {
+-          dev.module.io.counters(BoomPerfCounterConsts.CORE_NUM_COUNTERS + i) := l2ctrs(i)
++          dev.module.io.counters(BoomPerfCounterConsts.CORE_NUM_COUNTERS + BoomPerfCounterConsts.MEM_ORDER_NUM_COUNTERS + BoomPerfCounterConsts.DATA_DEP_NUM_COUNTERS + i) := l2ctrs(i)
+         }
+       }
+     }
+@@ -287,7 +287,7 @@ class BoomTileModuleImp(outer: BoomTile) extends BaseTileModuleImp(outer){
+       // Override L2 counter slots with actual values
+       l2PerfCounters.foreach { l2ctrs =>
+         for (i <- 0 until BoomPerfCounterConsts.L2_NUM_COUNTERS) {
+-          dump.io.counters(BoomPerfCounterConsts.CORE_NUM_COUNTERS + i) := l2ctrs(i)
++          dump.io.counters(BoomPerfCounterConsts.CORE_NUM_COUNTERS + BoomPerfCounterConsts.MEM_ORDER_NUM_COUNTERS + BoomPerfCounterConsts.DATA_DEP_NUM_COUNTERS + i) := l2ctrs(i)
+         }
+       }
+     }
+diff --git a/src/main/scala/v3/exu/core.scala b/src/main/scala/v3/exu/core.scala
+index 1eedb6eb..4547f40c 100644
+--- a/src/main/scala/v3/exu/core.scala
++++ b/src/main/scala/v3/exu/core.scala
+@@ -948,6 +948,81 @@ class BoomCore()(implicit p: Parameters) extends BoomModule
+     dontTouch(tma_ctr_br_mispred_bpd)
+     dontTouch(tma_ctr_br_mispred_btb)
+ 
++    // --- Pipeline & Execution counters ---
++    val tma_ctr_dispatch_slots_valid = RegInit(0.U(xLen.W))
++    val tma_ctr_issued_int           = RegInit(0.U(xLen.W))
++    val tma_ctr_issued_mem           = RegInit(0.U(xLen.W))
++    val tma_ctr_issued_mul           = RegInit(0.U(xLen.W))
++    val tma_ctr_issued_div           = RegInit(0.U(xLen.W))
++    val tma_ctr_flush_xcpt           = RegInit(0.U(xLen.W))
++    val tma_ctr_flush_eret           = RegInit(0.U(xLen.W))
++    val tma_ctr_flush_refetch        = RegInit(0.U(xLen.W))
++    val tma_ctr_flush_next           = RegInit(0.U(xLen.W))
++    val tma_ctr_dis_stall            = RegInit(0.U(xLen.W))
++
++    tma_ctr_dispatch_slots_valid := tma_ctr_dispatch_slots_valid + PopCount(dis_valids)
++    tma_ctr_issued_int  := tma_ctr_issued_int  + PopCount(int_iss_unit.io.iss_valids)
++    tma_ctr_issued_mem  := tma_ctr_issued_mem  + PopCount(mem_iss_unit.io.iss_valids)
++    tma_ctr_issued_mul  := tma_ctr_issued_mul  + PopCount(VecInit((0 until exe_units.numIrfReaders).map(i => iss_valids(i) && iss_uops(i).fu_code_is(FU_MUL))))
++    tma_ctr_issued_div  := tma_ctr_issued_div  + PopCount(VecInit((0 until exe_units.numIrfReaders).map(i => iss_valids(i) && iss_uops(i).fu_code_is(FU_DIV))))
++    tma_ctr_flush_xcpt    := tma_ctr_flush_xcpt    + (rob.io.flush.valid && rob.io.flush.bits.flush_typ === FlushTypes.xcpt)
++    tma_ctr_flush_eret    := tma_ctr_flush_eret    + (rob.io.flush.valid && rob.io.flush.bits.flush_typ === FlushTypes.eret)
++    tma_ctr_flush_refetch := tma_ctr_flush_refetch + (rob.io.flush.valid && rob.io.flush.bits.flush_typ === FlushTypes.refetch)
++    tma_ctr_flush_next    := tma_ctr_flush_next    + (rob.io.flush.valid && rob.io.flush.bits.flush_typ === FlushTypes.next)
++    tma_ctr_dis_stall     := tma_ctr_dis_stall     + !dis_ready
++
++    dontTouch(tma_ctr_dispatch_slots_valid)
++    dontTouch(tma_ctr_issued_int)
++    dontTouch(tma_ctr_issued_mem)
++    dontTouch(tma_ctr_issued_mul)
++    dontTouch(tma_ctr_issued_div)
++    dontTouch(tma_ctr_flush_xcpt)
++    dontTouch(tma_ctr_flush_eret)
++    dontTouch(tma_ctr_flush_refetch)
++    dontTouch(tma_ctr_flush_next)
++    dontTouch(tma_ctr_dis_stall)
++
++    // --- Branch Prediction counters ---
++    val tma_ctr_br_cond_mispredict     = RegInit(0.U(xLen.W))
++    val tma_ctr_br_indirect_mispredict = RegInit(0.U(xLen.W))
++    val tma_ctr_br_ret_mispredict      = RegInit(0.U(xLen.W))
++    val tma_ctr_br_no_prediction       = RegInit(0.U(xLen.W))
++
++    val tma_ftq1_is_ret = io.ifu.get_pc(1).entry.cfi_is_ret
++    tma_ctr_br_cond_mispredict     := tma_ctr_br_cond_mispredict     + (b2.mispredict && b2.cfi_type === CFI_BR)
++    tma_ctr_br_indirect_mispredict := tma_ctr_br_indirect_mispredict + (b2.mispredict && b2.cfi_type === CFI_JALR && !tma_ftq1_is_ret)
++    tma_ctr_br_ret_mispredict      := tma_ctr_br_ret_mispredict      + (b2.mispredict && b2.cfi_type === CFI_JALR && tma_ftq1_is_ret)
++    tma_ctr_br_no_prediction       := tma_ctr_br_no_prediction       + PopCount(VecInit(brinfos.map(bi => bi.valid && bi.uop.debug_fsrc === BSRC_C)))
++
++    dontTouch(tma_ctr_br_cond_mispredict)
++    dontTouch(tma_ctr_br_indirect_mispredict)
++    dontTouch(tma_ctr_br_ret_mispredict)
++    dontTouch(tma_ctr_br_no_prediction)
++
++    // --- Fetch & Decode counters ---
++    val tma_ctr_fetch_bubble_raw      = RegInit(0.U(xLen.W))
++    val tma_ctr_fetch_slots_delivered = RegInit(0.U(xLen.W))
++    val tma_ctr_decode_backend_stall  = RegInit(0.U(xLen.W))
++    val tma_ctr_int_iq_empty          = RegInit(0.U(xLen.W))
++    val tma_ctr_mem_iq_empty          = RegInit(0.U(xLen.W))
++    val tma_ctr_sfb_opt_events        = RegInit(0.U(xLen.W))
++
++    tma_ctr_fetch_bubble_raw      := tma_ctr_fetch_bubble_raw      + !io.ifu.fetchpacket.valid
++    tma_ctr_fetch_slots_delivered := tma_ctr_fetch_slots_delivered + Mux(io.ifu.fetchpacket.valid,
++      PopCount(VecInit((0 until coreWidth).map(w => dec_fbundle.uops(w).valid))), 0.U)
++    tma_ctr_decode_backend_stall  := tma_ctr_decode_backend_stall  + (io.ifu.fetchpacket.valid && !dis_ready)
++    tma_ctr_int_iq_empty          := tma_ctr_int_iq_empty          + int_iss_unit.io.event_empty
++    tma_ctr_mem_iq_empty          := tma_ctr_mem_iq_empty          + mem_iss_unit.io.event_empty
++    tma_ctr_sfb_opt_events        := tma_ctr_sfb_opt_events        + PopCount(VecInit((0 until exe_units.numIrfReaders).map(i => iss_valids(i) && iss_uops(i).is_sfb_br)))
++
++    dontTouch(tma_ctr_fetch_bubble_raw)
++    dontTouch(tma_ctr_fetch_slots_delivered)
++    dontTouch(tma_ctr_decode_backend_stall)
++    dontTouch(tma_ctr_int_iq_empty)
++    dontTouch(tma_ctr_mem_iq_empty)
++    dontTouch(tma_ctr_sfb_opt_events)
++
++    // --- Memory ordering counters (60-67) ---
+     val tma_ctr_stld_fwd_stall_cycles       = RegInit(0.U(xLen.W))
+     val tma_ctr_stld_fwd_success            = RegInit(0.U(xLen.W))
+     val tma_ctr_stld_fwd_wakeup_retries     = RegInit(0.U(xLen.W))
+@@ -978,39 +1053,33 @@ class BoomCore()(implicit p: Parameters) extends BoomModule
+     dontTouch(tma_ctr_load_spec_mispredict)
+     dontTouch(tma_ctr_load_nack_retries)
+ 
+-    // Data dependency counters (65-71)
+-    val tma_ctr_dep_stall_cycles        = RegInit(0.U(xLen.W))
++    // --- Data dependency counters (68-74) ---
++    val tma_ctr_dep_stall_cycles         = RegInit(0.U(xLen.W))
+     val tma_ctr_operand_wait_slot_cycles = RegInit(0.U(xLen.W))
+-    val tma_ctr_iq_dispatched_ready     = RegInit(0.U(xLen.W))
+-    val tma_ctr_iq_dispatched_not_ready = RegInit(0.U(xLen.W))
+-    val tma_ctr_issued_with_poison      = RegInit(0.U(xLen.W))
+-    val tma_ctr_ldspec_squash_grants    = RegInit(0.U(xLen.W))
+-    val tma_ctr_spec_ld_wakeup_events   = RegInit(0.U(xLen.W))
++    val tma_ctr_iq_dispatched_ready      = RegInit(0.U(xLen.W))
++    val tma_ctr_iq_dispatched_not_ready  = RegInit(0.U(xLen.W))
++    val tma_ctr_issued_with_poison       = RegInit(0.U(xLen.W))
++    val tma_ctr_ldspec_squash_grants     = RegInit(0.U(xLen.W))
++    val tma_ctr_spec_ld_wakeup_events    = RegInit(0.U(xLen.W))
+ 
+     if (boomParams.enableDataDepCounters) {
+-      // dep_stall_cycles: core-level boolean — any INT/MEM IQ has valid entries but none requesting
+       val any_dep_stall = issue_units.map(_.io.perf_dep.dep_stall).reduce(_||_)
+       tma_ctr_dep_stall_cycles := tma_ctr_dep_stall_cycles + any_dep_stall
+ 
+-      // operand_wait_slot_cycles: sum of (valid && !request) across all IQ slots
+       val total_not_ready = issue_units.map(_.io.perf_dep.not_ready_slots).reduce(_ +& _)
+       tma_ctr_operand_wait_slot_cycles := tma_ctr_operand_wait_slot_cycles + total_not_ready
+ 
+-      // iq_dispatched_ready/not_ready: sum across issue units
+       val total_disp_ready = issue_units.map(_.io.perf_dep.iq_dispatched_ready).reduce(_ +& _)
+       val total_disp_not_ready = issue_units.map(_.io.perf_dep.iq_dispatched_not_ready).reduce(_ +& _)
+-      tma_ctr_iq_dispatched_ready := tma_ctr_iq_dispatched_ready + total_disp_ready
++      tma_ctr_iq_dispatched_ready     := tma_ctr_iq_dispatched_ready     + total_disp_ready
+       tma_ctr_iq_dispatched_not_ready := tma_ctr_iq_dispatched_not_ready + total_disp_not_ready
+ 
+-      // issued_with_poison: sum across issue units
+       val total_poison = issue_units.map(_.io.perf_dep.issued_with_poison).reduce(_ +& _)
+       tma_ctr_issued_with_poison := tma_ctr_issued_with_poison + total_poison
+ 
+-      // ldspec_squash_grants: sum across issue units
+       val total_squash = issue_units.map(_.io.perf_dep.squash_grants).reduce(_ +& _)
+       tma_ctr_ldspec_squash_grants := tma_ctr_ldspec_squash_grants + total_squash
+ 
+-      // spec_ld_wakeup_events: count from LSU spec_ld_wakeup ports
+       tma_ctr_spec_ld_wakeup_events := tma_ctr_spec_ld_wakeup_events +
+         PopCount(io.lsu.spec_ld_wakeup.map(_.valid))
+     }
+@@ -1064,25 +1133,48 @@ class BoomCore()(implicit p: Parameters) extends BoomModule
+       tma_ctr_br_resolve,           // 36: br_resolve
+       tma_ctr_jalr_mispredict,      // 37: jalr_mispredict
+       tma_ctr_br_mispred_bpd,       // 38: br_mispredict_bpd
+-      tma_ctr_br_mispred_btb        // 39: br_mispredict_btb
+-    ) ++ Seq.fill(BoomPerfCounterConsts.L2_NUM_COUNTERS)(0.U(xLen.W)) ++ Seq(
+-      tma_ctr_stld_fwd_stall_cycles,   // 57: stld_fwd_stall_cycles
+-      tma_ctr_stld_fwd_success,        // 58: stld_fwd_success
+-      tma_ctr_stld_fwd_wakeup_retries, // 59: stld_fwd_wakeup_retries
+-      tma_ctr_stld_block_load_wakeup,  // 60: stld_fwd_block_load_wakeup_cycles
+-      tma_ctr_mem_order_failures,      // 61: mem_order_failures
+-      tma_ctr_load_ordering_failures,  // 62: load_ordering_failures
+-      tma_ctr_load_spec_mispredict,    // 63: load_spec_mispredict
+-      tma_ctr_load_nack_retries        // 64: load_nack_retries
++      tma_ctr_br_mispred_btb,       // 39: br_mispredict_btb
++      // New core counters (40-59)
++      tma_ctr_dispatch_slots_valid, // 40: dispatch_slots_valid
++      tma_ctr_issued_int,           // 41: issued_int_total
++      tma_ctr_issued_mem,           // 42: issued_mem_total
++      tma_ctr_issued_mul,           // 43: issued_mul_total
++      tma_ctr_issued_div,           // 44: issued_div_total
++      tma_ctr_flush_xcpt,           // 45: flush_xcpt_events
++      tma_ctr_flush_eret,           // 46: flush_eret_events
++      tma_ctr_flush_refetch,        // 47: flush_refetch_events
++      tma_ctr_flush_next,           // 48: flush_next_events
++      tma_ctr_dis_stall,            // 49: dis_stall_cycles
++      tma_ctr_br_cond_mispredict,   // 50: br_cond_mispredict
++      tma_ctr_br_indirect_mispredict, // 51: br_indirect_mispredict
++      tma_ctr_br_ret_mispredict,    // 52: br_ret_mispredict
++      tma_ctr_br_no_prediction,     // 53: br_no_prediction
++      tma_ctr_fetch_bubble_raw,     // 54: fetch_bubble_raw
++      tma_ctr_fetch_slots_delivered,// 55: fetch_slots_delivered
++      tma_ctr_decode_backend_stall, // 56: decode_backend_stall
++      tma_ctr_int_iq_empty,         // 57: int_iq_empty_cycles
++      tma_ctr_mem_iq_empty,         // 58: mem_iq_empty_cycles
++      tma_ctr_sfb_opt_events        // 59: sfb_opt_events
+     ) ++ Seq(
+-      tma_ctr_dep_stall_cycles,         // 65: dep_stall_cycles
+-      tma_ctr_operand_wait_slot_cycles, // 66: operand_wait_slot_cycles
+-      tma_ctr_iq_dispatched_ready,      // 67: iq_dispatched_ready
+-      tma_ctr_iq_dispatched_not_ready,  // 68: iq_dispatched_not_ready
+-      tma_ctr_issued_with_poison,       // 69: issued_with_poison
+-      tma_ctr_ldspec_squash_grants,     // 70: ldspec_squash_grants
+-      tma_ctr_spec_ld_wakeup_events    // 71: spec_ld_wakeup_events
+-    )
++      // Memory ordering counters (60-67)
++      tma_ctr_stld_fwd_stall_cycles,   // 60
++      tma_ctr_stld_fwd_success,        // 61
++      tma_ctr_stld_fwd_wakeup_retries, // 62
++      tma_ctr_stld_block_load_wakeup,  // 63
++      tma_ctr_mem_order_failures,      // 64
++      tma_ctr_load_ordering_failures,  // 65
++      tma_ctr_load_spec_mispredict,    // 66
++      tma_ctr_load_nack_retries        // 67
++    ) ++ Seq(
++      // Data dependency counters (68-74)
++      tma_ctr_dep_stall_cycles,         // 68
++      tma_ctr_operand_wait_slot_cycles, // 69
++      tma_ctr_iq_dispatched_ready,      // 70
++      tma_ctr_iq_dispatched_not_ready,  // 71
++      tma_ctr_issued_with_poison,       // 72
++      tma_ctr_ldspec_squash_grants,     // 73
++      tma_ctr_spec_ld_wakeup_events     // 74
++    ) ++ Seq.fill(BoomPerfCounterConsts.L2_NUM_COUNTERS)(0.U(xLen.W)) // 75-91: L2 placeholders (overridden by tile)
+     )
+   } // end enableTMACounters
+ 

@@ -1,0 +1,268 @@
+{
+  "case_id": "openhwgroup.ariane#158",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "msfschaffner",
+    "name": "ariane"
+  },
+  "fix_oid": "a956c810684d65bbecd358a3656322ac86fde850",
+  "buggy_commit_sha": "a3044dbfcec3a69fec92e7bc6fee5fed40eaf6b3",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_158.diff",
+  "diff_sha256": "fd105315ad590cfcfdc3111f755c6051304f6b44444e539f556ba6576244f201",
+  "fix_oids_sorted": [
+    "a956c810684d65bbecd358a3656322ac86fde850",
+    "be3c614f71071e7899714bc5acafce6b02d1ce7f",
+    "9c503b540a2e88ec01c23a9b948b8e06f32e0e49",
+    "4fd90a30173f4a259ee24b869a51565a37712c97",
+    "fae34590b328b2848646cf1b22fcbf2a3f51e5f5"
+  ],
+  "n_fix_commits": 5,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "include/riscv_pkg.sv",
+    "src/ariane.sv",
+    "src/csr_regfile.sv",
+    "src/perf_counters.sv",
+    "openpiton/ariane_verilog_wrap.sv"
+  ],
+  "ground_truth_hunks": {
+    "include/riscv_pkg.sv": [
+      [
+        255,
+        278
+      ],
+      [
+        330,
+        335
+      ],
+      [
+        389,
+        407
+      ],
+      [
+        255,
+        278
+      ],
+      [
+        390,
+        407
+      ],
+      [
+        255,
+        278
+      ],
+      [
+        390,
+        407
+      ],
+      [
+        255,
+        278
+      ],
+      [
+        390,
+        407
+      ],
+      [
+        255,
+        278
+      ],
+      [
+        390,
+        407
+      ]
+    ],
+    "src/ariane.sv": [
+      [
+        187,
+        193
+      ],
+      [
+        187,
+        193
+      ],
+      [
+        187,
+        193
+      ],
+      [
+        187,
+        193
+      ],
+      [
+        187,
+        193
+      ]
+    ],
+    "src/csr_regfile.sv": [
+      [
+        76,
+        82
+      ],
+      [
+        149,
+        156
+      ],
+      [
+        249,
+        255
+      ],
+      [
+        76,
+        82
+      ],
+      [
+        149,
+        156
+      ],
+      [
+        249,
+        255
+      ],
+      [
+        76,
+        82
+      ],
+      [
+        149,
+        156
+      ],
+      [
+        249,
+        255
+      ],
+      [
+        76,
+        82
+      ],
+      [
+        149,
+        156
+      ],
+      [
+        249,
+        255
+      ],
+      [
+        76,
+        82
+      ],
+      [
+        149,
+        156
+      ],
+      [
+        249,
+        255
+      ]
+    ],
+    "src/perf_counters.sv": [
+      [
+        21,
+        27
+      ],
+      [
+        45,
+        51
+      ],
+      [
+        57,
+        122
+      ],
+      [
+        21,
+        27
+      ],
+      [
+        45,
+        51
+      ],
+      [
+        57,
+        122
+      ],
+      [
+        21,
+        27
+      ],
+      [
+        45,
+        51
+      ],
+      [
+        57,
+        122
+      ],
+      [
+        21,
+        27
+      ],
+      [
+        45,
+        51
+      ],
+      [
+        57,
+        122
+      ],
+      [
+        21,
+        27
+      ],
+      [
+        45,
+        51
+      ],
+      [
+        57,
+        122
+      ]
+    ],
+    "openpiton/ariane_verilog_wrap.sv": [
+      [
+        61,
+        66
+      ],
+      [
+        72,
+        77
+      ],
+      [
+        112,
+        132
+      ],
+      [
+        134,
+        145
+      ],
+      [
+        61,
+        66
+      ],
+      [
+        72,
+        77
+      ],
+      [
+        112,
+        132
+      ],
+      [
+        134,
+        145
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    ".travis.yml",
+    "ci/build-riscv-gcc.sh"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_158.raw.diff"
+}

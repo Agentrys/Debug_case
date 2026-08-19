@@ -1,0 +1,35 @@
+{
+  "case_id": "enjoy-digital.litex#1364",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_oid": "7909a834a4f8d62347bc9dd0f71bc8292246ce35",
+  "buggy_commit_sha": "61bce275ae97068e21a2511a948fdb1028007705",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/enjoy-digital.litex_1364.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "7909a834a4f8d62347bc9dd0f71bc8292246ce35",
+    "81b7b026af74a06fa4efefe6e80bd03cfc2b1e23",
+    "d86a229ea95b70a9c50d914adb28f03205abdd12"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/soc/cores/cpu/cv32e41p/core.py",
+    "test/test_cpu.py",
+    "test/test_integration.py",
+    ".github/workflows/ci.yml"
+  ],
+  "raw_diff_path": "ground_truth/enjoy-digital.litex_1364.raw.diff"
+}

@@ -1,0 +1,35 @@
+{
+  "case_id": "sld-columbia.esp#94",
+  "issue_repo": {
+    "owner": "sld-columbia",
+    "name": "esp"
+  },
+  "fix_repo": {
+    "owner": "sld-columbia",
+    "name": "esp"
+  },
+  "fix_oid": "003cb1b3034a3088f9e54b388eb9fba476b9ca0e",
+  "buggy_commit_sha": "607b249f06fb257c50e6f4e2e9d8a447f92eb1ee",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/sld-columbia.esp_94.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "003cb1b3034a3088f9e54b388eb9fba476b9ca0e",
+    "36ddc0fef108724b6323ad2524d71e2143f1e4eb",
+    "0e0ab3be8a24b9b7674a607901d9c2df578be876",
+    "793258c0051fc086c662247eeb2c7c445357107d",
+    "a878711517cb4a3423287e50b5090ab1e787fccd",
+    "29b1014cb26d07bcd45335edd2ac5ee35a439e6b"
+  ],
+  "n_fix_commits": 6,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "utils/make/vivado.mk"
+  ],
+  "raw_diff_path": "ground_truth/sld-columbia.esp_94.raw.diff"
+}

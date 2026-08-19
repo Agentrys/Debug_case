@@ -1,0 +1,616 @@
+diff --git a/utils/make/modelsim.mk b/utils/make/modelsim.mk
+index d96fb902..908f08e5 100644
+--- a/utils/make/modelsim.mk
++++ b/utils/make/modelsim.mk
+@@ -102,12 +102,6 @@ endif
+ 	@cd modelsim; \
+ 	echo $(SPACES)"vmake > vsim.mk"; \
+ 	vmake 2> /dev/null > vsim.mk; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	cd ../;
+ 
+ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+@@ -115,6 +109,10 @@ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+ 		cp $$dat modelsim; \
+ 	done;
+ 	$(QUIET_MAKE)make -C modelsim -f vsim.mk
++	@cd modelsim; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ sim: sim-compile
+ 	@cd modelsim; \
+diff --git a/utils/make/modelsim.mk b/utils/make/modelsim.mk
+index d96fb902..908f08e5 100644
+--- a/utils/make/modelsim.mk
++++ b/utils/make/modelsim.mk
+@@ -102,12 +102,6 @@ endif
+ 	@cd modelsim; \
+ 	echo $(SPACES)"vmake > vsim.mk"; \
+ 	vmake 2> /dev/null > vsim.mk; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	cd ../;
+ 
+ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+@@ -115,6 +109,10 @@ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+ 		cp $$dat modelsim; \
+ 	done;
+ 	$(QUIET_MAKE)make -C modelsim -f vsim.mk
++	@cd modelsim; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ sim: sim-compile
+ 	@cd modelsim; \
+diff --git a/utils/make/ncsim.mk b/utils/make/ncsim.mk
+index 8e943649..012d5c61 100644
+--- a/utils/make/ncsim.mk
++++ b/utils/make/ncsim.mk
+@@ -94,12 +94,6 @@ endif
+ 		echo $(SPACES)"$(NCLOG) $$rtl"; \
+ 		$(NCLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch ncready; \
+ 	cd ../;
+@@ -119,6 +113,10 @@ ncsim-compile: socketgen check_all_srcs soft incisive/ncready incisive/ncsim.in
+ 	echo $(SPACES)"$(NCUPDATE) $(SIMTOP)"; \
+ 	$(NCUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd incisive; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ ncsim: ncsim-compile
+ 	@cd incisive; \
+diff --git a/utils/make/xmsim.mk b/utils/make/xmsim.mk
+index 95c03ee9..f3f671fa 100644
+--- a/utils/make/xmsim.mk
++++ b/utils/make/xmsim.mk
+@@ -96,12 +96,6 @@ endif
+ 		echo $(SPACES)"$(XMLOG) -work work $$rtl"; \
+ 		$(XMLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch xmready; \
+ 	cd ../;
+@@ -118,6 +112,10 @@ xmsim-compile: socketgen check_all_srcs soft xcelium/xmready xcelium/xmsim.in
+ 	echo $(SPACES)"$(XMUPDATE) $(SIMTOP)"; \
+ 	$(XMUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd xcelium; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ xmsim: xmsim-compile
+ 	@cd xcelium; \
+diff --git a/utils/make/modelsim.mk b/utils/make/modelsim.mk
+index d96fb902..908f08e5 100644
+--- a/utils/make/modelsim.mk
++++ b/utils/make/modelsim.mk
+@@ -102,12 +102,6 @@ endif
+ 	@cd modelsim; \
+ 	echo $(SPACES)"vmake > vsim.mk"; \
+ 	vmake 2> /dev/null > vsim.mk; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	cd ../;
+ 
+ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+@@ -115,6 +109,10 @@ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+ 		cp $$dat modelsim; \
+ 	done;
+ 	$(QUIET_MAKE)make -C modelsim -f vsim.mk
++	@cd modelsim; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ sim: sim-compile
+ 	@cd modelsim; \
+diff --git a/utils/make/ncsim.mk b/utils/make/ncsim.mk
+index 8e943649..012d5c61 100644
+--- a/utils/make/ncsim.mk
++++ b/utils/make/ncsim.mk
+@@ -94,12 +94,6 @@ endif
+ 		echo $(SPACES)"$(NCLOG) $$rtl"; \
+ 		$(NCLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch ncready; \
+ 	cd ../;
+@@ -119,6 +113,10 @@ ncsim-compile: socketgen check_all_srcs soft incisive/ncready incisive/ncsim.in
+ 	echo $(SPACES)"$(NCUPDATE) $(SIMTOP)"; \
+ 	$(NCUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd incisive; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ ncsim: ncsim-compile
+ 	@cd incisive; \
+diff --git a/utils/make/xmsim.mk b/utils/make/xmsim.mk
+index 95c03ee9..f3f671fa 100644
+--- a/utils/make/xmsim.mk
++++ b/utils/make/xmsim.mk
+@@ -96,12 +96,6 @@ endif
+ 		echo $(SPACES)"$(XMLOG) -work work $$rtl"; \
+ 		$(XMLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch xmready; \
+ 	cd ../;
+@@ -118,6 +112,10 @@ xmsim-compile: socketgen check_all_srcs soft xcelium/xmready xcelium/xmsim.in
+ 	echo $(SPACES)"$(XMUPDATE) $(SIMTOP)"; \
+ 	$(XMUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd xcelium; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ xmsim: xmsim-compile
+ 	@cd xcelium; \
+diff --git a/utils/make/modelsim.mk b/utils/make/modelsim.mk
+index d96fb902..908f08e5 100644
+--- a/utils/make/modelsim.mk
++++ b/utils/make/modelsim.mk
+@@ -102,12 +102,6 @@ endif
+ 	@cd modelsim; \
+ 	echo $(SPACES)"vmake > vsim.mk"; \
+ 	vmake 2> /dev/null > vsim.mk; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	cd ../;
+ 
+ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+@@ -115,6 +109,10 @@ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+ 		cp $$dat modelsim; \
+ 	done;
+ 	$(QUIET_MAKE)make -C modelsim -f vsim.mk
++	@cd modelsim; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ sim: sim-compile
+ 	@cd modelsim; \
+diff --git a/utils/make/ncsim.mk b/utils/make/ncsim.mk
+index 8e943649..012d5c61 100644
+--- a/utils/make/ncsim.mk
++++ b/utils/make/ncsim.mk
+@@ -94,12 +94,6 @@ endif
+ 		echo $(SPACES)"$(NCLOG) $$rtl"; \
+ 		$(NCLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch ncready; \
+ 	cd ../;
+@@ -119,6 +113,10 @@ ncsim-compile: socketgen check_all_srcs soft incisive/ncready incisive/ncsim.in
+ 	echo $(SPACES)"$(NCUPDATE) $(SIMTOP)"; \
+ 	$(NCUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd incisive; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ ncsim: ncsim-compile
+ 	@cd incisive; \
+diff --git a/utils/make/xmsim.mk b/utils/make/xmsim.mk
+index 95c03ee9..f3f671fa 100644
+--- a/utils/make/xmsim.mk
++++ b/utils/make/xmsim.mk
+@@ -96,12 +96,6 @@ endif
+ 		echo $(SPACES)"$(XMLOG) -work work $$rtl"; \
+ 		$(XMLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch xmready; \
+ 	cd ../;
+@@ -118,6 +112,10 @@ xmsim-compile: socketgen check_all_srcs soft xcelium/xmready xcelium/xmsim.in
+ 	echo $(SPACES)"$(XMUPDATE) $(SIMTOP)"; \
+ 	$(XMUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd xcelium; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ xmsim: xmsim-compile
+ 	@cd xcelium; \
+diff --git a/utils/make/modelsim.mk b/utils/make/modelsim.mk
+index d96fb902..908f08e5 100644
+--- a/utils/make/modelsim.mk
++++ b/utils/make/modelsim.mk
+@@ -102,12 +102,6 @@ endif
+ 	@cd modelsim; \
+ 	echo $(SPACES)"vmake > vsim.mk"; \
+ 	vmake 2> /dev/null > vsim.mk; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	cd ../;
+ 
+ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+@@ -115,6 +109,10 @@ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+ 		cp $$dat modelsim; \
+ 	done;
+ 	$(QUIET_MAKE)make -C modelsim -f vsim.mk
++	@cd modelsim; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ sim: sim-compile
+ 	@cd modelsim; \
+diff --git a/utils/make/ncsim.mk b/utils/make/ncsim.mk
+index 8e943649..012d5c61 100644
+--- a/utils/make/ncsim.mk
++++ b/utils/make/ncsim.mk
+@@ -94,12 +94,6 @@ endif
+ 		echo $(SPACES)"$(NCLOG) $$rtl"; \
+ 		$(NCLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch ncready; \
+ 	cd ../;
+@@ -119,6 +113,10 @@ ncsim-compile: socketgen check_all_srcs soft incisive/ncready incisive/ncsim.in
+ 	echo $(SPACES)"$(NCUPDATE) $(SIMTOP)"; \
+ 	$(NCUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd incisive; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ ncsim: ncsim-compile
+ 	@cd incisive; \
+diff --git a/utils/make/xmsim.mk b/utils/make/xmsim.mk
+index 95c03ee9..f3f671fa 100644
+--- a/utils/make/xmsim.mk
++++ b/utils/make/xmsim.mk
+@@ -96,12 +96,6 @@ endif
+ 		echo $(SPACES)"$(XMLOG) -work work $$rtl"; \
+ 		$(XMLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch xmready; \
+ 	cd ../;
+@@ -118,6 +112,10 @@ xmsim-compile: socketgen check_all_srcs soft xcelium/xmready xcelium/xmsim.in
+ 	echo $(SPACES)"$(XMUPDATE) $(SIMTOP)"; \
+ 	$(XMUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd xcelium; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ xmsim: xmsim-compile
+ 	@cd xcelium; \
+diff --git a/utils/make/modelsim.mk b/utils/make/modelsim.mk
+index d96fb902..908f08e5 100644
+--- a/utils/make/modelsim.mk
++++ b/utils/make/modelsim.mk
+@@ -102,12 +102,6 @@ endif
+ 	@cd modelsim; \
+ 	echo $(SPACES)"vmake > vsim.mk"; \
+ 	vmake 2> /dev/null > vsim.mk; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	cd ../;
+ 
+ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+@@ -115,6 +109,10 @@ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+ 		cp $$dat modelsim; \
+ 	done;
+ 	$(QUIET_MAKE)make -C modelsim -f vsim.mk
++	@cd modelsim; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ sim: sim-compile
+ 	@cd modelsim; \
+diff --git a/utils/make/ncsim.mk b/utils/make/ncsim.mk
+index 8e943649..012d5c61 100644
+--- a/utils/make/ncsim.mk
++++ b/utils/make/ncsim.mk
+@@ -94,12 +94,6 @@ endif
+ 		echo $(SPACES)"$(NCLOG) $$rtl"; \
+ 		$(NCLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch ncready; \
+ 	cd ../;
+@@ -119,6 +113,10 @@ ncsim-compile: socketgen check_all_srcs soft incisive/ncready incisive/ncsim.in
+ 	echo $(SPACES)"$(NCUPDATE) $(SIMTOP)"; \
+ 	$(NCUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd incisive; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ ncsim: ncsim-compile
+ 	@cd incisive; \
+diff --git a/utils/make/xmsim.mk b/utils/make/xmsim.mk
+index 95c03ee9..f3f671fa 100644
+--- a/utils/make/xmsim.mk
++++ b/utils/make/xmsim.mk
+@@ -96,12 +96,6 @@ endif
+ 		echo $(SPACES)"$(XMLOG) -work work $$rtl"; \
+ 		$(XMLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch xmready; \
+ 	cd ../;
+@@ -118,6 +112,10 @@ xmsim-compile: socketgen check_all_srcs soft xcelium/xmready xcelium/xmsim.in
+ 	echo $(SPACES)"$(XMUPDATE) $(SIMTOP)"; \
+ 	$(XMUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd xcelium; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ xmsim: xmsim-compile
+ 	@cd xcelium; \
+diff --git a/utils/make/modelsim.mk b/utils/make/modelsim.mk
+index d96fb902..908f08e5 100644
+--- a/utils/make/modelsim.mk
++++ b/utils/make/modelsim.mk
+@@ -102,12 +102,6 @@ endif
+ 	@cd modelsim; \
+ 	echo $(SPACES)"vmake > vsim.mk"; \
+ 	vmake 2> /dev/null > vsim.mk; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	cd ../;
+ 
+ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+@@ -115,6 +109,10 @@ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+ 		cp $$dat modelsim; \
+ 	done;
+ 	$(QUIET_MAKE)make -C modelsim -f vsim.mk
++	@cd modelsim; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ sim: sim-compile
+ 	@cd modelsim; \
+diff --git a/utils/make/ncsim.mk b/utils/make/ncsim.mk
+index 8e943649..012d5c61 100644
+--- a/utils/make/ncsim.mk
++++ b/utils/make/ncsim.mk
+@@ -94,12 +94,6 @@ endif
+ 		echo $(SPACES)"$(NCLOG) $$rtl"; \
+ 		$(NCLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch ncready; \
+ 	cd ../;
+@@ -119,6 +113,10 @@ ncsim-compile: socketgen check_all_srcs soft incisive/ncready incisive/ncsim.in
+ 	echo $(SPACES)"$(NCUPDATE) $(SIMTOP)"; \
+ 	$(NCUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd incisive; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ ncsim: ncsim-compile
+ 	@cd incisive; \
+diff --git a/utils/make/xmsim.mk b/utils/make/xmsim.mk
+index 95c03ee9..f3f671fa 100644
+--- a/utils/make/xmsim.mk
++++ b/utils/make/xmsim.mk
+@@ -96,12 +96,6 @@ endif
+ 		echo $(SPACES)"$(XMLOG) -work work $$rtl"; \
+ 		$(XMLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch xmready; \
+ 	cd ../;
+@@ -118,6 +112,10 @@ xmsim-compile: socketgen check_all_srcs soft xcelium/xmready xcelium/xmsim.in
+ 	echo $(SPACES)"$(XMUPDATE) $(SIMTOP)"; \
+ 	$(XMUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd xcelium; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ xmsim: xmsim-compile
+ 	@cd xcelium; \
+diff --git a/utils/make/modelsim.mk b/utils/make/modelsim.mk
+index d96fb902..908f08e5 100644
+--- a/utils/make/modelsim.mk
++++ b/utils/make/modelsim.mk
+@@ -102,12 +102,6 @@ endif
+ 	@cd modelsim; \
+ 	echo $(SPACES)"vmake > vsim.mk"; \
+ 	vmake 2> /dev/null > vsim.mk; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	cd ../;
+ 
+ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+@@ -115,6 +109,10 @@ sim-compile: socketgen check_all_srcs modelsim/vsim.mk soft
+ 		cp $$dat modelsim; \
+ 	done;
+ 	$(QUIET_MAKE)make -C modelsim -f vsim.mk
++	@cd modelsim; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ sim: sim-compile
+ 	@cd modelsim; \
+diff --git a/utils/make/ncsim.mk b/utils/make/ncsim.mk
+index 8e943649..012d5c61 100644
+--- a/utils/make/ncsim.mk
++++ b/utils/make/ncsim.mk
+@@ -94,12 +94,6 @@ endif
+ 		echo $(SPACES)"$(NCLOG) $$rtl"; \
+ 		$(NCLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(NCELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch ncready; \
+ 	cd ../;
+@@ -119,6 +113,10 @@ ncsim-compile: socketgen check_all_srcs soft incisive/ncready incisive/ncsim.in
+ 	echo $(SPACES)"$(NCUPDATE) $(SIMTOP)"; \
+ 	$(NCUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd incisive; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ ncsim: ncsim-compile
+ 	@cd incisive; \
+diff --git a/utils/make/xmsim.mk b/utils/make/xmsim.mk
+index 95c03ee9..f3f671fa 100644
+--- a/utils/make/xmsim.mk
++++ b/utils/make/xmsim.mk
+@@ -96,12 +96,6 @@ endif
+ 		echo $(SPACES)"$(XMLOG) -work work $$rtl"; \
+ 		$(XMLOG) -work work $$rtl || exit; \
+ 	done; \
+-	if ! test -e prom.srec; then \
+-		ln -s $(SOFT_BUILD)/prom.srec; \
+-	fi; \
+-	if ! test -e ram.srec; then \
+-		ln -s $(SOFT_BUILD)/ram.srec; \
+-	fi; \
+ 	echo $(SPACES)"$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP)"; \
+ 	$(XMELAB) $(SIMTOP) $(EXTRA_SIMTOP) && touch xmready; \
+ 	cd ../;
+@@ -118,6 +112,10 @@ xmsim-compile: socketgen check_all_srcs soft xcelium/xmready xcelium/xmsim.in
+ 	echo $(SPACES)"$(XMUPDATE) $(SIMTOP)"; \
+ 	$(XMUPDATE) $(SIMTOP); \
+ 	cd ../;
++	@cd xcelium; \
++	rm -f prom.srec ram.srec; \
++	ln -s $(SOFT_BUILD)/prom.srec; \
++	ln -s $(SOFT_BUILD)/ram.srec;
+ 
+ xmsim: xmsim-compile
+ 	@cd xcelium; \

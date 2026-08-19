@@ -1,0 +1,26 @@
+diff --git a/boards/kcu105/base_fw/kcu105_basex/synth/firmware/ucf/kcu105_basex.tcl b/boards/kcu105/base_fw/kcu105_basex/synth/firmware/ucf/kcu105_basex.tcl
+index ba19cf01..6bffe638 100644
+--- a/boards/kcu105/base_fw/kcu105_basex/synth/firmware/ucf/kcu105_basex.tcl
++++ b/boards/kcu105/base_fw/kcu105_basex/synth/firmware/ucf/kcu105_basex.tcl
+@@ -45,7 +45,7 @@ create_clock -period 6.4 -name eth_refclk [get_ports eth_clk_p]
+ # System clock (125MHz)
+ create_clock -period 8 -name sysclk [get_ports sysclk_p]
+ 
+-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks sysclk] -group [get_clocks -include_generated_clocks [get_clocks -filter {name =~ infra/eth/phy/*/rxoutclk*}]] -group [get_clocks -include_generated_clocks [get_clocks -filter {name =~ txoutclk*}]]
++set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks sysclk] -group [get_clocks -include_generated_clocks [get_clocks -filter {name =~ txoutclk*}]]
+                                                  
+ set_property LOC GTHE3_CHANNEL_X0Y10 [get_cells -hier -filter {name=~infra/eth/*/*GTHE3_CHANNEL_PRIM_INST}]
+ 
+diff --git a/boards/kcu105/base_fw/kcu105_basex/synth/firmware/ucf/kcu105_basex.tcl b/boards/kcu105/base_fw/kcu105_basex/synth/firmware/ucf/kcu105_basex.tcl
+index ba19cf01..6bffe638 100644
+--- a/boards/kcu105/base_fw/kcu105_basex/synth/firmware/ucf/kcu105_basex.tcl
++++ b/boards/kcu105/base_fw/kcu105_basex/synth/firmware/ucf/kcu105_basex.tcl
+@@ -45,7 +45,7 @@ create_clock -period 6.4 -name eth_refclk [get_ports eth_clk_p]
+ # System clock (125MHz)
+ create_clock -period 8 -name sysclk [get_ports sysclk_p]
+ 
+-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks sysclk] -group [get_clocks -include_generated_clocks [get_clocks -filter {name =~ infra/eth/phy/*/rxoutclk*}]] -group [get_clocks -include_generated_clocks [get_clocks -filter {name =~ txoutclk*}]]
++set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks sysclk] -group [get_clocks -include_generated_clocks [get_clocks -filter {name =~ txoutclk*}]]
+                                                  
+ set_property LOC GTHE3_CHANNEL_X0Y10 [get_cells -hier -filter {name=~infra/eth/*/*GTHE3_CHANNEL_PRIM_INST}]
+ 

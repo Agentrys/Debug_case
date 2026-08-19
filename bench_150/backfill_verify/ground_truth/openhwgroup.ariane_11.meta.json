@@ -1,0 +1,58 @@
+{
+  "case_id": "openhwgroup.ariane#11",
+  "issue_repo": {
+    "owner": "openhwgroup",
+    "name": "cva6"
+  },
+  "fix_repo": {
+    "owner": "alaaibrah97",
+    "name": "cva6"
+  },
+  "fix_oid": "f29c25f4d5da0712aa549fb5dfc0fa78466b7bfe",
+  "buggy_commit_sha": "ec7e185670a49ab2ab76f77410d9b5791dc00634",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_11.diff",
+  "diff_sha256": "58b59d86319024fce301ca7ef6fcfdac28bc6e7ce01d65320bb96eb196965fb2",
+  "fix_oids_sorted": [
+    "f29c25f4d5da0712aa549fb5dfc0fa78466b7bfe",
+    "ca437317ae486a0f5ea54c0f118e712f3ee6e3d8",
+    "40c0e6973e795c490272ca37ec47e50ac5aa322d"
+  ],
+  "n_fix_commits": 3,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "core/cache_subsystem/miss_handler.sv",
+    "core/cache_subsystem/std_nbdcache.sv"
+  ],
+  "ground_truth_hunks": {
+    "core/cache_subsystem/miss_handler.sv": [
+      [
+        377,
+        383
+      ]
+    ],
+    "core/cache_subsystem/std_nbdcache.sv": [
+      [
+        136,
+        142
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "CHANGELOG.md",
+    "README.md",
+    "piton/design/chip/tile/ariane",
+    "piton/tools/src/proto/common/rtl_setup.tcl",
+    "piton/tools/src/proto/common/setup.tcl",
+    "piton/tools/src/proto/protosyn,2.5",
+    "piton/tools/src/sims/sims,2.0",
+    "piton/verif/env/manycore/pc_cmp.v.pyv",
+    ".gitignore",
+    "Bender.lock",
+    "Bender.yml"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/openhwgroup.ariane_11.raw.diff"
+}

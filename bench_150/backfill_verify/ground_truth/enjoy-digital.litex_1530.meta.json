@@ -1,0 +1,34 @@
+{
+  "case_id": "enjoy-digital.litex#1530",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "buncram",
+    "name": "litex"
+  },
+  "fix_oid": "64aad961c046fb574a8e5f50a8d7de386edcc976",
+  "buggy_commit_sha": "26600f74679c0486a99b3e657a6fe261771cd823",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1530.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "64aad961c046fb574a8e5f50a8d7de386edcc976",
+    "80f31bbd5f1ef82631fd39d0454b3b556db61cd2"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/soc/integration/soc.py",
+    "litex/soc/interconnect/axi/axi_lite.py",
+    "litex/soc/interconnect/axi/axi_lite_to_csr.py",
+    "litex/soc/interconnect/csr_bus.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1530.raw.diff"
+}

@@ -1,0 +1,42 @@
+diff --git a/chisel3 b/chisel3
+index 9f504b992..e27657118 160000
+--- a/chisel3
++++ b/chisel3
+@@ -1 +1 @@
+-Subproject commit 9f504b9926d38d11fb8003c72360ff11d24b5ef6
++Subproject commit e27657118ff5915b96f8e3a467d464245fe09769
+diff --git a/firrtl b/firrtl
+index 8ab501e75..c12e3b22c 160000
+--- a/firrtl
++++ b/firrtl
+@@ -1 +1 @@
+-Subproject commit 8ab501e7527139a4ee8d0b38f9b4384551387043
++Subproject commit c12e3b22cc3487906a265fe02b28ad1ac05be9f2
+diff --git a/chisel3 b/chisel3
+index 9f504b992..e27657118 160000
+--- a/chisel3
++++ b/chisel3
+@@ -1 +1 @@
+-Subproject commit 9f504b9926d38d11fb8003c72360ff11d24b5ef6
++Subproject commit e27657118ff5915b96f8e3a467d464245fe09769
+diff --git a/firrtl b/firrtl
+index 8ab501e75..19abcb04a 160000
+--- a/firrtl
++++ b/firrtl
+@@ -1 +1 @@
+-Subproject commit 8ab501e7527139a4ee8d0b38f9b4384551387043
++Subproject commit 19abcb04ad005a21319354550e87bfd428ec5597
+diff --git a/chisel3 b/chisel3
+index 9f504b992..e27657118 160000
+--- a/chisel3
++++ b/chisel3
+@@ -1 +1 @@
+-Subproject commit 9f504b9926d38d11fb8003c72360ff11d24b5ef6
++Subproject commit e27657118ff5915b96f8e3a467d464245fe09769
+diff --git a/firrtl b/firrtl
+index 8ab501e75..19abcb04a 160000
+--- a/firrtl
++++ b/firrtl
+@@ -1 +1 @@
+-Subproject commit 8ab501e7527139a4ee8d0b38f9b4384551387043
++Subproject commit 19abcb04ad005a21319354550e87bfd428ec5597

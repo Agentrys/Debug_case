@@ -1,0 +1,31 @@
+{
+  "case_id": "ipbus.ipbus-firmware#62",
+  "issue_repo": {
+    "owner": "ipbus",
+    "name": "ipbus-firmware"
+  },
+  "fix_repo": {
+    "owner": "ipbus",
+    "name": "ipbus-firmware"
+  },
+  "fix_oid": "0259bb8279b7210969af9a21f024f96e97b29321",
+  "buggy_commit_sha": "94a3ff24d0bc59c5db4312802ebb4ca3ca239a4a",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/ipbus.ipbus-firmware_62.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "0259bb8279b7210969af9a21f024f96e97b29321",
+    "dd34f863c93fe1c323197ad9a7f392d7e6ca8823"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "boards/kcu105/base_fw/kcu105_basex/synth/firmware/ucf/kcu105_basex.tcl"
+  ],
+  "raw_diff_path": "ground_truth/ipbus.ipbus-firmware_62.raw.diff"
+}

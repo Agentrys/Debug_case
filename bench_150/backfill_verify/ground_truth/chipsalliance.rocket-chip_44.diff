@@ -1,0 +1,66 @@
+diff --git a/src/main/scala/uncore.scala b/src/main/scala/uncore.scala
+index e64ad083a..98eba33f1 100644
+--- a/src/main/scala/uncore.scala
++++ b/src/main/scala/uncore.scala
+@@ -133,7 +133,7 @@ abstract class ManagerCoherenceAgent(implicit p: Parameters) extends CoherenceAg
+     with HasCoherenceAgentWiringHelpers {
+   val io = new ManagerTLIO
+   def innerTL = io.inner
+-  lazy val outerTL = TileLinkIOWrapper(io.outer)(p.alterPartial({case TLId => p(OuterTLId)}))
++  def outerTL = TileLinkIOWrapper(io.outer)(p.alterPartial({case TLId => p(OuterTLId)}))
+   def incoherent = io.incoherent
+ }
+ 
+diff --git a/uncore/src/main/scala/uncore.scala b/uncore/src/main/scala/uncore.scala
+index e64ad083a..98eba33f1 100644
+--- a/uncore/src/main/scala/uncore.scala
++++ b/uncore/src/main/scala/uncore.scala
+@@ -133,7 +133,7 @@ abstract class ManagerCoherenceAgent(implicit p: Parameters) extends CoherenceAg
+     with HasCoherenceAgentWiringHelpers {
+   val io = new ManagerTLIO
+   def innerTL = io.inner
+-  lazy val outerTL = TileLinkIOWrapper(io.outer)(p.alterPartial({case TLId => p(OuterTLId)}))
++  def outerTL = TileLinkIOWrapper(io.outer)(p.alterPartial({case TLId => p(OuterTLId)}))
+   def incoherent = io.incoherent
+ }
+ 
+diff --git a/src/main/scala/fpu.scala b/src/main/scala/fpu.scala
+index b7c729455..107f93bdf 100644
+--- a/src/main/scala/fpu.scala
++++ b/src/main/scala/fpu.scala
+@@ -561,7 +561,7 @@ class FPU(implicit p: Parameters) extends CoreModule()(p) {
+   }
+ 
+   val waddr = Mux(divSqrt_wen, divSqrt_waddr, winfo(0)(4,0).toUInt)
+-  val wsrc = (winfo(0) >> 6)
++  val wsrc = (winfo(0) >> 6)(log2Up(pipes.size) - 1,0)
+   val wcp = winfo(0)(6+log2Up(pipes.size))
+   val wdata = Mux(divSqrt_wen, divSqrt_wdata, Vec(pipes.map(_.res.data))(wsrc))
+   val wexc = Vec(pipes.map(_.res.exc))(wsrc)
+diff --git a/rocket/src/main/scala/fpu.scala b/rocket/src/main/scala/fpu.scala
+index b7c729455..107f93bdf 100644
+--- a/rocket/src/main/scala/fpu.scala
++++ b/rocket/src/main/scala/fpu.scala
+@@ -561,7 +561,7 @@ class FPU(implicit p: Parameters) extends CoreModule()(p) {
+   }
+ 
+   val waddr = Mux(divSqrt_wen, divSqrt_waddr, winfo(0)(4,0).toUInt)
+-  val wsrc = (winfo(0) >> 6)
++  val wsrc = (winfo(0) >> 6)(log2Up(pipes.size) - 1,0)
+   val wcp = winfo(0)(6+log2Up(pipes.size))
+   val wdata = Mux(divSqrt_wen, divSqrt_wdata, Vec(pipes.map(_.res.data))(wsrc))
+   val wexc = Vec(pipes.map(_.res.exc))(wsrc)
+diff --git a/src/main/scala/tilelink/Fragmenter.scala b/src/main/scala/tilelink/Fragmenter.scala
+index 063d4beab..1766760e0 100644
+--- a/src/main/scala/tilelink/Fragmenter.scala
++++ b/src/main/scala/tilelink/Fragmenter.scala
+@@ -228,7 +228,8 @@ class TLFragmenter(val minSize: Int, val maxSize: Int, val alwaysMin: Boolean =
+           // Take denied only from the first beat and hold that value
+           val d_denied = out.d.bits.denied holdUnless dFirst
+           when (dHasData) {
+-            in.d.bits.denied := d_denied
++            in.d.bits.denied  := d_denied
++            in.d.bits.corrupt := d_denied || out.d.bits.corrupt
+           }
+         }
+ 

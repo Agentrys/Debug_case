@@ -1,0 +1,673 @@
+diff --git a/docs/Chipyard-Basics/Chipyard-Components.rst b/docs/Chipyard-Basics/Chipyard-Components.rst
+index c24f81ed..1d19a65f 100644
+--- a/docs/Chipyard-Basics/Chipyard-Components.rst
++++ b/docs/Chipyard-Basics/Chipyard-Components.rst
+@@ -106,12 +106,12 @@ Software
+ Sims
+ -------------------------------------------
+ 
+-**verilator (Verilator wrapper)**
++**Verilator**
+   Verilator is an open source Verilog simulator.
+   The ``verilator`` directory provides wrappers which construct Verilator-based simulators from relevant generated RTL, allowing for execution of test RISC-V programs on the simulator (including vcd waveform files).
+   See :ref:`Verilator (Open-Source)` for more information.
+ 
+-**vcs (VCS wrapper)**
++**VCS**
+   VCS is a proprietary Verilog simulator.
+   Assuming the user has valid VCS licenses and installations, the ``vcs`` directory provides wrappers which construct VCS-based simulators from relevant generated RTL, allowing for execution of test RISC-V programs on the simulator (including vcd/vpd waveform files).
+   See :ref:`Synopsys VCS (License Required)` for more information.
+@@ -124,6 +124,13 @@ Sims
+   In order to use FireSim, the repository must be cloned and executed on AWS instances.
+   See :ref:`FireSim` for more information.
+ 
++**FPGA Prototyping**
++  FPGA prototyping is supported in Chipyard using SiFive's ``fpga-shells``.
++  Some examples of FPGA's supported are Arty and VCU118.
++  For more accurate and deterministic simulation results, please consider using the :ref:`FireSim` platform.
++  See :ref:`FPGA Prototyping` for more information.
++
++
+ VLSI
+ -------------------------------------------
+ 
+diff --git a/docs/Simulation/FPGA-Prototyping.rst b/docs/Simulation/FPGA-Prototyping.rst
+new file mode 100644
+index 00000000..6f82446e
+--- /dev/null
++++ b/docs/Simulation/FPGA-Prototyping.rst
+@@ -0,0 +1,148 @@
++FPGA Prototyping
++==============================
++
++FPGA Prototyping
++----------------
++
++Chipyard supports FPGA prototyping for local FPGAs supported by `fpga-shells <https://github.com/sifive/fpga-shells>`__.
++This includes popular FPGAs such as the Xilinx VCU118 and the Xilinx Arty board.
++FPGA prototyping allows RTL-level simulation at orders-of-magnitude faster speeds than software RTL simulators at the cost of slower compile times.
++
++.. Note:: While ``fpga-shells`` also supports Xilinx VC707 and some MicroSemi PolarFire boards, currently only the VCU118 and Arty boards are explicitly supported in Chipyard.
++    However, using the VCU118/Arty examples would be useful to see how to implement VC707/PolarFire support.
++
++Sources and Submodule Setup
++---------------------------
++
++All FPGA related collateral and sources are located in the ``fpga`` top-level Chipyard folder.
++This includes ``fpga-shells`` and the ``src`` folders that hold both Scala, TCL and other collateral.
++However, the ``fpga-shells`` repository is not initialized by default.
++To initialize the ``fpga-shells`` repository, run the included submodule script:
++
++.. code-block:: shell
++
++    # in the chipyard top level folder
++    ./scripts/init-fpga.sh
++
++Making a Bitstream
++------------------
++
++Making a bitstream for any FPGA target is similar to building RTL for a software RTL simulation.
++Similar to a software RTL simulation (:ref:`Simulating A Custom Project`), you can run the following command in the ``fpga`` directory to build a bitstream:
++
++.. code-block:: shell
++
++    make SBT_PROJECT=... MODEL=... VLOG_MODEL=... MODEL_PACKAGE=... CONFIG=... CONFIG_PACKAGE=... GENERATOR_PACKAGE=... TB=... TOP=... bit
++
++    # or
++
++    make SUB_PROJECT=<sub_project> bit
++
++By default a couple of ``SUB_PROJECT``'s are already defined for use, including ``vcu118`` and ``arty``.
++These default ``SUB_PROJECT``'s setup the necessary test harnesses, packages, and more.
++Like a software RTL simulation make invocation, all of the make variables can be overridden with user specific values (i.e. include the ``SUB_PROJECT`` with a ``CONFIG`` and ``CONFIG_PACKAGE`` override).
++In most cases, you will just need to run a command with a ``SUB_PROJECT`` and an overridden ``CONFIG`` to point to.
++For example, building the BOOM configuration on the VCU118:
++
++.. code-block:: shell
++
++    make SUB_PROJECT=vcu118 CONFIG=BoomVCU118Config bit
++
++That command will build the RTL and generate a bitstream using Vivado.
++However, like a software RTL simulation, you can also run the intermediate make steps to just generate Verilog or FIRRTL.
++
++Running a Design on Arty
++------------------------
++
++Basic Design
++~~~~~~~~~~~~
++
++The default Arty FPGA target design is setup to have JTAG, UART, SPI, and I2C available over the board's GPIO pins. The pin mappings of these interfaces are identical to those described in the `SiFive Freedom E310 Arty Getting Started Guide <https://static.dev.sifive.com/SiFive-E310-arty-gettingstarted-v1.0.6.pdf>`__.
++The JTAG interface allows a user to connect to the core over OpenOCD, run bare-metal applications, and debug using gdb.
++To extend this design, you can create your own Chipyard configuration and add the ``WithArtyTweaks`` located in ``fpga/src/main/scala/arty/Configs.scala``.
++Adding this config. fragment will enable and connect the JTAG, UART, SPI, and I2C interfaces to your Chipyard design/config.
++
++.. literalinclude:: ../../fpga/src/main/scala/arty/Configs.scala
++    :language: scala
++    :start-after: DOC include start: AbstractArty and Rocket
++    :end-before: DOC include end: AbstractArty and Rocket
++
++Future peripherals to be supported include the Arty's SPI Flash EEPROM.
++
++Brief Implementation Description for Less Complicated Designs (Such as Arty), and Guidance for Adding/Changing Xilinx Collateral
++~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++
++Like the VCU118, the basis for the Arty design is the creation of a special test harness that connects the external IO (which exist as Xilinx IP blackboxes) to the Chipyard design.
++This is done with the ``ArtyTestHarness`` in the basic default Arty target. However, unlike the ``VCU118TestHarness``, the ``ArtyTestHarness`` uses no ``Overlays``, and instead directly connects chip top IO to the ports of the external IO blackboxes, using functions such as ``IOBUF`` provided by ``fpga-shells``. Unlike the VCU118 and other more complicated test harnesses, the Arty's Vivado collateral is not generated by ``Overlays``, but rather are a static collection of ``create_ip`` and ``set_properties`` statements located in the files within ``fpga/fpga-shells/xilinx/arty/tcl`` and ``fpga/fpga-shells/xilinx/arty/constraints``. If the user wishes to re-map FPGA package pins to different harness-level IO, this may be changed within ``fpga/fpga-shells/xilinx/arty/constraints/arty-master.xdc``. The addition of new Xilinx IP blocks may be done in ``fpga-shells/xilinx/arty/tcl/ip.tcl``, mapped to harness-level IOs in ``arty-master.xdc``, and wired through from the test harness to the chip top using ``HarnessBinders`` and ``IOBinders``.
++
++Running a Design on VCU118
++--------------------------
++
++Basic Design
++~~~~~~~~~~~~
++
++The default VCU118 FPGA target design is setup to have UART, a SPI SDCard, and DDR backing memory.
++This allows it to run RISC-V Linux from an SDCard while piping the terminal over UART to the host machine (the machine connected to the VCU118).
++To extend this design, you can create your own Chipyard configuration and add the ``WithVCU118Tweaks`` located in ``fpga/src/main/scala/vcu118/Configs.scala``.
++Adding this config. fragment will enable and connect the UART, SPI SDCard, and DDR backing memory to your Chipyard design/config.
++
++.. literalinclude:: ../../fpga/src/main/scala/vcu118/Configs.scala
++    :language: scala
++    :start-after: DOC include start: AbstractVCU118 and Rocket
++    :end-before: DOC include end: AbstractVCU118 and Rocket
++
++Brief Implementation Description + More Complicated Designs
++~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++
++The basis for a VCU118 design revolves around creating a special test harness to connect the external IOs to your Chipyard design.
++This is done with the ``VCU118TestHarness`` in the basic default VCU118 FPGA target.
++The ``VCU118TestHarness`` (located in ``fpga/src/main/scala/vcu118/TestHarness.scala``) uses ``Overlays`` that connect to the VCU118 external IOs.
++Generally, the ``Overlays`` take an IO from the ``ChipTop`` (labeled as ``topDesign`` in the file) when "placed" and connect it to the external IO and generate necessary Vivado collateral.
++For example, the following shows a UART ``Overlay`` being "placed" into the design with a IO input called ``io_uart_bb``.
++
++.. literalinclude:: ../../fpga/src/main/scala/vcu118/TestHarness.scala
++    :language: scala
++    :start-after: DOC include start: UartOverlay
++    :end-before: DOC include end: UartOverlay
++
++Here the ``UARTOverlayKey`` is referenced and used to "place" the necessary connections (and collateral) to connect to the UART.
++The ``UARTDesignInput`` is used to pass in the UART IO from the ``ChipTop``/``topDesign`` to the ``Overlay``.
++Note that the ``BundleBridgeSource`` can be viewed as a glorified wire (that is defined in the ``LazyModule`` scope).
++This pattern is similar for all other ``Overlays`` in the test harness.
++They must be "placed" and given a set of inputs (IOs, parameters).
++The main exception to this pattern is the ``Overlay`` used to generate the clock(s) for the FPGA.
++
++.. literalinclude:: ../../fpga/src/main/scala/vcu118/TestHarness.scala
++    :language: scala
++    :start-after: DOC include start: ClockOverlay
++    :end-before: DOC include end: ClockOverlay
++
++Without going into too much detail, the clocks overlay is placed in the harness and a PLL node (``harnessSysPLL``) generates the necessary clocks specified by ``ClockSinkNodes``.
++For ease of use, you can change the ``FPGAFrequencyKey`` to change the default clock frequency of the FPGA design.
++
++After the harness is created, the ``BundleBridgeSource``'s must be connected to the ``ChipTop`` IOs.
++This is done with harness binders and io binders (see ``fpga/src/main/scala/vcu118/HarnessBinders.scala`` and ``fpga/src/main/scala/vcu118/IOBinders.scala``).
++For more information on harness binders and io binders, refer to :ref:`IOBinders and HarnessBinders`.
++
++An example of a more complicated design using new ``Overlays`` can be viewed in ``fpga/src/main/scala/vcu118/bringup/``.
++This example extends the default test harness and creates new ``Overlays`` to connect to the FMC port.
++
++.. Note:: Remember that since whenever a new test harness is created (or the config. changes, or the config. packages changes, or...), you need to modify the make invocation.
++    For example, ``make SUB_PROJECT=vcu118 CONFIG=MyNewVCU118Config CONFIG_PACKAGE=this.is.my.scala.package bit``.
++    See :ref:`Making a Bitstream` for information on the various make variables.
++
++Debugging with ILAs
++~~~~~~~~~~~~~~~~~~~
++
++Adding an ILA can be added to the design for debugging relevant signals.
++First, open up the post synthesis checkpoint located in the build directory for your design in Vivado (it should be labeled ``post_synth.dcp``).
++Then using Vivado, add ILAs (and other debugging tools) for your design (search online for more information on how to add an ILA).
++After the changes are made, save the checkpoint and run the make invocation with the ``debug-bitstream`` target:
++be done by modifying the post synthesis checkpoint, saving it, and running ``make ... debug-bitstream``.
++For example, running the bitstream build for an added ILA for a BOOM config.:
++
++.. code-block:: shell
++
++    make SUB_PROJECT=vcu118 CONFIG=BoomVCU118Config debug-bitstream
++
++For more extensive debugging tools for FPGA simulations including printf synthesis, assert synthesis, instruction traces, ILAs, out-of-band profiling, co-simulation, and more, please refer to the :ref:`FireSim` platform.
+diff --git a/docs/Simulation/index.rst b/docs/Simulation/index.rst
+index c15283d3..24099bfb 100644
+--- a/docs/Simulation/index.rst
++++ b/docs/Simulation/index.rst
+@@ -1,16 +1,18 @@
+ Simulation
+ =======================
+ 
+-Chipyard supports two classes of simulation:
++Chipyard supports three classes of simulation:
+ 
+-#. Software RTL simulation using commercial or open-source (Verilator) RTL simulators 
++#. Software RTL simulation using commercial or open-source (Verilator) RTL simulators
+ #. FPGA-accelerated full-system simulation using FireSim
++#. FPGA prototyping on ``fpga-shells`` platforms
+ 
+ Software RTL simulators of Chipyard designs run at O(1 KHz), but compile
+-quickly and provide full waveforms. Conversly, FPGA-accelerated simulators run
++quickly and provide full waveforms. Conversely, FPGA-accelerated simulators and FPGA prototyping run
+ at O(100 MHz), making them appropriate for booting an operating system and
+ running a complete workload, but have multi-hour compile times and poorer debug
+-visability.
++visibility. However, FPGA-accelerated simulators differ from FPGA prototyping by providing deterministic
++cycle-accurate results.
+ 
+ Click next to see how to run a simulation.
+ 
+@@ -20,4 +22,5 @@ Click next to see how to run a simulation.
+ 
+    Software-RTL-Simulation
+    FPGA-Accelerated-Simulation
++   FPGA-Prototyping
+ 
+diff --git a/fpga/src/main/scala/arty/Configs.scala b/fpga/src/main/scala/arty/Configs.scala
+index bc62bcf9..61a6234c 100644
+--- a/fpga/src/main/scala/arty/Configs.scala
++++ b/fpga/src/main/scala/arty/Configs.scala
+@@ -26,7 +26,7 @@ class WithDefaultPeripherals extends Config((site, here, up) => {
+     debugIdleCycles = 5)
+   case SerialTLKey => None // remove serialized tl port
+ })
+-
++// DOC include start: AbstractArty and Rocket
+ class WithArtyTweaks extends Config(
+   new WithArtyJTAGHarnessBinder ++
+   new WithArtyUARTHarnessBinder ++
+@@ -41,3 +41,4 @@ class WithArtyTweaks extends Config(
+ class TinyRocketArtyConfig extends Config(
+   new WithArtyTweaks ++
+   new chipyard.TinyRocketConfig)
++// DOC include start: AbstractArty and Rocket
+diff --git a/fpga/src/main/scala/vcu118/Configs.scala b/fpga/src/main/scala/vcu118/Configs.scala
+index aee3c489..a08ce0f2 100644
+--- a/fpga/src/main/scala/vcu118/Configs.scala
++++ b/fpga/src/main/scala/vcu118/Configs.scala
+@@ -51,6 +51,7 @@ class WithSystemModifications extends Config((site, here, up) => {
+   case SerialTLKey => None // remove serialized tl port
+ })
+ 
++// DOC include start: AbstractVCU118 and Rocket
+ class WithVCU118Tweaks extends Config(
+   new WithUART ++
+   new WithSPISDCard ++
+@@ -66,6 +67,7 @@ class WithVCU118Tweaks extends Config(
+ class RocketVCU118Config extends Config(
+   new WithVCU118Tweaks ++
+   new chipyard.RocketConfig)
++// DOC include end: AbstractVCU118 and Rocket
+ 
+ class BoomVCU118Config extends Config(
+   new WithFPGAFrequency(75) ++
+diff --git a/fpga/src/main/scala/vcu118/TestHarness.scala b/fpga/src/main/scala/vcu118/TestHarness.scala
+index 8b91c3ea..3d1d438e 100644
+--- a/fpga/src/main/scala/vcu118/TestHarness.scala
++++ b/fpga/src/main/scala/vcu118/TestHarness.scala
+@@ -41,6 +41,7 @@ class VCU118FPGATestHarness(override implicit val p: Parameters) extends VCU118S
+ 
+   val topDesign = LazyModule(p(BuildTop)(dp))
+ 
++// DOC include start: ClockOverlay
+   // place all clocks in the shell
+   require(dp(ClockInputOverlayKey).size >= 1)
+   val sysClkNode = dp(ClockInputOverlayKey)(0).place(ClockInputDesignInput()).overlayOutput.node
+@@ -56,13 +57,16 @@ class VCU118FPGATestHarness(override implicit val p: Parameters) extends VCU118S
+   val dutWrangler = LazyModule(new ResetWrangler)
+   val dutGroup = ClockGroup()
+   dutClock := dutWrangler.node := dutGroup := harnessSysPLL
++// DOC include end: ClockOverlay
+ 
+   /*** UART ***/
+ 
++// DOC include start: UartOverlay
+   // 1st UART goes to the VCU118 dedicated UART
+ 
+   val io_uart_bb = BundleBridgeSource(() => (new UARTPortIO(dp(PeripheryUARTKey).head)))
+   dp(UARTOverlayKey).head.place(UARTDesignInput(io_uart_bb))
++// DOC include end: UartOverlay
+ 
+   /*** SPI ***/
+ 
+diff --git a/Makefile b/Makefile
+index 3fc389cc..7c3a62e0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -16,8 +16,10 @@ $(SPECKLE_DIR)/build/overlay/%/$(INPUT):
+ 	cd $(SPECKLE_DIR) && ./gen_binaries.sh --compile --suite $* --input $(INPUT)
+ 
+ spec17-%: $(SPECKLE_DIR)/build/overlay/%/$(INPUT);
++	echo $^
+ 
+ clean:
+ 	rm -rf $(SPECKLE_DIR)/build
+ 
+ .PHONY: $(spec17_overlays) $(spec17_rootfs_dirs) clean
++.PRECIOUS: $(SPECKLE_DIR)/build/overlay/%/$(INPUT)
+diff --git a/README.md b/README.md
+index dcf3fdd2..6d12009b 100644
+--- a/README.md
++++ b/README.md
+@@ -9,18 +9,15 @@ Requirements
+ Getting Started
+ ---------------
+ 
+-First install this repository into FireMarshal:
+-
+-    cd /PATH/TO/FIREMARSHAL/firemarshal/example-workloads
+-    git submodule add https://github.com/ucb-bar/spec2017-workload.git spec2017
+-
+ When you first install this repository, you should update all submodules:
+ 
+-    cd /PATH/TO/FIREMARSHAL/firemarshal/example-workloads
+     git submodule update --init --recursive spec2017
+ 
+ After that you can use FireMarshal as normal and point to the `json` workload configs:
+ 
+-    # build
+-    cd /PATH/TO/FIREMARSHAL/firemarshal/example-workloads
+-    ./marshal build example-workloads/spec2017/marshal-configs/spec17-intrate.json
++    # Assuming marshal is on your $PATH
++    marshal build ./marshal-configs/spec17-intrate.json
++
++
++See https://firemarshal.readthedocs.io/en/latest/index.html for FireMarshal
++documentation.
+diff --git a/compare_results.py b/compare_results.py
+new file mode 100755
+index 00000000..19ec36e7
+--- /dev/null
++++ b/compare_results.py
+@@ -0,0 +1,94 @@
++#!/usr/bin/env python3
++import pandas as pd
++import argparse
++import pathlib
++import matplotlib
++from matplotlib import pyplot as plt
++
++# Color style similar to ppt color scheme
++plt.style.use('seaborn-colorblind')
++
++#Latex Default Font
++plt.rc('font', family='serif') 
++plt.rc('font', serif='Latin Modern Roman')
++matplotlib.rcParams.update({'font.size': 18})
++
++speedBenches= [
++    "600.perlbench_s",
++    "602.gcc_s",
++    "605.mcf_s",
++    "620.omnetpp_s",
++    "623.xalancbmk_s",
++    "625.x264_s",
++    "631.deepsjeng_s",
++    "641.leela_s",
++    "648.exchange2_s",
++    "657.xz_s"
++]
++
++speedCleanName = {
++        "600.perlbench_s" : "perl",
++        "602.gcc_s" : "gcc",
++        "605.mcf_s" : "mcf",
++        "620.omnetpp_s" : "omnetpp",
++        "623.xalancbmk_s" : "xalancbmk",
++        "625.x264_s" : "x264",
++        "631.deepsjeng_s" : "deepsjeng",
++        "641.leela_s" : "leela",
++        "648.exchange2_s" : "exchange2",
++        "657.xz_s" : "xz"
++}
++
++def loadFiles(files):
++    fullDF = None
++    for name, path in files.items():
++        newDF = pd.read_csv(path, index_col=0)
++        newDF.index.rename("Benchmark", inplace=True)
++        newDF = newDF.assign(Experiment=name).set_index('Experiment',append=True).swaplevel(0,1)
++
++        if fullDF is None:
++            fullDF = newDF
++        else:
++            fullDF = fullDF.append(newDF)
++
++    fullDF.rename(index=speedCleanName, inplace=True)
++    return fullDF
++
++def make_hatches(ax, df):
++    hatches = [h*len(df.index) for h in [['//'], ['--'], ['x'], ['\\'], ['||'], ['+'], ['o'], ['.']]]
++    hatches = sum(hatches, [])
++
++    if len(hatches) < len(ax.patches):
++        print("Not enough hatches defined")
++        
++    for i,bar in enumerate(ax.patches):
++        bar.set_hatch(hatches[i])
++    ax.legend()
++
++def plotRes(res):
++    scores = resDF.loc[pd.IndexSlice[:,:], "score"].unstack(level=0)
++
++    plot = scores.plot(kind="bar")
++    make_hatches(plot, scores)
++    plot.set_ylabel("SPEC Score")
++    plot.set_xticklabels(scores.index, rotation=45, ha='right')
++
++    plot.get_figure().savefig("result.pdf", bbox_inches = "tight", format="pdf")
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(description="Compare results from multiple runs of the spec workload")
++    parser.add_argument('-s', '--suite', required=True, choices=['intspeed', 'intrate'], help="Which suite was run.")
++    parser.add_argument('-d', '--dataset', required=True, help="Which dataset was used, either test or ref. You can also specify a path to a previous output of this script to use as a baseline.")
++    parser.add_argument("-n", "--names", nargs='?', default=None, type=lambda s: [item for item in s.split(',')], help="list of names to display of results. If omitted, the parent directory name will be used.")
++    parser.add_argument('resultPaths', nargs="+", type=pathlib.Path, help="Paths to results csvs to compare (csvs should be in the format produced by handle-results.py")
++
++    args = parser.parse_args()
++
++    if args.names is None:
++        args.names = [ p.parent.name for p in args.resultPaths ]
++
++    datasets = { name : path for (name, path) in zip(args.names, args.resultPaths) }
++
++    resDF = loadFiles(datasets)
++    plotRes(resDF)
+diff --git a/handle-results.py b/handle-results.py
+new file mode 100755
+index 00000000..0489c65a
+--- /dev/null
++++ b/handle-results.py
+@@ -0,0 +1,133 @@
++#!/usr/bin/env python3
++import pathlib
++import sys
++import pandas as pd
++import argparse
++
++# All time measurements are in seconds
++
++# rate suite not supported yet
++# Reference times taken from https://www.spec.org/cpu2017/results/res2017q2/cpu2017-20161026-00003.html
++specRateReference = pd.DataFrame.from_dict({
++    "500.perlbench_r" : 1591,
++    "502.gcc_r" : 1415,
++    "505.mcf_r" : 1615,
++    "520.omnetpp_r" : 1311,
++    "523.xalancbmk_r" : 1055,
++    "525.x264_r" : 1751,
++    "531.deepsjeng_r" : 1145,
++    "541.leela_r" : 1655,
++    "548.exchange2_r" : 2619,
++    "557.xz_r" : 1076
++    }, orient='index', columns=['RealTime'])
++
++# Reference times taken from https://www.spec.org/cpu2017/results/res2017q2/cpu2017-20161026-00004.html
++specSpeedReference = pd.DataFrame.from_dict({
++    "600.perlbench_s" : 1774,
++    "602.gcc_s" : 3976,
++    "605.mcf_s" : 4721,
++    "620.omnetpp_s" : 1630,
++    "623.xalancbmk_s" : 1417,
++    "625.x264_s" : 1763,
++    "631.deepsjeng_s" : 1432,
++    "641.leela_s" : 1703,
++    "648.exchange2_s" : 2939,
++    "657.xz_s" : 6182
++    }, orient='index', columns=['RealTime'])
++
++# This is taken from agfi-0fa2162c2c1a475d4
++# (firesim-rocket-quadcore-no-nic-l2-llc4mb-ddr3 circa oct 13 2020)
++# specSpeedTest = pd.DataFrame.from_dict({
++#     "600.perlbench_s" : 59.87,
++#     "602.gcc_s" : 0.04,
++#     "605.mcf_s" : 32.12,
++#     "620.omnetpp_s" : 10.15,
++#     "623.xalancbmk_s" : 0.31,
++#     "625.x264_s" : 188.23,
++#     "631.deepsjeng_s" : 31.40,
++#     "641.leela_s" : 12.17,
++#     "648.exchange2_s" : 31.59,
++#     "657.xz_s" : 3.71 # note that the marshal workload splits xz into two jobs to save some runtime, these are recombined during load
++#     }, orient='index', columns=['RealTime'])
++
++# Pieced together from the spec repo: spec2017/benchspec/CPU/*/data/test/reftime
++specSpeedTest = pd.DataFrame.from_dict({
++    "600.perlbench_s" : 74,
++    "602.gcc_s" : 2,
++    "605.mcf_s" : 40,
++    "620.omnetpp_s" : 16,
++    "623.xalancbmk_s" : 2,
++    "625.x264_s" : 186,
++    "631.deepsjeng_s" : 41,
++    "641.leela_s" : 17,
++    "648.exchange2_s" : 74,
++    "657.xz_s" : 30
++    }, orient='index', columns=['RealTime'])
++
++def handleSpeed(outDir, dataset):
++    if dataset == 'test':
++        baseline = specSpeedTest
++    elif dataset == 'ref':
++        baseline = specSpeedReference
++    else:
++        baselinePath = pathlib.Path(dataset)
++        if not baselinePath.exists():
++            raise RuntimeError("Baseline csv doesn't exist: ", dataset)
++        baseline = pd.read_csv(baselinePath, index_col=0)
++ 
++    resDF = None
++    for csvFile in outDir.glob("*/output/*.csv"):
++        if resDF is None:
++            resDF = pd.read_csv(csvFile, index_col=0)
++        else:
++            resDF = resDF.append(pd.read_csv(csvFile, index_col=0))
++
++    # To speed up the firesim run, xz is split into multiple concurrent runs of
++    # different parts of the benchmark. We just recombine here.
++    resDF.loc['657.xz_s', :] = resDF.loc['657.xz_s_0', :] + resDF.loc['657.xz_s_1', :]
++    resDF.drop(['657.xz_s_0','657.xz_s_1'], inplace=True)
++
++    resDF['score'] = baseline['RealTime'] / resDF['RealTime']
++    resDF.sort_index(inplace=True)
++    return resDF
++
++
++def handleRate(outDir):
++    resDF = None
++    for csvFile in outDir.glob("*/output/*.csv"):
++        if resDF is None:
++            resDF = pd.read_csv(csvFile)
++        else:
++            resDF = resDF.append(pd.read_csv(csvFile))
++
++    nameGroups = resDF.groupby(['name'])
++
++    resDF = resDF[nameGroups['RealTime'].transform(max) == resDF['RealTime']].copy()
++    resDF.drop('copy', axis=1, inplace=True)
++    resDF.set_index('name', inplace=True)
++    resDF = pd.concat([resDF, nameGroups['copy'].count().rename("ncopy")], axis=1)
++
++    resDF['score'] = (specRateReference['RealTime'] / resDF['RealTime']) * resDF['ncopy']
++
++    return resDF
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(description="Aggregate results from a run of a SPEC suite")
++    parser.add_argument('-s', '--suite', required=True, choices=['intspeed', 'intrate'], help="Which suite was run.")
++    parser.add_argument('-d', '--dataset', required=True, help="Which dataset was used, either test or ref. You can also specify a path to a previous output of this script to use as a baseline.")
++    parser.add_argument('outputPath', type=pathlib.Path, help="Output directory to process")
++
++    args = parser.parse_args()
++
++    if args.suite == "intspeed":
++        resDF = handleSpeed(args.outputPath, dataset=args.dataset)
++    elif args.suite == "intrate":
++        resDF = handleRate(args.outputPath)
++
++    with open(args.outputPath / "results.csv", "w") as f:
++        f.write(resDF.to_csv())
++
++    plot = resDF['score'].plot(kind="bar", title="SPEC Score")
++    plot.get_figure().savefig(args.outputPath / "results.pdf", bbox_inches = "tight")
++    print("Output available in: ", args.outputPath)
+diff --git a/marshal-configs/spec17-intrate-test-500.json b/marshal-configs/spec17-intrate-test-500.json
+new file mode 100644
+index 00000000..01a8ae07
+--- /dev/null
++++ b/marshal-configs/spec17-intrate-test-500.json
+@@ -0,0 +1,16 @@
++{
++  "name" : "spec17-intrate-test-500",
++  "base" : "br-base.json",
++  "workdir" : "..",
++  "host-init" : "build-intrate.sh test",
++  "overlay" : "speckle/build/overlay/intrate/test",
++  "rootfs-size" : "3GiB",
++  "outputs" : ["/output"],
++  "post_run_hook" : "handle-results.py -d test -s intrate",
++  "jobs" : [
++    {
++      "name": "500.perlbench_r",
++      "command": "./intrate.sh 500.perlbench_r --copies 4"
++    }
++  ]
++}
+diff --git a/marshal-configs/spec17-intrate-test.json b/marshal-configs/spec17-intrate-test.json
+index a52147b6..fd126688 100644
+--- a/marshal-configs/spec17-intrate-test.json
++++ b/marshal-configs/spec17-intrate-test.json
+@@ -6,6 +6,7 @@
+   "overlay" : "speckle/build/overlay/intrate/test",
+   "rootfs-size" : "3GiB",
+   "outputs" : ["/output"],
++  "post_run_hook" : "handle-results.py -d test -s intrate",
+   "jobs" : [
+     {
+       "name": "500.perlbench_r",
+diff --git a/marshal-configs/spec17-intrate.json b/marshal-configs/spec17-intrate.json
+index 097877f3..758c8922 100644
+--- a/marshal-configs/spec17-intrate.json
++++ b/marshal-configs/spec17-intrate.json
+@@ -6,6 +6,7 @@
+   "overlay" : "speckle/build/overlay/intrate/ref",
+   "rootfs-size" : "3GiB",
+   "outputs" : ["/output"],
++  "post_run_hook" : "handle-results.py -d ref -s intrate",
+   "jobs" : [
+     {
+       "name": "500.perlbench_r",
+diff --git a/marshal-configs/spec17-intspeed-test-600.json b/marshal-configs/spec17-intspeed-test-600.json
+index 2ecbd0dc..5e2b4926 100644
+--- a/marshal-configs/spec17-intspeed-test-600.json
++++ b/marshal-configs/spec17-intspeed-test-600.json
+@@ -6,10 +6,11 @@
+   "overlay" : "speckle/build/overlay/intspeed/test",
+   "rootfs-size" : "3GiB",
+   "outputs" : ["/output"],
++  "post_run_hook" : "handle-results.py -d test -s intspeed",
+   "jobs" : [
+     {
+-      "name": "600.perlbench_s",
+-      "command": "./intspeed.sh 600.perlbench_s --threads 1"
++      "name": "657.xz_s-cld",
++      "command": "./intspeed.sh 657.xz_s --workload 1 --threads 1"
+     }
+   ]
+ }
+diff --git a/marshal-configs/spec17-intspeed-test.json b/marshal-configs/spec17-intspeed-test.json
+index 62a2c6c3..edc002b0 100644
+--- a/marshal-configs/spec17-intspeed-test.json
++++ b/marshal-configs/spec17-intspeed-test.json
+@@ -6,6 +6,7 @@
+   "overlay" : "speckle/build/overlay/intspeed/test",
+   "rootfs-size" : "3GiB",
+   "outputs" : ["/output"],
++  "post_run_hook" : "handle-results.py -d test -s intspeed",
+   "jobs" : [
+     {
+       "name": "600.perlbench_s",
+diff --git a/marshal-configs/spec17-intspeed.json b/marshal-configs/spec17-intspeed.json
+index 93b6f386..dd86465c 100644
+--- a/marshal-configs/spec17-intspeed.json
++++ b/marshal-configs/spec17-intspeed.json
+@@ -6,6 +6,7 @@
+   "overlay" : "speckle/build/overlay/intspeed/ref",
+   "rootfs-size" : "3GiB",
+   "outputs" : ["/output"],
++  "post_run_hook" : "handle-results.py -d ref -s intspeed",
+   "jobs" : [
+     {
+       "name": "600.perlbench_s",
+diff --git a/python_requirements.txt b/python_requirements.txt
+new file mode 100644
+index 00000000..5d56fdde
+--- /dev/null
++++ b/python_requirements.txt
+@@ -0,0 +1,2 @@
++pandas
++matplotlib
+diff --git a/speckle b/speckle
+index f6503ea6..e43e0a6c 160000
+--- a/speckle
++++ b/speckle
+@@ -1 +1 @@
+-Subproject commit f6503ea670599530011c964b45aa5bd31f6f1c31
++Subproject commit e43e0a6c1a54da6fe74d9ca31f82f974f87327c0

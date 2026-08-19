@@ -1,0 +1,111 @@
+{
+  "case_id": "OSCPU.NutShell#68",
+  "issue_repo": {
+    "owner": "OSCPU",
+    "name": "NutShell"
+  },
+  "fix_repo": {
+    "owner": "Jiayuah",
+    "name": "NutShell"
+  },
+  "fix_oid": "504a7fddd1e2574b9b0eac7857afcdfca060f3fc",
+  "buggy_commit_sha": "98b151b5753f43e58523722a78f4744841eb9f50",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/OSCPU.NutShell_68.diff",
+  "diff_sha256": "16eccf7228e8b8001431b9d57ab49722347c0b9ec655b5b0a69a128241127c2e",
+  "fix_oids_sorted": [
+    "504a7fddd1e2574b9b0eac7857afcdfca060f3fc"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/huancun/Common.scala",
+    "src/main/scala/huancun/HuanCun.scala",
+    "src/main/scala/huancun/RefillBuffer.scala",
+    "src/main/scala/huancun/SinkD.scala",
+    "src/main/scala/huancun/Slice.scala",
+    "src/main/scala/huancun/SourceD.scala",
+    "src/main/scala/huancun/noninclusive/MSHR.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/huancun/Common.scala": [
+      [
+        22,
+        28
+      ],
+      [
+        112,
+        117
+      ]
+    ],
+    "src/main/scala/huancun/HuanCun.scala": [
+      [
+        60,
+        66
+      ]
+    ],
+    "src/main/scala/huancun/RefillBuffer.scala": [
+      [
+        5,
+        69
+      ]
+    ],
+    "src/main/scala/huancun/SinkD.scala": [
+      [
+        29,
+        35
+      ],
+      [
+        61,
+        66
+      ],
+      [
+        71,
+        77
+      ]
+    ],
+    "src/main/scala/huancun/Slice.scala": [
+      [
+        74,
+        81
+      ]
+    ],
+    "src/main/scala/huancun/SourceD.scala": [
+      [
+        80,
+        93
+      ],
+      [
+        101,
+        115
+      ],
+      [
+        118,
+        130
+      ],
+      [
+        139,
+        148
+      ],
+      [
+        162,
+        169
+      ],
+      [
+        229,
+        235
+      ]
+    ],
+    "src/main/scala/huancun/noninclusive/MSHR.scala": [
+      [
+        1239,
+        1244
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/OSCPU.NutShell_68.raw.diff"
+}

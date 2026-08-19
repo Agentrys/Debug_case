@@ -1,0 +1,79 @@
+{
+  "case_id": "ucb-bar.chipyard#1",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_oid": "b6918388ad48384ca99b17618516ddcd564cea89",
+  "buggy_commit_sha": "d8dcd7cf47e7d57cfb4f461891b8001004a9f171",
+  "is_merge": true,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/ucb-bar.chipyard_1.diff",
+  "diff_sha256": "9903d300f31f599f9be70d0726cbf251dc9408591740a1fbf8665c6704240c54",
+  "fix_oids_sorted": [
+    "b6918388ad48384ca99b17618516ddcd564cea89",
+    "b86431364360a9e64487e5dec2962c48bafb67ff"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/HeaderEnum.scala",
+    "src/main/scala/SCR.scala",
+    "src/main/scala/Util.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/HeaderEnum.scala": [
+      [
+        1,
+        7
+      ],
+      [
+        12,
+        21
+      ]
+    ],
+    "src/main/scala/SCR.scala": [
+      [
+        4,
+        9
+      ],
+      [
+        38,
+        48
+      ],
+      [
+        52,
+        58
+      ],
+      [
+        74,
+        79
+      ],
+      [
+        89,
+        94
+      ]
+    ],
+    "src/main/scala/Util.scala": [
+      [
+        1,
+        8
+      ],
+      [
+        40,
+        42
+      ]
+    ]
+  },
+  "non_design_files_dropped": [
+    "marshal-configs/spec17-intrate.json",
+    "marshal-configs/spec17-intspeed-test.json"
+  ],
+  "raw_diff_path": "ground_truth/ucb-bar.chipyard_1.raw.diff"
+}

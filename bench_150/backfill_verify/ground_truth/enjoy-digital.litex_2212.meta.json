@@ -1,0 +1,33 @@
+{
+  "case_id": "enjoy-digital.litex#2212",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "trabucayre",
+    "name": "litex"
+  },
+  "fix_oid": "6babd50dc0e4debbcdadb604a44102578475d957",
+  "buggy_commit_sha": "9db1ac76d697bd3a143f0950e667134d8dded7a9",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_2212.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "6babd50dc0e4debbcdadb604a44102578475d957",
+    "3bebd1bc7a0ea2371e03ebf48f21c8fbb29108b1",
+    "b743e4787f07a6f3fbf69623b210cf12b9f9cbdf",
+    "275a1681c64bd8188a61e97564e0cb5852d79f51"
+  ],
+  "n_fix_commits": 4,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "litex/build/vhd2v_converter.py"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_2212.raw.diff"
+}

@@ -1,0 +1,26 @@
+diff --git a/src/main/scala/naxriscv/platform/litex/NaxSoc.scala b/src/main/scala/naxriscv/platform/litex/NaxSoc.scala
+index b4290dc..96957bd 100644
+--- a/src/main/scala/naxriscv/platform/litex/NaxSoc.scala
++++ b/src/main/scala/naxriscv/platform/litex/NaxSoc.scala
+@@ -189,7 +189,7 @@ class NaxSoc(c : NaxSocConfig) extends Component{
+           case p: FetchCachePlugin => add(p.logic.refill.fire, i * 0x80 + 0x000)
+           case p: DataCachePlugin => {
+             add(p.logic.cache.refill.push.fire, i * 0x80 + 0x010)
+-            add(p.logic.cache.writeback.push.fire, i * 0x80 + 0x014)
++            add(p.logic.cache.writeback.push.fire.pull() && p.logic.cache.writeback.push.dirty.pull(), i * 0x80 + 0x014)
+             if (withL2) {
+               val l2c = l2.cache.logic.cache
+               l2c.rework {
+diff --git a/src/main/scala/naxriscv/platform/tilelinkdemo/SocSim.scala b/src/main/scala/naxriscv/platform/tilelinkdemo/SocSim.scala
+index 7b5ad3c..3f3a901 100644
+--- a/src/main/scala/naxriscv/platform/tilelinkdemo/SocSim.scala
++++ b/src/main/scala/naxriscv/platform/tilelinkdemo/SocSim.scala
+@@ -112,7 +112,7 @@ object SocSim extends App {
+           case p: FetchCachePlugin => add(p.logic.refill.fire, i * 0x80 + 0x000)
+           case p: DataCachePlugin => {
+             add(p.logic.cache.refill.push.fire, i * 0x80 + 0x010)
+-            add(p.logic.cache.writeback.push.fire, i * 0x80 + 0x014)
++            add(p.logic.cache.writeback.push.fire.pull() && p.logic.cache.writeback.push.dirty.pull(), i * 0x80 + 0x014)
+             if (withL2) {
+               val l2c = l2.cache.logic.cache
+               l2c.rework{

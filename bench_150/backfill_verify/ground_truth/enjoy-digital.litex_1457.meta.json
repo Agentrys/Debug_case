@@ -1,0 +1,30 @@
+{
+  "case_id": "enjoy-digital.litex#1457",
+  "issue_repo": {
+    "owner": "enjoy-digital",
+    "name": "litex"
+  },
+  "fix_repo": {
+    "owner": "litex-hub",
+    "name": "pythondata-software-picolibc"
+  },
+  "fix_oid": "bfa87fc1a0493aa8d97d855dae7f843966dee672",
+  "buggy_commit_sha": "a42fe31df446cf6fa680400ba83a0d3cc4a7facc",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1457.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "bfa87fc1a0493aa8d97d855dae7f843966dee672"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "pythondata_software_picolibc/data"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/enjoy-digital.litex_1457.raw.diff"
+}

@@ -1,0 +1,38 @@
+{
+  "case_id": "spinalhdl.naxriscv#121",
+  "issue_repo": {
+    "owner": "SpinalHDL",
+    "name": "NaxRiscv"
+  },
+  "fix_repo": {
+    "owner": "Minres",
+    "name": "NaxRiscv"
+  },
+  "fix_oid": "07848759261511923b8c5a6cc84c461cb16c6d09",
+  "buggy_commit_sha": "5211920b9f945963135419126087c998828f7d07",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/spinalhdl.naxriscv_121.diff",
+  "diff_sha256": "b8c6e3162dfee6407493943ec26f4f56143e45a1323f6770f92b01c593716386",
+  "fix_oids_sorted": [
+    "07848759261511923b8c5a6cc84c461cb16c6d09",
+    "c0b5ab929a0c2315324304ce076161b1ff6c2e7c"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "range",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/naxriscv/misc/PerformanceCounterPlugin.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/naxriscv/misc/PerformanceCounterPlugin.scala": [
+      [
+        55,
+        61
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/spinalhdl.naxriscv_121.raw.diff"
+}

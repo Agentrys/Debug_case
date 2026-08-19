@@ -1,0 +1,42 @@
+{
+  "case_id": "ucb-bar.chipyard#1731",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "tymcauley",
+    "name": "rocket-chip-blocks"
+  },
+  "fix_oid": "36c895b78ce1394d1a29d3058b46cc237ec5a8de",
+  "buggy_commit_sha": "42fa33b0a30513a3471ccf246377215dfc38356b",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "ground_truth/ucb-bar.chipyard_1731.diff",
+  "diff_sha256": "8d3bb834976bcad703619a392d863b1d92fbcaa4d2de978042ff3af3f4002bf4",
+  "fix_oids_sorted": [
+    "36c895b78ce1394d1a29d3058b46cc237ec5a8de",
+    "2e2952c8ce44238122c52c4c7c07a49bf646f3bf"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/devices/gpio/GPIO.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/devices/gpio/GPIO.scala": [
+      [
+        243,
+        248
+      ],
+      [
+        243,
+        248
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "ground_truth/ucb-bar.chipyard_1731.raw.diff"
+}

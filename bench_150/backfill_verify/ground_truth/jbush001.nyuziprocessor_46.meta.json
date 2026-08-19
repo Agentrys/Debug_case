@@ -1,0 +1,30 @@
+{
+  "case_id": "jbush001.nyuziprocessor#46",
+  "issue_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_repo": {
+    "owner": "jbush001",
+    "name": "NyuziProcessor"
+  },
+  "fix_oid": "1ef94c3d56854704f1cd87e197666cd634ab2e9e",
+  "buggy_commit_sha": "2ee1df969ca03af67bccbe84f51aafa7bc210b30",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "backfill_verify/ground_truth/jbush001.nyuziprocessor_46.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "1ef94c3d56854704f1cd87e197666cd634ab2e9e"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "tools/emulator/remote-gdb.c"
+  ],
+  "raw_diff_path": "backfill_verify/ground_truth/jbush001.nyuziprocessor_46.raw.diff"
+}

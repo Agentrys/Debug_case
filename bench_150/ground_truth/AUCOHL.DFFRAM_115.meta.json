@@ -1,0 +1,35 @@
+{
+  "case_id": "AUCOHL.DFFRAM#115",
+  "issue_repo": {
+    "owner": "AUCOHL",
+    "name": "DFFRAM"
+  },
+  "fix_repo": {
+    "owner": "donn",
+    "name": "openlane"
+  },
+  "fix_oid": "9372884e155c11f7fe212b3e60927a6b02d60da9",
+  "buggy_commit_sha": "fe93ae601cd734a546bd0722b1fa7e7c3153678d",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/AUCOHL.DFFRAM_115.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "9372884e155c11f7fe212b3e60927a6b02d60da9",
+    "bdb1b56f5898dcc1be5dc6d47894911d791b9e87"
+  ],
+  "n_fix_commits": 2,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "docker/openroad_app/Dockerfile",
+    "docker/tar/openroad_app.tar.gz",
+    "docs/source/using_or_issue.md",
+    "scripts/openroad/sta.tcl",
+    "scripts/or_issue.py"
+  ],
+  "raw_diff_path": "ground_truth/AUCOHL.DFFRAM_115.raw.diff"
+}

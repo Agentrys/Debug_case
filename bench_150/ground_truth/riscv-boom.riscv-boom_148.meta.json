@@ -1,0 +1,33 @@
+{
+  "case_id": "riscv-boom.riscv-boom#148",
+  "issue_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_repo": {
+    "owner": "riscv-boom",
+    "name": "riscv-boom"
+  },
+  "fix_oid": "26a67fdbad606fa610bb880a292e566f19eb652f",
+  "buggy_commit_sha": "f7d0e19b75b2dc7089698ab31f4f0ce14aac4906",
+  "is_merge": false,
+  "unreachable_reason": "no_design_files_after_filter",
+  "diff_path": "ground_truth/riscv-boom.riscv-boom_148.diff",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fix_oids_sorted": [
+    "26a67fdbad606fa610bb880a292e566f19eb652f"
+  ],
+  "n_fix_commits": 1,
+  "is_multi_commit": false,
+  "merge_strategy": "single",
+  "design_only": false,
+  "ground_truth_files": [],
+  "ground_truth_hunks": {},
+  "non_design_files_dropped": [
+    "common.mk",
+    "sims/verisim/Makefile",
+    "sims/vsim/Makefile",
+    "variables.mk"
+  ],
+  "raw_diff_path": "ground_truth/riscv-boom.riscv-boom_148.raw.diff"
+}

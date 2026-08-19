@@ -1,0 +1,134 @@
+{
+  "case_id": "ucb-bar.chipyard#1888",
+  "issue_repo": {
+    "owner": "ucb-bar",
+    "name": "chipyard"
+  },
+  "fix_repo": {
+    "owner": "ksungkeun84",
+    "name": "rocket-chip"
+  },
+  "fix_oid": "8b80cba83792d1cdaa12308801f2d6ec81d6cc08",
+  "buggy_commit_sha": "dbcb06afe1c76d1129cb6d264949322a34c37185",
+  "is_merge": false,
+  "unreachable_reason": null,
+  "diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_1888.diff",
+  "diff_sha256": "49b1020cd332be9bf96ed4d3e4e88b25331d0f90c1727b445034bf44212b440d",
+  "fix_oids_sorted": [
+    "8b80cba83792d1cdaa12308801f2d6ec81d6cc08",
+    "b15d40ef55ec0580078f3131e01a0fe35bee583d",
+    "54ff5559f592372fb393cacade267a8f026bcd29",
+    "b7e7202a055cbc08cb4ee676d4e7b9fed7bcb7d6",
+    "14ba271dee8dc754162852ec37ffd8aa7aa0bdfb",
+    "5a73e158185cd51e918393e5e22c58939c43d9c2"
+  ],
+  "n_fix_commits": 6,
+  "is_multi_commit": true,
+  "merge_strategy": "concat",
+  "design_only": true,
+  "ground_truth_files": [
+    "src/main/scala/tilelink/Xbar.scala"
+  ],
+  "ground_truth_hunks": {
+    "src/main/scala/tilelink/Xbar.scala": [
+      [
+        159,
+        164
+      ],
+      [
+        180,
+        185
+      ],
+      [
+        216,
+        221
+      ],
+      [
+        235,
+        240
+      ],
+      [
+        159,
+        164
+      ],
+      [
+        180,
+        185
+      ],
+      [
+        216,
+        221
+      ],
+      [
+        235,
+        240
+      ],
+      [
+        157,
+        170
+      ],
+      [
+        184,
+        197
+      ],
+      [
+        226,
+        239
+      ],
+      [
+        251,
+        264
+      ],
+      [
+        157,
+        170
+      ],
+      [
+        184,
+        197
+      ],
+      [
+        226,
+        239
+      ],
+      [
+        251,
+        264
+      ],
+      [
+        163,
+        168
+      ],
+      [
+        184,
+        189
+      ],
+      [
+        220,
+        225
+      ],
+      [
+        239,
+        244
+      ],
+      [
+        161,
+        174
+      ],
+      [
+        188,
+        201
+      ],
+      [
+        230,
+        243
+      ],
+      [
+        255,
+        268
+      ]
+    ]
+  },
+  "non_design_files_dropped": [],
+  "raw_diff_path": "backfill_verify/ground_truth/ucb-bar.chipyard_1888.raw.diff"
+}

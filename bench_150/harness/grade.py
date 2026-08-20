@@ -4,10 +4,29 @@ grade.py — LLM-judge grader for RTL-Debug-150 (v1 default).
 
 Implements the 4-component rubric in ../instructions/grading.md:
 
-  score = 0.20 * file_loc          # deterministic
-        + 0.30 * hunk_loc          # deterministic
-        + 0.40 * patch_func        # LLM judge (component 3)
-        + 0.10 * rationale         # LLM judge (component 4)
+  score = 0.10 * file_loc          # deterministic (precision/recall F1)
+        + 0.15 * hunk_loc          # deterministic (max precision/recall)
+        + 0.70 * patch_func        # LLM judge (component 3) — DOMINANT
+        + 0.05 * rationale         # LLM judge (component 4)
+
+Functional correctness (patch_func) is the primary result and carries 0.70;
+localization (file+hunk = 0.25) still gives signal for non-simulatable cases.
+Weights are configurable via env (RTLDBG_W_PATCH_FUNC, RTLDBG_W_FILE_LOC,
+RTLDBG_W_HUNK_LOC, RTLDBG_W_RATIONALE) and renormalized to sum to 1.0.
+
+Localization scoring is PRECISION-AWARE and does NOT punish minimal fixes:
+  - file_loc = F1(precision, recall) over the GT's *functional* files, i.e.
+    hitting exactly the one buggy file among a multi-file GT scores 1.0
+    (not 1/len(GT)). GT files whose diff is purely cosmetic (whitespace /
+    comments / docs / cleanup) are filtered out first — deterministically
+    for blank/comment-only diffs, otherwise via the LLM judge
+    (JUDGE_PROMPT_FUNCTIONAL_FILE). Disable filtering with
+    RTLDBG_NO_GT_FILE_FILTER=1.
+  - hunk_loc = max(precision, recall) against the (tolerance-padded) GT
+    defect region. A tight 7-line fix that lands *inside* a 25-line GT hunk
+    scores ~1.0 via precision (instead of the old IoU ~0.28), while a wide
+    fix that covers the GT region still scores via recall. Being *smaller*
+    than the GT hunk no longer costs anything.
 
 Inputs per case:
   - the bench_150.jsonl row (has ground-truth fix_commits, difficulty_reasons)
@@ -110,6 +129,29 @@ Labels:
                                    present in the code.
 """
 
+JUDGE_PROMPT_FUNCTIONAL_FILE = """\
+You are deciding whether a single file in a ground-truth bug-fix commit is
+FUNCTIONALLY part of the fix, or just incidental (formatting, whitespace,
+comment/doc edits, renames, cleanup, unrelated refactors bundled into the
+same commit).
+
+You will see:
+  - the bug report title + body,
+  - ONE file's unified diff from the fix commit.
+
+A file is "functional" if its changes alter hardware behavior / logic
+needed to fix the reported bug (RTL logic, FSM, decode, control, timing,
+parameters affecting behavior). A file is "non_functional" if its changes
+are only cosmetic: whitespace, reindentation, comments/docs, pure renames,
+lint/style cleanup, or edits unrelated to the reported defect.
+
+Return EXACTLY one JSON object, no prose:
+  {"label": "functional" | "non_functional", "reasoning": "<<= 1 sentence>"}
+
+When genuinely unsure, choose "functional" (do not discard a file that
+might carry the real fix).
+"""
+
 PATCH_FUNC_SCORE = {
     "functionally_equivalent": 1.00,
     "mostly_correct": 0.75,
@@ -123,6 +165,50 @@ RATIONALE_SCORE = {
     "adjacent_defect": 0.30,
     "unrelated_or_hallucinated": 0.00,
 }
+
+# --------------------------------------------------------------------------
+# Rubric weights — FUNCTIONAL CORRECTNESS DOMINATES.
+#
+#   score = W_FILE_LOC * file_loc      (deterministic localization)
+#         + W_HUNK_LOC * hunk_loc      (deterministic localization)
+#         + W_PATCH_FUNC * patch_func  (LLM judge — the actual fix)
+#         + W_RATIONALE * rationale    (LLM judge — root-cause reasoning)
+#
+# Being functionally correct is the primary result, so patch_func carries
+# 0.70. Localization (file+hunk = 0.25) still gives signal for cases that
+# cannot be simulated and anchors the abstention credit; rationale keeps a
+# small 0.05. Override any weight via env (RTLDBG_W_PATCH_FUNC, etc.);
+# whatever is set is renormalized to sum to 1.0 so the total stays bounded.
+# --------------------------------------------------------------------------
+def _weight_env(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        v = float(raw)
+        return v if v >= 0 else default
+    except ValueError:
+        return default
+
+
+W_FILE_LOC = _weight_env("RTLDBG_W_FILE_LOC", 0.10)
+W_HUNK_LOC = _weight_env("RTLDBG_W_HUNK_LOC", 0.15)
+W_PATCH_FUNC = _weight_env("RTLDBG_W_PATCH_FUNC", 0.70)
+W_RATIONALE = _weight_env("RTLDBG_W_RATIONALE", 0.05)
+
+# Renormalize so the four weights always sum to exactly 1.0 (guards against
+# env overrides that don't add up). Falls back to defaults if all are zero.
+_W_SUM = W_FILE_LOC + W_HUNK_LOC + W_PATCH_FUNC + W_RATIONALE
+if _W_SUM <= 0:
+    W_FILE_LOC, W_HUNK_LOC, W_PATCH_FUNC, W_RATIONALE = 0.10, 0.15, 0.70, 0.05
+    _W_SUM = 1.0
+W_FILE_LOC /= _W_SUM
+W_HUNK_LOC /= _W_SUM
+W_PATCH_FUNC /= _W_SUM
+W_RATIONALE /= _W_SUM
+
+# Localization share (used by the loc-only diagnostic in aggregate()).
+W_LOC = W_FILE_LOC + W_HUNK_LOC
 
 
 # --------------------------------------------------------------------------
@@ -165,18 +251,91 @@ def _hunks_by_file(diff_text: str) -> dict[str, list[tuple[int, int]]]:
     return dict(out)
 
 
+def _split_diff_by_file(diff_text: str) -> dict[str, str]:
+    """Split a multi-file unified diff into {b/file -> that file's diff text}.
+
+    Used to show the LLM judge one file's changes at a time when deciding
+    whether a GT-touched file is functionally relevant to the bug fix.
+    """
+    out: dict[str, str] = {}
+    cur_file: str | None = None
+    buf: list[str] = []
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            if cur_file is not None and buf:
+                out[cur_file] = "\n".join(buf)
+            cur_file = None
+            buf = [line]
+            continue
+        buf.append(line)
+        m = re.match(r"^\+\+\+ b/(.+)$", line)
+        if m:
+            cur_file = m.group(1)
+    if cur_file is not None and buf:
+        out[cur_file] = "\n".join(buf)
+    return out
+
+
+def _diff_is_trivially_nonfunctional(file_diff: str) -> bool:
+    """Cheap, deterministic pre-filter before spending an LLM call.
+
+    Returns True when the changed lines of a per-file diff contain NO
+    substantive code change — i.e. every added/removed line is blank,
+    a pure comment (// ... or /* */ or #), or the file is docs/markdown.
+    Conservative: any non-comment, non-blank code change → returns False
+    (defer to the LLM judge).
+    """
+    changed = [
+        ln[1:] for ln in file_diff.splitlines()
+        if (ln.startswith("+") or ln.startswith("-"))
+        and not ln.startswith("+++") and not ln.startswith("---")
+    ]
+    if not changed:
+        return False
+    for raw in changed:
+        s = raw.strip()
+        if not s:
+            continue  # whitespace-only change
+        if s.startswith("//") or s.startswith("#") or s.startswith("*") \
+                or s.startswith("/*") or s.startswith("*/"):
+            continue  # comment-only change
+        return False  # a real code line changed → not trivially non-functional
+    return True
+
+
 def _drop_testbench(files: list[str]) -> list[str]:
     return [f for f in files if not TESTBENCH_PATH_RE.search(f)]
 
 
 def score_file_loc(agent_files: list[str], fix_files: list[str]) -> float:
+    """File-level localization as the F1 of (precision, recall).
+
+    Rationale: a pure recall (hit / |GT|) punishes a precise, minimal fix when
+    the GT commit bundles unrelated files (formatting/cleanup). The caller is
+    expected to have already filtered GT down to *functional* files (see
+    ``_functional_gt_files``); here we additionally drop testbench paths.
+
+    - recall    = |A ∩ G| / |G|   (did the agent find the buggy files?)
+    - precision = |A ∩ G| / |A|   (did it avoid pointing at innocent files?)
+    - score     = F1 = 2·p·r / (p + r)
+
+    An agent that pinpoints exactly the one core file among a multi-file GT
+    now scores 1.0 instead of 1/len(GT). An agent that dumps many spurious
+    files is still constrained by precision.
+    """
     fix_files = _drop_testbench(fix_files)
     if not fix_files:
         return 1.0  # ground truth is all testbench (should not happen); no penalty
-    A = {f.lstrip("./") for f in agent_files}
+    A = {f.lstrip("./") for f in agent_files if f}
     G = {f.lstrip("./") for f in fix_files}
+    if not A:
+        return 0.0
     hit = len(A & G)
-    return hit / len(G)
+    if hit == 0:
+        return 0.0
+    precision = hit / len(A)
+    recall = hit / len(G)
+    return 2 * precision * recall / (precision + recall)
 
 
 def _interval_union(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -219,6 +378,29 @@ def score_hunk_loc(
     agent_loc: list[dict], fix_hunks: dict[str, list[tuple[int, int]]],
     tol: int = 3,
 ) -> float:
+    """Hunk-level localization that rewards *pinpointing* the defect region.
+
+    Rationale: the previous IoU (intersection / union) punished a tight,
+    minimal fix — a 7-line pinpoint against a 25-line GT hunk scored
+    ~7/25 ≈ 0.28 even though it lands squarely inside the defect. Pure
+    recall (|A∩G|/|G|) is just as unfair: a correct 7-line fix inside a
+    25-line GT region would still only score ~0.28 because the denominator
+    is the whole GT hunk. What we actually want to reward is "did the agent
+    point at the buggy lines, without spraying?".
+
+    We therefore score each GT file by the *max* of precision and recall:
+
+        precision_f = |A ∩ G| / |A|     # is what the agent pointed at inside GT?
+        recall_f    = |A ∩ G| / |G|     # how much of GT did the agent cover?
+        score_f     = max(precision_f, recall_f)
+
+    A minimal fix that sits entirely inside the GT region gets precision ≈
+    1.0 → full credit, so being *smaller* than GT no longer costs anything.
+    An agent that covers the whole GT but over-shoots is caught by recall.
+    A precise fix that lands squarely in the defect wins either way. The
+    per-file scores are averaged over the GT files, so missing a whole file
+    → 0 for that file.
+    """
     if not fix_hunks:
         return 0.0
     # group agent locs by file
@@ -239,8 +421,11 @@ def score_hunk_loc(
         AL = _interval_union(agent_by_file.get(f_key, []))
         GL = _interval_union([(max(1, s - tol), e + tol) for s, e in ranges_g])
         inter = _interval_len(_interval_intersect(AL, GL))
-        union = _interval_len(_interval_union(AL + GL))
-        per_file.append(inter / union if union else 0.0)
+        a_len = _interval_len(AL)
+        gt_len = _interval_len(GL)
+        precision = inter / a_len if a_len else 0.0
+        recall = inter / gt_len if gt_len else 0.0
+        per_file.append(max(precision, recall))
     return sum(per_file) / len(per_file)
 
 
@@ -351,6 +536,68 @@ def judge_rationale(judge: JudgeFn, row: dict, fix_diff: str, agent: dict) -> tu
     return RATIONALE_SCORE.get(label, 0.0), out
 
 
+def _functional_gt_files(
+    judge: JudgeFn, row: dict, fix_diff: str, fix_files: list[str],
+) -> tuple[list[str], list[str]]:
+    """Filter GT files down to the ones that FUNCTIONALLY carry the fix.
+
+    Removes files whose only changes are cosmetic (whitespace / comments /
+    docs / cleanup) so that an agent which pinpoints exactly the buggy
+    file(s) is not penalized for skipping incidental cleanup bundled into
+    the same commit.
+
+    Order of decisions per file:
+      1. testbench/CI/docs path  -> dropped (already handled downstream too,
+         but we surface it here as non-functional for reporting).
+      2. per-file diff is trivially non-functional (blank/comment-only) ->
+         dropped deterministically, no LLM call.
+      3. otherwise ask the LLM judge (JUDGE_PROMPT_FUNCTIONAL_FILE).
+
+    Safety: if filtering would remove EVERY file (e.g. judge misfires or the
+    diff cannot be split), fall back to the original list — we must never
+    end up with an empty GT (which would score every agent 1.0/0.0 wrongly).
+
+    Returns (functional_files, dropped_files) for reporting.
+    """
+    per_file_diff = _split_diff_by_file(fix_diff)
+    functional: list[str] = []
+    dropped: list[str] = []
+    for f in fix_files:
+        f_norm = f.lstrip("./")
+        if TESTBENCH_PATH_RE.search(f_norm):
+            dropped.append(f)
+            continue
+        fd = per_file_diff.get(f) or per_file_diff.get(f_norm) or ""
+        if fd and _diff_is_trivially_nonfunctional(fd):
+            dropped.append(f)
+            continue
+        if not fd:
+            # no diff text to inspect -> keep (cannot prove non-functional)
+            functional.append(f)
+            continue
+        user = (
+            f"# Bug report\n\n"
+            f"Title: {row.get('title','')}\n\n"
+            f"{(row.get('body','') or '')[:2000]}\n\n"
+            f"# File\n\n`{f}`\n\n"
+            f"# This file's diff\n\n```diff\n{fd}\n```\n"
+        )
+        try:
+            out = judge(JUDGE_PROMPT_FUNCTIONAL_FILE, user)
+            label = (out.get("label") or "").strip().lower()
+        except Exception:
+            label = "functional"  # fail open — never discard on judge error
+        if label == "non_functional":
+            dropped.append(f)
+        else:
+            functional.append(f)
+
+    if not functional:
+        # never leave GT empty; the filter must not erase the fix
+        return list(fix_files), []
+    return functional, dropped
+
+
 # --------------------------------------------------------------------------
 # Abstention handling — grading.md §5
 # --------------------------------------------------------------------------
@@ -395,6 +642,10 @@ class CaseResult:
     syntax_ok: bool | None = None         # patched file(s) parse
     syntax_tool: str | None = None        # verilator|iverilog|none
     objective_bonus_applied: bool = False  # any objective bonus fired?
+    # Non-functional GT files removed before localization scoring (so a
+    # precise/minimal fix is not penalized for skipping cosmetic cleanup
+    # bundled into the same commit). Empty when nothing was filtered.
+    gt_files_dropped: list[str] = field(default_factory=list)
 
 
 def grade_case(row: dict, agent: dict, fix_diff: str, judge: JudgeFn,
@@ -443,6 +694,21 @@ def grade_case(row: dict, agent: dict, fix_diff: str, judge: JudgeFn,
                      for f, hs in gt_hunks.items()}
     else:
         fix_hunks = _hunks_by_file(fix_diff)
+
+    # Filter GT down to FUNCTIONALLY-relevant files before localization
+    # scoring, so an agent that pinpoints exactly the buggy file(s) is not
+    # penalized for skipping cosmetic/cleanup files bundled into the same
+    # commit. Uses the LLM judge (cheap deterministic pre-filter first).
+    # Disable with RTLDBG_NO_GT_FILE_FILTER=1 for exact-reproduction runs.
+    if os.environ.get("RTLDBG_NO_GT_FILE_FILTER", "").strip() not in ("1", "true", "yes"):
+        functional_files, dropped = _functional_gt_files(judge, row, fix_diff, fix_files)
+        if dropped:
+            r.gt_files_dropped = dropped
+            fix_files = functional_files
+            drop_norm = {d.lstrip("./") for d in dropped}
+            fix_hunks = {f: hs for f, hs in fix_hunks.items()
+                         if f.lstrip("./") not in drop_norm}
+
     r.file_loc = score_file_loc(
         [l.get("file", "") for l in agent.get("localization") or []],
         fix_files,
@@ -494,7 +760,8 @@ def grade_case(row: dict, agent: dict, fix_diff: str, judge: JudgeFn,
             r.patch_func = 0.25
             r.objective_bonus_applied = True
 
-    r.score = 0.20 * r.file_loc + 0.30 * r.hunk_loc + 0.40 * r.patch_func + 0.10 * r.rationale
+    r.score = (W_FILE_LOC * r.file_loc + W_HUNK_LOC * r.hunk_loc
+               + W_PATCH_FUNC * r.patch_func + W_RATIONALE * r.rationale)
     return r
 
 
@@ -552,7 +819,7 @@ def aggregate(results: list[CaseResult]) -> dict:
                 by_type[t].append(r.score * w)
         else:
             by_type["(untyped)"].append(r.score)
-        loc_only.append(0.20 * r.file_loc + 0.30 * r.hunk_loc)
+        loc_only.append(W_FILE_LOC * r.file_loc + W_HUNK_LOC * r.hunk_loc)
         patch_only.append(r.patch_func)
         if r.abstained:
             abst_total += 1
@@ -688,6 +955,7 @@ def main() -> int:
                           "patch_func": round(r.patch_func, 3),
                           "rationale": round(r.rationale, 3),
                           "abstained": r.abstained,
+                          "gt_files_dropped": r.gt_files_dropped,
                           "sim_status": r.sim_status,
                           "sim_bonus": r.sim_bonus_applied,
                           "policy_violation": r.policy_violation}))

@@ -1,0 +1,93 @@
+{
+  "summary": {
+    "n": 1,
+    "overall": 0.23,
+    "per_difficulty": {
+      "middle": {
+        "n": 1,
+        "mean": 0.23
+      }
+    },
+    "per_bug_type": {
+      "memory/cache": {
+        "n": 1,
+        "weighted_mean": 0.115
+      },
+      "control/FSM": {
+        "n": 1,
+        "weighted_mean": 0.115
+      }
+    },
+    "localization_component_mean": 0.0,
+    "patch_functional_mean": 0.5,
+    "abstention": {
+      "count": 0,
+      "correct": 0,
+      "rate": 0.0,
+      "precision": null
+    },
+    "simulation": {
+      "run": 0,
+      "passed": 0,
+      "bonus_applied": 0,
+      "unavailable": 0
+    },
+    "judge_basis": {
+      "llm_judge": 1,
+      "simulation": 0,
+      "fallback_to_llm": 0,
+      "sim_declined": 0
+    },
+    "objective_signals": {
+      "gt_valid": 0,
+      "gt_evaluated": 0,
+      "exact_equiv_gt": 0,
+      "normalized_equiv_gt": 0,
+      "syntax_ok": 0,
+      "syntax_evaluated": 0,
+      "objective_bonus": 0
+    },
+    "policy_violations": 0
+  },
+  "per_case": [
+    {
+      "case_id": "OSCPU.NutShell#5",
+      "difficulty": "middle",
+      "bug_types": [
+        "memory/cache",
+        "control/FSM"
+      ],
+      "file_loc": 0.0,
+      "hunk_loc": 0.0,
+      "patch_func": 0.5,
+      "rationale": 0.3,
+      "score": 0.23,
+      "policy_violation": null,
+      "abstained": false,
+      "abstention_correct": null,
+      "judge_patch": {
+        "label": "partial",
+        "reasoning": "stub judge"
+      },
+      "judge_rationale": {
+        "label": "adjacent_defect",
+        "reasoning": "stub judge"
+      },
+      "sim_passed": null,
+      "sim_status": null,
+      "sim_bonus_applied": false,
+      "sim_decision": null,
+      "judge_basis": "llm_judge",
+      "gt_valid": null,
+      "exact_equiv_gt": null,
+      "normalized_equiv_gt": null,
+      "syntax_ok": null,
+      "syntax_tool": null,
+      "objective_bonus_applied": false
+    }
+  ],
+  "judge": {
+    "provider": "stub",
+    "model": "stub-model"
+  }
+}

@@ -1,0 +1,1 @@
+{"case_id": "OSCPU.NutShell#5", "status": "done", "started_at": "2026-08-20T02:09:05+00:00", "reason": null, "termination": "submitted", "tool_calls": 24, "wall_clock_s": 100.784, "policy_violation": null, "sim_status": null, "sim_decision": null, "elapsed_s": 100.821}

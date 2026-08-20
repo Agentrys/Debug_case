@@ -25,7 +25,8 @@ Concurrency:
   point of view, so threads are fine.
 
 Providers:
-  Agent  : --agent-provider / RTLDBG_AGENT_PROVIDER  (stub|openai|anthropic)
+  Agent  : --agent-provider / RTLDBG_AGENT_PROVIDER  (stub|openai|anthropic|opencode)
+           'opencode' drives our own agent runtime (agentrys run headless CLI).
   Judge  : --judge-provider / RTLDBG_JUDGE_PROVIDER  (stub|openai|anthropic)
   Models via --agent-model / --judge-model or their env vars.
 
@@ -613,7 +614,8 @@ def main() -> int:
                          "use bench_150.backfilled.jsonl for the backfilled set)")
 
     ap.add_argument("--agent-provider", default=None,
-                    help="stub|openai|anthropic (env RTLDBG_AGENT_PROVIDER)")
+                    help="stub|openai|anthropic|opencode (env RTLDBG_AGENT_PROVIDER); "
+                         "opencode = our own agent runtime via `agentrys run`")
     ap.add_argument("--agent-model", default=None)
     ap.add_argument("--judge-provider", default=None,
                     help="stub|openai|anthropic (env RTLDBG_JUDGE_PROVIDER)")

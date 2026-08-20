@@ -1,0 +1,52 @@
+{"case_id": "OSCPU.NutShell#5", "score": 0.23, "file_loc": 0.0, "hunk_loc": 0.0, "patch_func": 0.5, "rationale": 0.3, "abstained": false, "sim_status": null, "sim_bonus": false, "policy_violation": null}
+── summary ──
+{
+  "n": 1,
+  "overall": 0.23,
+  "per_difficulty": {
+    "middle": {
+      "n": 1,
+      "mean": 0.23
+    }
+  },
+  "per_bug_type": {
+    "memory/cache": {
+      "n": 1,
+      "weighted_mean": 0.115
+    },
+    "control/FSM": {
+      "n": 1,
+      "weighted_mean": 0.115
+    }
+  },
+  "localization_component_mean": 0.0,
+  "patch_functional_mean": 0.5,
+  "abstention": {
+    "count": 0,
+    "correct": 0,
+    "rate": 0.0,
+    "precision": null
+  },
+  "simulation": {
+    "run": 0,
+    "passed": 0,
+    "bonus_applied": 0,
+    "unavailable": 0
+  },
+  "judge_basis": {
+    "llm_judge": 1,
+    "simulation": 0,
+    "fallback_to_llm": 0,
+    "sim_declined": 0
+  },
+  "objective_signals": {
+    "gt_valid": 0,
+    "gt_evaluated": 0,
+    "exact_equiv_gt": 0,
+    "normalized_equiv_gt": 0,
+    "syntax_ok": 0,
+    "syntax_evaluated": 0,
+    "objective_bonus": 0
+  },
+  "policy_violations": 0
+}

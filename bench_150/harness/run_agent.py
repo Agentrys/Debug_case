@@ -30,8 +30,17 @@ For a single case_id this script:
        }
 
 Provider selection via env vars (same convention as grade.py):
-  RTLDBG_AGENT_PROVIDER = stub | openai | anthropic
+  RTLDBG_AGENT_PROVIDER = stub | openai | anthropic | opencode
   RTLDBG_AGENT_MODEL    = "gpt-4o-2024-11-20" etc.
+
+The `opencode` provider drives OUR OWN agent runtime (the `agentrys run`
+headless CLI, shared by opencode + agentrys-studio) instead of a raw SDK
+tool-loop. It explores the buggy worktree with the agent's builtin
+read/grep/list tools (source-only, leakage-safe since the worktree holds
+the buggy commit only) and its final strict-JSON answer is funnelled through
+the same Toolbox.submit_answer / schema-validation / grading path. Optional:
+  RTLDBG_OPENCODE_BIN   = path to the CLI (default: "agentrys")
+  RTLDBG_OPENCODE_AGENT = named agent to use (passed as `--agent`)
 
 The API key is read from the standard SDK env vars (never hard-code it):
   OPENAI_API_KEY        (when RTLDBG_AGENT_PROVIDER=openai)
@@ -411,10 +420,224 @@ def _anthropic_agent(system: str, user: str, tools: list[dict],
     return "budget", None
 
 
+# ---------------------------------------------------------------------------
+# opencode / agentrys-studio provider
+#
+# Unlike the openai/anthropic drivers (which run a raw SDK tool-loop against
+# the harness Toolbox), this provider drives OUR OWN agent runtime — the
+# `agentrys run` headless CLI (opencode daemon + agentrys-studio share the
+# same runtime). The agent explores the buggy worktree with its own builtin
+# read/grep/list tools; because the worktree is checked out at the buggy
+# commit ONLY (the fix commit is never materialized), this is source-only and
+# leakage-safe by construction. The final strict-JSON answer is parsed and
+# funnelled through toolbox.dispatch("submit_answer", ...) so it goes through
+# the exact same schema validation + grading path as every other provider.
+# ---------------------------------------------------------------------------
+_OPENCODE_SUBMIT_INSTRUCTIONS = (
+    "\n\n"
+    "=============================================================\n"
+    "MANDATORY OUTPUT CONTRACT — READ THIS FIRST AND LAST\n"
+    "=============================================================\n"
+    "You are running HEADLESS on a source-only RTL bug-localization task. "
+    "Never ask questions. Explore with read/grep/list ONLY. Do NOT run "
+    "simulators, do NOT edit files, and do NOT use `git log`/`git show`/git "
+    "history to hunt for the fixing commit — the fix is NOT in this checkout "
+    "and searching for it only wastes your budget. Reason about the bug from "
+    "the CURRENT source you can read.\n\n"
+    "CONVERGE FAST: aim for <= 12 tool calls. The moment you have a plausible "
+    "localization + root cause, STOP exploring and answer. A well-calibrated "
+    "partial answer (lower `confidence`) beats never answering.\n\n"
+    "YOUR FINAL ASSISTANT MESSAGE MUST BE EXACTLY ONE ```json fenced block "
+    "containing a single JSON object and nothing else — no prose before or "
+    "after it. If you emit any other final message, the run scores ZERO. "
+    "The object MUST match this schema exactly:\n"
+    "```json\n"
+    "{\n"
+    '  "root_cause": "<non-empty string>",\n'
+    '  "localization": [{"file": "<repo-relative path>", "start_line": <int >= 1>, "end_line": <int >= 1>}],\n'
+    '  "patch": "<unified diff string, may be empty string if abstaining>",\n'
+    '  "confidence": <float between 0 and 1>,\n'
+    '  "needs_waveform": <true|false>,\n'
+    '  "unresolved_questions": ["<string>", "..."]\n'
+    "}\n"
+    "```\n"
+    "`localization` must have at least one entry. Output that JSON block as "
+    "your VERY LAST message, then stop.\n"
+    "============================================================="
+)
+
+
+def _opencode_bin() -> str:
+    return os.environ.get("RTLDBG_OPENCODE_BIN") or "agentrys"
+
+
+def _opencode_agent(system: str, user: str, tools: list[dict],
+                    toolbox: tools_mod.Toolbox,
+                    wall_clock_s: int, trace: list[dict],
+                    model: str, max_iters: int = 30) -> tuple[str, Optional[dict]]:  # pragma: no cover
+    """Drive the `agentrys run` headless CLI over the buggy worktree.
+
+    The worktree (toolbox.workdir) contains only the buggy checkout, so the
+    agent's own file tools cannot reach the fix commit — leakage-safe.
+    We collect the final text message, extract a JSON answer blob, and submit
+    it through the Toolbox so grading is identical to other providers.
+    """
+    binary = _opencode_bin()
+    if shutil.which(binary) is None:
+        raise SystemExit(
+            f"RTLDBG_AGENT_PROVIDER=opencode 需要可执行的 {binary!r} CLI，但未在 PATH 找到。\n"
+            f"  请先安装/构建 opencode 运行时，或设置 RTLDBG_OPENCODE_BIN 指向可执行文件。\n"
+            f"[en] provider 'opencode' needs the {binary!r} CLI on PATH "
+            f"(or set RTLDBG_OPENCODE_BIN)."
+        )
+
+    # Hard cap on tool_use events; env override lets ops tune convergence.
+    try:
+        max_iters = int(os.environ.get("RTLDBG_OPENCODE_MAX_ITERS", max_iters))
+    except (TypeError, ValueError):
+        pass
+
+    workdir = str(toolbox.workdir)
+    prompt = f"{system}\n\n{user}{_OPENCODE_SUBMIT_INSTRUCTIONS}"
+
+    cmd = [binary, "run", "--format", "json", "--dir", workdir]
+    if model and model != "stub-model":
+        cmd += ["--model", model]
+    agent_name = os.environ.get("RTLDBG_OPENCODE_AGENT")
+    if agent_name:
+        cmd += ["--agent", agent_name]
+
+    trace.append({"provider": "opencode", "cmd": cmd, "cwd": workdir,
+                  "wall_clock_s": wall_clock_s, "max_iters": max_iters})
+
+    # Stream the JSON event line-by-line so a late/partial answer survives a
+    # timeout, and so we can early-stop the moment a valid answer JSON is seen
+    # (headless agents tend to keep exploring past a usable answer). This also
+    # lets us enforce both a wall-clock deadline and a hard tool-call cap.
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            cwd=workdir,
+        )
+    except Exception as e:
+        trace.append({"provider_error": f"{type(e).__name__}: {e}"})
+        return "error", None
+
+    assert proc.stdin is not None and proc.stdout is not None
+    try:
+        proc.stdin.write(prompt)
+        proc.stdin.close()
+    except Exception:
+        pass
+
+    deadline = time.monotonic() + max(1, int(wall_clock_s))
+    tool_uses = 0
+    text_parts: list[str] = []
+    session_error: Optional[str] = None
+    blob: Optional[dict] = None
+    stop_reason = "eof"
+
+    def _terminate() -> None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    try:
+        for line in proc.stdout:  # blocks per-line; process streams events
+            if time.monotonic() > deadline:
+                stop_reason = "deadline"
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                evt = json.loads(line)
+            except Exception:
+                continue
+            etype = evt.get("type")
+            if etype == "tool_use":
+                tool_uses += 1
+                part = evt.get("part") or {}
+                trace.append({"opencode_tool": part.get("tool")})
+                if tool_uses >= max_iters:
+                    stop_reason = "max_iters"
+                    break
+            elif etype == "text":
+                part = evt.get("part") or {}
+                txt = part.get("text")
+                if isinstance(txt, str) and txt.strip():
+                    text_parts.append(txt)
+                    cand = _try_parse_json_blob(txt)
+                    if cand is not None:
+                        blob = cand
+                        stop_reason = "answer"
+                        break
+            elif etype == "error":
+                session_error = json.dumps(evt.get("error"))[:500]
+                trace.append({"opencode_error": session_error})
+    finally:
+        _terminate()
+
+    stderr_tail = ""
+    try:
+        stderr_tail = (proc.stderr.read() or "")[-2000:] if proc.stderr else ""
+    except Exception:
+        pass
+
+    trace.append({"opencode_tool_uses": tool_uses,
+                  "opencode_text_parts": len(text_parts),
+                  "opencode_stop_reason": stop_reason})
+    if stderr_tail and (proc.returncode not in (0, None)):
+        trace.append({"opencode_stderr_tail": stderr_tail})
+
+    # If we didn't early-stop on a parsed answer, scan collected text parts
+    # (newest first) for a JSON blob.
+    if blob is None:
+        for txt in reversed(text_parts):
+            blob = _try_parse_json_blob(txt)
+            if blob is not None:
+                break
+
+    if blob is None:
+        if session_error:
+            return "error", None
+        if stop_reason == "deadline":
+            trace.append({"provider_step": "timeout"})
+            return "budget", None
+        trace.append({"provider_step": "no_answer_json"})
+        return "malformed", None
+
+# The agent used its OWN tools (opencode's read/grep/shell), not the
+    # Toolbox, so the harness's Toolbox.call_count is 0. Reflect the real work
+    # in the tool_calls stat. We call submit_answer directly (not via dispatch)
+    # because the Toolbox budget guard would spuriously reject an otherwise
+    # valid answer when tool_uses exceeded max_calls — opencode enforces its
+    # own budget via max_iters + wall_clock. Schema validation still happens in
+    # run_one() via _validate_answer, identical to every other provider.
+    toolbox.call_count = max(toolbox.call_count, tool_uses)
+    try:
+        toolbox.submit_answer(blob)
+    except Exception as e:
+        trace.append({"provider_error": f"submit_answer: {type(e).__name__}: {e}"})
+        return "malformed", None
+    return "submitted", toolbox.submitted_answer
+
+
 PROVIDERS = {
     "stub": _stub_agent,
     "openai": _openai_agent,
     "anthropic": _anthropic_agent,
+    "opencode": _opencode_agent,
 }
 
 
@@ -550,7 +773,9 @@ def main() -> int:
     ap.add_argument("--cache", type=Path, default=DEFAULT_CACHE)
     ap.add_argument("--work-root", type=Path, default=None)
     ap.add_argument("--provider", default=None,
-                    help="stub | openai | anthropic (env RTLDBG_AGENT_PROVIDER)")
+                    help="stub | openai | anthropic | opencode "
+                         "(env RTLDBG_AGENT_PROVIDER). 'opencode' drives our "
+                         "own agent runtime via the `agentrys run` headless CLI.")
     ap.add_argument("--model", default=None)
     ap.add_argument("--max-tool-calls", type=int, default=20)
     ap.add_argument("--wall-clock-s", type=int, default=300)
